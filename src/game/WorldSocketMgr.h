@@ -51,6 +51,9 @@ class WorldSocketMgr
         /// Wait untill all network threads have "joined" .
         void Wait();
 
+        std::string& GetBindAddress() { return m_addr; }
+        ACE_UINT16 GetBindPort() { return m_port; }
+
         /// Make this class singleton .
         static WorldSocketMgr* Instance();
 

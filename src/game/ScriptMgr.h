@@ -66,7 +66,7 @@ enum ScriptCommand                                          // resSource, resTar
     SCRIPT_COMMAND_CAST_SPELL               = 15,           // resSource = Unit, cast spell at resTarget = Unit
                                                             // datalong=spellid
                                                             // data_flags &  SCRIPT_FLAG_COMMAND_ADDITIONAL = cast triggered
-    SCRIPT_COMMAND_PLAY_SOUND               = 16,           // resSource = WorldObject, target=any/player, datalong (sound_id), datalong2 (bitmask: 0/1=anyone/target, 0/2=with distance dependent, so 1|2 = 3 is target with distance dependent)
+    SCRIPT_COMMAND_PLAY_SOUND               = 16,           // resSource = WorldObject, target=any/player, datalong (sound_id), datalong2 (bitmask: 0/1=target-player, 0/2=with distance dependent, 0/4=map wide, 0/8=zone wide; so 1|2 = 3 is target with distance dependent)
     SCRIPT_COMMAND_CREATE_ITEM              = 17,           // source or target must be player, datalong = item entry, datalong2 = amount
     SCRIPT_COMMAND_DESPAWN_SELF             = 18,           // resSource = Creature, datalong = despawn delay
     SCRIPT_COMMAND_PLAY_MOVIE               = 19,           // target can only be a player, datalog = movie id
@@ -397,9 +397,9 @@ class ScriptAction
         bool IsSameScript(const char* table, uint32 id, ObjectGuid sourceGuid, ObjectGuid targetGuid, ObjectGuid ownerGuid) const
         {
             return table == m_table && id == GetId() &&
-                (sourceGuid == m_sourceGuid || !sourceGuid) &&
-                (targetGuid == m_targetGuid || !targetGuid) &&
-                (ownerGuid == m_ownerGuid || !ownerGuid);
+                   (sourceGuid == m_sourceGuid || !sourceGuid) &&
+                   (targetGuid == m_targetGuid || !targetGuid) &&
+                   (ownerGuid == m_ownerGuid || !ownerGuid);
         }
 
     private:
@@ -530,10 +530,10 @@ class ScriptMgr
 
         void (MANGOS_IMPORT* m_pOnInitScriptLibrary)();
         void (MANGOS_IMPORT* m_pOnFreeScriptLibrary)();
-        const char*(MANGOS_IMPORT* m_pGetScriptLibraryVersion)();
+        const char* (MANGOS_IMPORT* m_pGetScriptLibraryVersion)();
 
-        CreatureAI*(MANGOS_IMPORT* m_pGetCreatureAI)(Creature*);
-        InstanceData*(MANGOS_IMPORT* m_pCreateInstanceData)(Map*);
+        CreatureAI* (MANGOS_IMPORT* m_pGetCreatureAI)(Creature*);
+        InstanceData* (MANGOS_IMPORT* m_pCreateInstanceData)(Map*);
 
         bool (MANGOS_IMPORT* m_pOnGossipHello)(Player*, Creature*);
         bool (MANGOS_IMPORT* m_pOnGOGossipHello)(Player*, GameObject*);

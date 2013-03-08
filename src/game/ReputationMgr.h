@@ -32,7 +32,8 @@ enum FactionFlags
     FACTION_FLAG_INVISIBLE_FORCED   = 0x08,                 // always overwrite FACTION_FLAG_VISIBLE and hide faction in rep.list, used for hide opposite team factions
     FACTION_FLAG_PEACE_FORCED       = 0x10,                 // always overwrite FACTION_FLAG_AT_WAR, used for prevent war with own team factions
     FACTION_FLAG_INACTIVE           = 0x20,                 // player controlled, state stored in characters.data ( CMSG_SET_FACTION_INACTIVE )
-    FACTION_FLAG_RIVAL              = 0x40                  // flag for the two competing outland factions
+    FACTION_FLAG_RIVAL              = 0x40,                 // flag for the two competing outland factions
+    FACTION_FLAG_TEAM_REPUTATION    = 0x80                  // faction has own reputation standing despite teaming up sub-factions; spillover from subfactions will go this instead of other subfactions
 };
 
 typedef uint32 RepListID;
@@ -57,7 +58,8 @@ class QueryResult;
 class ReputationMgr
 {
     public:                                                 // constructors and global modifiers
-        explicit ReputationMgr(Player* owner) : m_player(owner) {}
+        explicit ReputationMgr(Player* owner) : m_player(owner),
+            m_visibleFactionCount(0), m_honoredFactionCount(0), m_reveredFactionCount(0), m_exaltedFactionCount(0) {}
         ~ReputationMgr() {}
 
         void SaveToDB();
@@ -69,6 +71,11 @@ class ReputationMgr
 
         static ReputationRank ReputationToRank(int32 standing);
     public:                                                 // accessors
+        uint8 GetVisibleFactionCount() const { return m_visibleFactionCount; }
+        uint8 GetHonoredFactionCount() const { return m_honoredFactionCount; }
+        uint8 GetReveredFactionCount() const { return m_reveredFactionCount; }
+        uint8 GetExaltedFactionCount() const { return m_exaltedFactionCount; }
+
         FactionStateList const& GetStateList() const { return m_factions; }
 
         FactionState const* GetState(FactionEntry const* factionEntry) const
@@ -96,13 +103,13 @@ class ReputationMgr
         }
 
     public:                                                 // modifiers
-        bool SetReputation(FactionEntry const* factionEntry, int32 standing)
+        void SetReputation(FactionEntry const* factionEntry, int32 standing)
         {
-            return SetReputation(factionEntry, standing, false);
+            SetReputation(factionEntry, standing, false);
         }
-        bool ModifyReputation(FactionEntry const* factionEntry, int32 standing)
+        void ModifyReputation(FactionEntry const* factionEntry, int32 standing)
         {
-            return SetReputation(factionEntry, standing, true);
+            SetReputation(factionEntry, standing, true);
         }
 
         void SetVisible(FactionTemplateEntry const* factionTemplateEntry);
@@ -115,21 +122,26 @@ class ReputationMgr
     public:                                                 // senders
         void SendInitialReputations();
         void SendForceReactions();
-        void SendState(FactionState const* faction);
+        void SendState(FactionState const* faction, bool anyRankIncreased);
 
     private:                                                // internal helper functions
         void Initialize();
         uint32 GetDefaultStateFlags(const FactionEntry* factionEntry) const;
-        bool SetReputation(FactionEntry const* factionEntry, int32 standing, bool incremental);
+        void SetReputation(FactionEntry const* factionEntry, int32 standing, bool incremental);
         bool SetOneFactionReputation(FactionEntry const* factionEntry, int32 standing, bool incremental);
         void SetVisible(FactionState* faction);
         void SetAtWar(FactionState* faction, bool atWar);
         void SetInactive(FactionState* faction, bool inactive);
         void SendVisible(FactionState const* faction) const;
+        void UpdateRankCounters(ReputationRank old_rank, ReputationRank new_rank);
     private:
         Player* m_player;
         FactionStateList m_factions;
         ForcedReactions m_forcedReactions;
+        uint8 m_visibleFactionCount : 8;
+        uint8 m_honoredFactionCount : 8;
+        uint8 m_reveredFactionCount : 8;
+        uint8 m_exaltedFactionCount : 8;
 };
 
 #endif

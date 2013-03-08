@@ -76,7 +76,7 @@ bool preciseVectorData = false;
 
 //static const char * szWorkDirMaps = ".\\Maps";
 const char* szWorkDirWmo = "./Buildings";
-const char* szRawVMAPMagic = "VMAPs04";
+const char* szRawVMAPMagic = "VMAP004";
 
 // Local testing functions
 
@@ -348,11 +348,14 @@ bool fillArchiveNameVector(std::vector<std::string>& pArchiveNames)
     {
         pArchiveNames.push_back(in_path + *i + "/locale-" + *i + ".MPQ");
         pArchiveNames.push_back(in_path + *i + "/expansion-locale-" + *i + ".MPQ");
+        pArchiveNames.push_back(in_path + *i + "/lichking-locale-" + *i + ".MPQ");
     }
 
     // open expansion and common files
     pArchiveNames.push_back(input_path + string("common.MPQ"));
+    pArchiveNames.push_back(input_path + string("common-2.MPQ"));
     pArchiveNames.push_back(input_path + string("expansion.MPQ"));
+    pArchiveNames.push_back(input_path + string("lichking.MPQ"));
 
     // now, scan for the patch levels in the core dir
     printf("Scanning patch levels from data directory.\n");
@@ -494,6 +497,7 @@ int main(int argc, char** argv)
         printf("FATAL ERROR: None MPQ archive found by path '%s'. Use -d option with proper path.\n", input_path);
         return 1;
     }
+    ReadLiquidTypeTableDBC();
 
     // extract data
     if (success)

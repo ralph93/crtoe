@@ -265,6 +265,7 @@ CleanCharacterDB = 1
 #        0 = Minimum; 1 = Error; 2 = Detail; 3 = Full/Debug
 #        Default: 0
 #
+#    LogFilter_AchievementUpdates
 #    LogFilter_CreatureMoves
 #    LogFilter_TransportMoves
 #    LogFilter_PlayerMoves
@@ -275,6 +276,7 @@ CleanCharacterDB = 1
 #    LogFilter_Pathfinding
 #    LogFilter_MapsLoading
 #    LogFilter_EventAiDev
+#    LogFilter_Calendar
 #        Log filters (active by default - meaning: the filter is active, hence the log is not displayed)
 #        Default: 1 - not include with any log level
 #                 0 - include in log if log level permit
@@ -361,8 +363,9 @@ LogTime = 0
 LogFile = "Server.log"
 LogTimestamp = 0
 LogFileLevel = 0
-LogFilter_TransportMoves = 1
+LogFilter_AchievementUpdates = 1
 LogFilter_CreatureMoves = 1
+LogFilter_TransportMoves = 1
 LogFilter_VisibilityChanges = 1
 LogFilter_Weather = 1
 LogFilter_DbStrictedCheck = 1
@@ -377,6 +380,7 @@ LogFilter_PlayerStats = 0
 LogFilter_Damage = 0
 LogFilter_Combat = 0
 LogFilter_SpellCast = 0
+LogFilter_Calendar = 1
 WorldLogFile = ""
 WorldLogTimestamp = 0
 DBErrorLogFile = "DBErrors.log"
@@ -434,9 +438,9 @@ LogColors = ""
 #
 #    Expansion
 #        Allow server use content from expansion
-#                 2 - check expansion 2 maps existence, and if client support expansion 2 and account have
+#        Default: 2 - check expansion 2 maps existence, and if client support expansion 2 and account have
 #                     expansion 2 setting then allow visit expansion 2 maps, allow create new class character)
-#        Default: 1 - check expansion 1 maps existence, and if client support expansion 1 and account have
+#                 1 - check expansion 1 maps existence, and if client support expansion 1 and account have
 #                     expansion 1 setting then allow visit expansion 1 maps, allow create new races character)
 #                 0 - not check expansion maps existence, not allow visit its, not allow create new race or new class
 #                     characters, ignore account expansion setting)
@@ -508,6 +512,18 @@ LogColors = ""
 #        Default: 10 (client limitation)
 #                The number must be between 1 and 10
 #
+#    HeroicCharactersPerRealm
+#        Limit numbers of heroic class characters for account at realm
+#        Default: 1
+#                The number must be between 0 (not allowed) and 10
+#
+#    MinLevelForHeroicCharacterCreating
+#        Limit creating heroic characters only for account with another character of specific level (ignored for GM accounts)
+#                 0  - does not require any existing character
+#                 1  - require at least one other existing character
+#        Default: 55 - default requirement
+#
+#
 #    SkipCinematics
 #        Disable in-game script movie at first character's login(allows to prevent buggy intro in case of custom start location coordinates)
 #        Default: 0 - show intro for each new character
@@ -517,11 +533,15 @@ LogColors = ""
 #    MaxPlayerLevel
 #        Max level that can be reached by a player for experience (in range from 1 to 100).
 #        Change not recommended
-#        Default: 70
+#        Default: 80
 #
 #    StartPlayerLevel
 #        Staring level that have character at creating (in range 1 to MaxPlayerLevel)
 #        Default: 1
+#
+#    StartHeroicPlayerLevel
+#        Staring level that have character of heroic class at creating (in range 1 to MaxPlayerLevel)
+#        Default: 55
 #
 #    StartPlayerMoney
 #        Amount of money that new players will start with.
@@ -550,8 +570,8 @@ LogColors = ""
 #
 #    AllFlightPaths
 #        Players will start with all flight paths (Note: ALL flight paths, not only player's team)
-#        Default: 0 (true)
-#                 1 (false)
+#        Default: 0 (false)
+#                 1 (true)
 #
 #    AlwaysMaxSkillForLevel
 #        Players will automatically gain max level dependent (weapon/defense) skill when logging in, leveling up etc.
@@ -574,6 +594,10 @@ LogColors = ""
 #                 0 (no limit)
 #        Default: 10
 #
+#   BirthdayTime
+#        Set to birthday (date in unix time), By default 28th August 2005, when MaNGOS got it’s name
+#        Default: 1125180000
+#
 #    Instance.IgnoreLevel
 #        Ignore level requirement to enter instance
 #        Default: 0 (false)
@@ -590,7 +614,7 @@ LogColors = ""
 #
 #    Instance.UnloadDelay
 #        Unload the instance map from memory after some time if no players are inside.
-#        Default: 1800000 (miliseconds, i.e 30 minutes)
+#        Default: 1800000 (miliseconds 30 minutes)
 #                 0 (instance maps are kept in memory until they are reset)
 #
 #    Quests.LowLevelHideDiff
@@ -607,6 +631,14 @@ LogColors = ""
 #
 #    Quests.Daily.ResetHour
 #        Hour when daily quests reset (0..23)
+#        Default: 6
+#
+#    Quests.Weekly.ResetWeekDay
+#        Week day when daily quests reset (0..6) 0 == Sunday
+#        Default: 3
+#
+#    Quests.Weekly.ResetHour
+#        Hour in one from weekly days when weekly quests reset (0..23)
 #        Default: 6
 #
 #    Quests.IgnoreRaid
@@ -688,7 +720,12 @@ LogColors = ""
 #        Default: 10
 #
 #    SkillChance.Prospecting
-#        For prospecting skillup not possible by default, but can be allowed as custom setting
+#        For prospecting skillup impossible by default, but can be allowed as custom setting
+#        Default: 0 - no skilups
+#                 1 - skilups possible
+#
+#    SkillChance.Milling
+#        For milling skillup impossible by default, but can be allowed as custom setting
 #        Default: 0 - no skilups
 #                 1 - skilups possible
 #
@@ -701,6 +738,10 @@ LogColors = ""
 #        Persmanent pet will unsummoned at player mount
 #                 0 - unsummon only for flying mounts
 #        Default: 1 - unsummon for any mount
+#
+#    ClientCacheVersion
+#        Client cache version for client cache data reset. Use any different from DB value and not recently used for triggering reset.
+#        Default: 0 (use DB value from world DB db_version.cache_id field)
 #
 #    Event.Announce
 #        Default: 0 (false)
@@ -725,11 +766,16 @@ LogColors = ""
 #    Motd
 #        Message of the Day. Displayed at worldlogin for every user ('@' for a newline).
 #
+#    Raid.MinLevel
+#        Minimal player level to join raid groups (only affects existing raid groups, party->raid convert ignored)
+#        You can bypass this setting by typing "/script SetAllowLowLevelRaid(true/false)" command in chat
+#        Default: 10
+#
 ###################################################################################################################
 
 GameType = 1
 RealmZone = 1
-Expansion = 1
+Expansion = 2
 DBC.Locale = 255
 DeclinedNames = 0
 StrictPlayerNames = 0
@@ -741,9 +787,12 @@ MinPetName = 2
 CharactersCreatingDisabled = 0
 CharactersPerAccount = 50
 CharactersPerRealm = 10
+HeroicCharactersPerRealm = 1
+MinLevelForHeroicCharacterCreating = 55
 SkipCinematics = 0
-MaxPlayerLevel = 70
+MaxPlayerLevel = 80
 StartPlayerLevel = 1
+StartHeroicPlayerLevel = 55
 StartPlayerMoney = 0
 MaxHonorPoints = 75000
 StartHonorPoints = 0
@@ -756,6 +805,7 @@ AlwaysMaxSkillForLevel = 0
 ActivateWeather = 1
 CastUnstuck = 1
 MaxSpellCastsInChain = 10
+BirthdayTime = 1125180000
 Instance.IgnoreLevel = 0
 Instance.IgnoreRaid = 0
 Instance.ResetTimeHour = 4
@@ -763,6 +813,8 @@ Instance.UnloadDelay = 1800000
 Quests.LowLevelHideDiff = 4
 Quests.HighLevelHideDiff = 7
 Quests.Daily.ResetHour = 6
+Quests.Weekly.ResetWeekDay = 3
+Quests.Weekly.ResetHour = 6
 Quests.IgnoreRaid = 0
 Guild.EventLogRecordsCount = 100
 Guild.BankEventLogRecordsCount = 25
@@ -781,21 +833,24 @@ MaxGroupXPDistance = 74
 MailDeliveryDelay = 3600
 MassMailer.SendPerTick = 10
 SkillChance.Prospecting = 0
+SkillChance.Milling = 0
 OffhandCheckAtTalentsReset = 0
 PetUnsummonAtMount = 1
+ClientCacheVersion = 0
 Event.Announce = 0
 BeepAtStart = 1
 ShowProgressBars = 1
 WaitAtStartupError = 0
 Motd = "Welcome to the Massive Network Game Object Server."
+Raid.MinLevel = 10
 
 ###################################################################################################################
 # PLAYER INTERACTION
 #
 #    AllowTwoSide.Accounts
 #        Allow accounts to create characters in both teams in any game type.
-#        Default: 0 (Not allowed)
-#                 1 (Allowed)
+#                 0 (Not allowed)
+#        Default: 1 (Allowed)
 #
 #    AllowTwoSide.Interaction.Chat
 #    AllowTwoSide.Interaction.Channel
@@ -803,8 +858,9 @@ Motd = "Welcome to the Massive Network Game Object Server."
 #    AllowTwoSide.Interaction.Guild
 #    AllowTwoSide.Interaction.Auction
 #    AllowTwoSide.Interaction.Mail
+#    AllowTwoSide.Interaction.Calendar
 #        Allow or not common :chat(say,yell);channel(chat)group(join)guild(join);merge all auction houses for players from
-#        different teams, send mail to different team.
+#        different teams, send mail to different team, calendar(invite player from different team)
 #        Default: 0 (Not allowed)
 #                 1 (Allowed)
 #
@@ -826,13 +882,14 @@ Motd = "Welcome to the Massive Network Game Object Server."
 #
 ###################################################################################################################
 
-AllowTwoSide.Accounts = 0
+AllowTwoSide.Accounts = 1
 AllowTwoSide.Interaction.Chat = 0
 AllowTwoSide.Interaction.Channel = 0
 AllowTwoSide.Interaction.Group = 0
 AllowTwoSide.Interaction.Guild = 0
 AllowTwoSide.Interaction.Auction = 0
 AllowTwoSide.Interaction.Mail = 0
+AllowTwoSide.Interaction.Calendar = 0
 AllowTwoSide.WhoList = 0
 AllowTwoSide.AddFriend = 0
 TalentsInspecting = 1
@@ -1082,13 +1139,18 @@ Channel.SilentlyGMJoin = 0
 #                 0 (not include)
 #
 #    GM.StartLevel
-#        GM starting level (1-255)
+#        GM starting level (1-100)
 #        Default: 1
 #
 #    GM.LowerSecurity
 #        Disallow a lower security member to interact with a higher one using commands
 #        Default: 0 (disable)
 #                 1 (enable)
+#
+#    GM.AllowAchievementGain
+#        If enabled it allows gaining achievements for GM characters
+#        Default: 1 (enable)
+#                 0 (disable)
 #
 #    GM.InvisibleAura
 #        A spell that will be cast when a gm uses ".gm visible off" (Must be aura spell)
@@ -1107,6 +1169,7 @@ GM.InWhoList.Level       = 3
 GM.LogTrade              = 1
 GM.StartLevel            = 1
 GM.LowerSecurity         = 0
+GM.AllowAchievementGain  = 1
 GM.InvisibleAura         = 37800
 
 ###################################################################################################################
@@ -1169,8 +1232,9 @@ Visibility.AIRelocationNotifyDelay = 1000
 #    Rate.Mana
 #    Rate.Rage.Income
 #    Rate.Rage.Loss
+#    Rate.RunicPower.Income
+#    Rate.RunicPower.Loss
 #    Rate.Focus
-#    Rate.Loyalty
 #    Rate.Energy (Rogue)
 #        Health and power regeneration and rage income from damage.
 #        Default: 1
@@ -1212,7 +1276,7 @@ Visibility.AIRelocationNotifyDelay = 1000
 #
 #    Auction.Deposit.Min
 #        Minimum auction deposit size in copper
-#        Default: 0
+#        Default: 100 (1 silver)
 #
 #    Rate.Honor
 #        Honor gain rate
@@ -1232,7 +1296,7 @@ Visibility.AIRelocationNotifyDelay = 1000
 #
 #    Rate.Reputation.LowLevel.Kill
 #         Reputation Gain form low level kill (grey creture)
-#         Default: 0.2
+#         Default: 1
 #
 #    Rate.Reputation.LowLevel.Quest
 #         Reputation Gain rate
@@ -1264,18 +1328,18 @@ Visibility.AIRelocationNotifyDelay = 1000
 #
 #    SkillFail.Loot.Fishing
 #         For fishing instead fail provided junk loot
-#         Default: 0 (disabled)
-#                  1 (enabled)
+#         Default: 1 (enabled)
+#                  0 (disabled)
 #
 #    SkillFail.Gain.Fishing
 #         For fishing skill gain possible at fail also
-#         Default: 0 (disabled)
-#                  1 (enabled)
+#         Default: 1 (enabled)
+#                  0 (disabled)
 #
 #    SkillFail.Possible.FishingPool
 #         For fishing pool impossible fail from low skill by default
-#         Default: 1 (enabled)
-#                  0 (disabled)
+#         Default: 0 (disabled)
+#                  1 (enabled)
 #
 #    DurabilityLossChance.Damage
 #         Chance lost one from equiped items durability point at damage apply or receive.
@@ -1307,7 +1371,7 @@ Visibility.AIRelocationNotifyDelay = 1000
 #
 #    Death.Bones.World
 #    Death.Bones.BattlegroundOrArena
-#         Enabled/disabled creating bones instead corpse at resurrection (in normal zones/instacnes, or battleground/arenas)
+#         Enable/disable creating bones instead corpse at resurrection (in normal zones/instacnes, or battleground/arenas)
 #         Default: 1 (enabled)
 #                  0 (disabled)
 #
@@ -1322,8 +1386,9 @@ Rate.Health = 1
 Rate.Mana = 1
 Rate.Rage.Income = 1
 Rate.Rage.Loss = 1
+Rate.RunicPower.Income = 1
+Rate.RunicPower.Loss = 1
 Rate.Focus = 1
-Rate.Loyalty = 1
 Rate.Energy = 1
 Rate.Skill.Discovery = 1
 Rate.Drop.Item.Poor = 1
@@ -1345,13 +1410,13 @@ Rate.Damage.Fall = 1
 Rate.Auction.Time = 1
 Rate.Auction.Deposit = 1
 Rate.Auction.Cut = 1
-Auction.Deposit.Min = 0
+Auction.Deposit.Min = 100
 Rate.Honor = 1
 Rate.Mining.Amount = 1
 Rate.Mining.Next   = 1
 Rate.Talent = 1
 Rate.Reputation.Gain = 1
-Rate.Reputation.LowLevel.Kill    = 0.2
+Rate.Reputation.LowLevel.Kill    = 1
 Rate.Reputation.LowLevel.Quest   = 1
 Rate.InstanceResetTime = 1
 SkillGain.Crafting = 1
@@ -1364,9 +1429,9 @@ SkillChance.Green  = 25
 SkillChance.Grey   = 0
 SkillChance.MiningSteps   = 0
 SkillChance.SkinningSteps = 0
-SkillFail.Loot.Fishing = 0
-SkillFail.Gain.Fishing = 0
-SkillFail.Possible.FishingPool = 1
+SkillFail.Loot.Fishing = 1
+SkillFail.Gain.Fishing = 1
+SkillFail.Possible.FishingPool = 0
 DurabilityLossChance.Damage = 0.5
 DurabilityLossChance.Absorb = 0.5
 DurabilityLossChance.Parry  = 0.05
@@ -1427,7 +1492,8 @@ BattleGround.PremadeGroupWaitForMatch = 1800000
 #
 #    Arena.MaxRatingDifference
 #        The maximum rating difference between two groups in rated matches
-#        Default: 0 (disable, rating difference is discarded)
+#        Default: 150 (enable, recommended)
+#                 0 (disable, rating difference is discarded)
 #
 #    Arena.RatingDiscardTimer
 #        After the specified milliseconds has passed,
@@ -1457,8 +1523,12 @@ BattleGround.PremadeGroupWaitForMatch = 1800000
 #                 1 (enable)
 #
 #    Arena.ArenaSeason.ID
-#        Current area season id, used for selection some rated arena settings.
+#        Current area season id show in client
 #        Default: 1
+#
+#    Arena.ArenaSeasonPrevious.ID
+#        Previous area season id show in client
+#        Default: 0
 #
 #    Arena.StartRating
 #        Default Rating at team creation
@@ -1470,7 +1540,7 @@ BattleGround.PremadeGroupWaitForMatch = 1800000
 #
 ###################################################################################################################
 
-Arena.MaxRatingDifference = 0
+Arena.MaxRatingDifference = 150
 Arena.RatingDiscardTimer = 600000
 Arena.AutoDistributePoints = 0
 Arena.AutoDistributeInterval = 7
@@ -1490,6 +1560,7 @@ Arena.StartPersonalRating = -1
 #    OutdoorPvp.ZMEnabled               #Enable Zangarmarsh Outdoor pvp
 #    OutdoorPvp.TFEnabled               #Enable Terokkar Forest  Outdoor pvp
 #    OutdoorPvp.NAEnabled               #Enable Halaa (Nagrand) Outdoor pvp
+#    OutdoorPvp.GHEnabled               #Enable Venture Bay (Grizzly Hills) Outdoor pvp
 #        Default: 1 (enable)
 #                 0 (disable)
 #
@@ -1501,6 +1572,7 @@ OutdoorPvp.HPEnabled = 1
 OutdoorPvp.ZMEnabled = 1
 OutdoorPvp.TFEnabled = 1
 OutdoorPvp.NAEnabled = 1
+OutdoorPvp.GHEnabled = 1
 
 ###################################################################################################################
 # NETWORK CONFIG

@@ -527,11 +527,11 @@
 				>
 			</File>
 			<File
-				RelativePath="..\..\src\game\AddonHandler.cpp"
+				RelativePath="..\..\src\game\AchievementMgr.cpp"
 				>
 			</File>
 			<File
-				RelativePath="..\..\src\game\AddonHandler.h"
+				RelativePath="..\..\src\game\AchievementMgr.h"
 				>
 			</File>
 			<File
@@ -540,6 +540,10 @@
 			</File>
 			<File
 				RelativePath="..\..\src\game\AuctionHouseHandler.cpp"
+				>
+			</File>
+			<File
+				RelativePath="..\..\src\game\CalendarHandler.cpp"
 				>
 			</File>
 			<File
@@ -703,11 +707,11 @@
 				>
 			</File>
 			<File
-				RelativePath="..\..\src\game\MailHandler.cpp"
+				RelativePath="..\..\src\game\Mail.h"
 				>
 			</File>
 			<File
-				RelativePath="..\..\src\game\Mail.h"
+				RelativePath="..\..\src\game\MailHandler.cpp"
 				>
 			</File>
 			<File
@@ -754,7 +758,7 @@
 				RelativePath="..\..\src\game\MoveMap.h"
 				>
 			</File>
-            <File
+			<File
 				RelativePath="..\..\src\game\MoveMapSharedDefines.h"
 				>
 			</File>
@@ -863,10 +867,6 @@
 				>
 			</File>
 			<File
-				RelativePath="..\..\src\game\UnitAuraProcHandler.cpp"
-				>
-			</File>
-			<File
 				RelativePath="..\..\src\game\SpellEffects.cpp"
 				>
 			</File>
@@ -899,11 +899,19 @@
 				>
 			</File>
 			<File
+				RelativePath="..\..\src\game\UnitAuraProcHandler.cpp"
+				>
+			</File>
+			<File
 				RelativePath="..\..\src\game\UpdateData.cpp"
 				>
 			</File>
 			<File
 				RelativePath="..\..\src\game\UpdateData.h"
+				>
+			</File>
+			<File
+				RelativePath="..\..\src\game\VehicleHandler.cpp"
 				>
 			</File>
 			<File
@@ -1068,6 +1076,14 @@
 			</File>
 			<File
 				RelativePath="..\..\src\game\Bag.h"
+				>
+			</File>
+			<File
+				RelativePath="..\..\src\game\Calendar.cpp"
+				>
+			</File>
+			<File
+				RelativePath="..\..\src\game\Calendar.h"
 				>
 			</File>
 			<File
@@ -1360,6 +1376,14 @@
 			</File>
 			<File
 				RelativePath="..\..\src\game\UpdateMask.h"
+				>
+			</File>
+			<File
+				RelativePath="..\..\src\game\Vehicle.cpp"
+				>
+			</File>
+			<File
+				RelativePath="..\..\src\game\Vehicle.h"
 				>
 			</File>
 		</Filter>
@@ -1703,6 +1727,14 @@
 				>
 			</File>
 			<File
+				RelativePath="..\..\src\game\OutdoorPvP\OutdoorPvPGH.cpp"
+				>
+			</File>
+			<File
+				RelativePath="..\..\src\game\OutdoorPvP\OutdoorPvPGH.h"
+				>
+			</File>
+			<File
 				RelativePath="..\..\src\game\OutdoorPvP\OutdoorPvPHP.cpp"
 				>
 			</File>
@@ -1795,6 +1827,14 @@
 				>
 			</File>
 			<File
+				RelativePath="..\..\src\game\BattleGround\BattleGroundDS.cpp"
+				>
+			</File>
+			<File
+				RelativePath="..\..\src\game\BattleGround\BattleGroundDS.h"
+				>
+			</File>
+			<File
 				RelativePath="..\..\src\game\BattleGround\BattleGroundEY.cpp"
 				>
 			</File>
@@ -1804,6 +1844,14 @@
 			</File>
 			<File
 				RelativePath="..\..\src\game\BattleGround\BattleGroundHandler.cpp"
+				>
+			</File>
+			<File
+				RelativePath="..\..\src\game\BattleGround\BattleGroundIC.cpp"
+				>
+			</File>
+			<File
+				RelativePath="..\..\src\game\BattleGround\BattleGroundIC.h"
 				>
 			</File>
 			<File
@@ -1823,11 +1871,35 @@
 				>
 			</File>
 			<File
+				RelativePath="..\..\src\game\BattleGround\BattleGroundRB.cpp"
+				>
+			</File>
+			<File
+				RelativePath="..\..\src\game\BattleGround\BattleGroundRB.h"
+				>
+			</File>
+			<File
 				RelativePath="..\..\src\game\BattleGround\BattleGroundRL.cpp"
 				>
 			</File>
 			<File
 				RelativePath="..\..\src\game\BattleGround\BattleGroundRL.h"
+				>
+			</File>
+			<File
+				RelativePath="..\..\src\game\BattleGround\BattleGroundRV.cpp"
+				>
+			</File>
+			<File
+				RelativePath="..\..\src\game\BattleGround\BattleGroundRV.h"
+				>
+			</File>
+			<File
+				RelativePath="..\..\src\game\BattleGround\BattleGroundSA.cpp"
+				>
+			</File>
+			<File
+				RelativePath="..\..\src\game\BattleGround\BattleGroundSA.h"
 				>
 			</File>
 			<File

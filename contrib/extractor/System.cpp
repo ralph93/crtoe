@@ -172,6 +172,43 @@ void HandleArgs(int argc, char* arg[])
     }
 }
 
+uint32 ReadBuild(int locale)
+{
+    // include build info file also
+    std::string filename  = std::string("component.wow-") + langs[locale] + ".txt";
+    //printf("Read %s file... ", filename.c_str());
+
+    MPQFile m(filename.c_str());
+    if (m.isEof())
+    {
+        printf("Fatal error: Not found %s file!\n", filename.c_str());
+        exit(1);
+    }
+
+    std::string text = m.getPointer();
+    m.close();
+
+    size_t pos = text.find("version=\"");
+    size_t pos1 = pos + strlen("version=\"");
+    size_t pos2 = text.find("\"", pos1);
+    if (pos == text.npos || pos2 == text.npos || pos1 >= pos2)
+    {
+        printf("Fatal error: Invalid  %s file format!\n", filename.c_str());
+        exit(1);
+    }
+
+    std::string build_str = text.substr(pos1, pos2 - pos1);
+
+    int build = atoi(build_str.c_str());
+    if (build <= 0)
+    {
+        printf("Fatal error: Invalid  %s file format!\n", filename.c_str());
+        exit(1);
+    }
+
+    return build;
+}
+
 uint32 ReadMapDBC()
 {
     printf("Read Map.dbc file... ");
@@ -245,7 +282,7 @@ void ReadLiquidTypeTableDBC()
 
 // Map file format data
 static char const* MAP_MAGIC         = "MAPS";
-static char const* MAP_VERSION_MAGIC = "s1.3";
+static char const* MAP_VERSION_MAGIC = "v1.3";
 static char const* MAP_AREA_MAGIC    = "AREA";
 static char const* MAP_HEIGHT_MAGIC  = "MHGT";
 static char const* MAP_LIQUID_MAGIC  = "MLIQ";
@@ -254,6 +291,7 @@ struct map_fileheader
 {
     uint32 mapMagic;
     uint32 versionMagic;
+    uint32 buildMagic;
     uint32 areaMapOffset;
     uint32 areaMapSize;
     uint32 heightMapOffset;
@@ -286,14 +324,13 @@ struct map_heightHeader
 };
 
 #define MAP_LIQUID_TYPE_NO_WATER    0x00
-#define MAP_LIQUID_TYPE_MAGMA       0x01
+#define MAP_LIQUID_TYPE_WATER       0x01
 #define MAP_LIQUID_TYPE_OCEAN       0x02
-#define MAP_LIQUID_TYPE_SLIME       0x04
-#define MAP_LIQUID_TYPE_WATER       0x08
+#define MAP_LIQUID_TYPE_MAGMA       0x04
+#define MAP_LIQUID_TYPE_SLIME       0x08
 
 #define MAP_LIQUID_TYPE_DARK_WATER  0x10
 #define MAP_LIQUID_TYPE_WMO_WATER   0x20
-
 
 #define MAP_LIQUID_NO_TYPE    0x0001
 #define MAP_LIQUID_NO_HEIGHT  0x0002
@@ -334,7 +371,7 @@ uint8 liquid_flags[ADT_CELLS_PER_GRID][ADT_CELLS_PER_GRID];
 bool  liquid_show[ADT_GRID_SIZE][ADT_GRID_SIZE];
 float liquid_height[ADT_GRID_SIZE + 1][ADT_GRID_SIZE + 1];
 
-bool ConvertADT(char* filename, char* filename2, int cell_y, int cell_x)
+bool ConvertADT(char* filename, char* filename2, int cell_y, int cell_x, uint32 build)
 {
     ADT_file adt;
 
@@ -356,6 +393,7 @@ bool ConvertADT(char* filename, char* filename2, int cell_y, int cell_x)
     map_fileheader map;
     map.mapMagic = *(uint32 const*)MAP_MAGIC;
     map.versionMagic = *(uint32 const*)MAP_VERSION_MAGIC;
+    map.buildMagic = build;
 
     // Get area flags data
     for (int i = 0; i < ADT_CELLS_PER_GRID; i++)
@@ -875,7 +913,7 @@ bool ConvertADT(char* filename, char* filename2, int cell_y, int cell_x)
     return true;
 }
 
-void ExtractMapsFromMpq()
+void ExtractMapsFromMpq(uint32 build)
 {
     char mpq_filename[1024];
     char output_filename[1024];
@@ -913,7 +951,7 @@ void ExtractMapsFromMpq()
                     continue;
                 sprintf(mpq_filename, "World\\Maps\\%s\\%s_%u_%u.adt", map_ids[z].name, map_ids[z].name, x, y);
                 sprintf(output_filename, "%s/maps/%03u%02u%02u.map", output_path, map_ids[z].id, y, x);
-                ConvertADT(mpq_filename, output_filename, y, x);
+                ConvertADT(mpq_filename, output_filename, y, x, build);
             }
             // draw progress bar
             printf("Processing........................%d%%\r", (100 * (y + 1)) / WDT_MAP_SIZE);
@@ -963,6 +1001,14 @@ void ExtractDBCFiles(int locale, bool basicLocale)
         path += langs[locale];
         path += "/";
         CreateDir(path);
+    }
+
+    // extract Build info file
+    {
+        string mpq_name = std::string("component.wow-") + langs[locale] + ".txt";
+        string filename = path + mpq_name;
+
+        ExtractFile(mpq_name.c_str(), filename);
     }
 
     // extract DBCs
@@ -1023,6 +1069,7 @@ int main(int argc, char* arg[])
     HandleArgs(argc, arg);
 
     int FirstLocale = -1;
+    uint32 build = 0;
 
     for (int i = 0; i < LANG_COUNT; i++)
     {
@@ -1038,6 +1085,8 @@ int main(int argc, char* arg[])
             if ((CONF_extract & EXTRACT_DBC) == 0)
             {
                 FirstLocale = i;
+                build = ReadBuild(FirstLocale);
+                printf("Detected client build: %u\n", build);
                 break;
             }
 
@@ -1045,6 +1094,8 @@ int main(int argc, char* arg[])
             if (FirstLocale < 0)
             {
                 FirstLocale = i;
+                build = ReadBuild(FirstLocale);
+                printf("Detected client build: %u\n", build);
                 ExtractDBCFiles(i, true);
             }
             else
@@ -1070,7 +1121,7 @@ int main(int argc, char* arg[])
         LoadCommonMPQFiles();
 
         // Extract maps
-        ExtractMapsFromMpq();
+        ExtractMapsFromMpq(build);
 
         // Close MPQs
         CloseMPQFiles();

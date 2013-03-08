@@ -72,6 +72,9 @@ void BattleGroundEY::StartingEventOpenDoors()
 {
     // eye-doors are despawned, not opened
     SpawnEvent(BG_EVENT_DOOR, 0, false);
+
+    // Players that join battleground after start are not eligible to get achievement.
+    StartTimedAchievement(ACHIEVEMENT_CRITERIA_TYPE_WIN_BG, EY_EVENT_START_BATTLE);
 }
 
 void BattleGroundEY::AddPoints(Team team, uint32 points)
@@ -559,7 +562,6 @@ WorldSafeLocsEntry const* BattleGroundEY::GetClosestGraveYard(Player* player)
     float plr_y = player->GetPositionY();
     float plr_z = player->GetPositionZ();
 
-
     distance = (entry->x - plr_x) * (entry->x - plr_x) + (entry->y - plr_y) * (entry->y - plr_y) + (entry->z - plr_z) * (entry->z - plr_z);
     nearestDistance = distance;
 
@@ -583,4 +585,13 @@ WorldSafeLocsEntry const* BattleGroundEY::GetClosestGraveYard(Player* player)
     }
 
     return nearestEntry;
+}
+
+bool BattleGroundEY::IsAllNodesControlledByTeam(Team team) const
+{
+    for (uint8 i = 0; i < EY_NODES_MAX; ++i)
+        if (m_towerOwner[i] != team)
+            return false;
+
+    return true;
 }

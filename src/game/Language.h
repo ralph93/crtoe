@@ -174,8 +174,8 @@ enum MangosStrings
     LANG_SOUND_NOT_EXIST                = 170,
     LANG_CANT_TELEPORT_SELF             = 171,
     LANG_CONSOLE_COMMAND                = 172,
-    //                                    173 used in master branch
-    //                                    174 used in master branch
+    LANG_YOU_CHANGE_RUNIC_POWER         = 173,
+    LANG_YOURS_RUNIC_POWER_CHANGED      = 174,
     LANG_LIQUID_STATUS                  = 175,
     // Room for more level 1              176-199 not used
 
@@ -335,8 +335,8 @@ enum MangosStrings
     LANG_CREATURE_NOT_FOLLOW_YOU_NOW    = 342,
     LANG_CREATURE_NON_TAMEABLE          = 343,
     LANG_YOU_ALREADY_HAVE_PET           = 344,
-    //                                    345 used in master branch
-    //                                    346 used in master branch
+    LANG_CUSTOMIZE_PLAYER               = 345,
+    LANG_CUSTOMIZE_PLAYER_GUID          = 346,
     LANG_COMMAND_GOTAXINODENOTFOUND     = 347,
     LANG_GAMEOBJECT_HAVE_INVALID_DATA   = 348,
     LANG_TITLE_LIST_CHAT                = 349,
@@ -359,10 +359,10 @@ enum MangosStrings
     LANG_TRIGGER_EXPLORE_QUEST          = 366,
     LANG_TRIGGER_REQ_LEVEL              = 367,
     LANG_TRIGGER_REQ_ITEMS              = 368,
-    LANG_TRIGGER_REQ_QUEST              = 369,
+    LANG_TRIGGER_REQ_QUEST_NORMAL       = 369,
     LANG_TRIGGER_REQ_KEYS_HEROIC        = 370,
-    //                                    371 used in master branch
-    //                                    372 used in master branch
+    LANG_TRIGGER_REQ_QUEST_HEROIC       = 371,
+    LANG_COMMAND_ACHIEVEMENT_NOTFOUND   = 372,
     LANG_COMMAND_TICKETRESPONSE         = 373,
     LANG_COMMAND_TICKETCOUNT_CONSOLE    = 374,
     LANG_COMMAND_TICKETNOTEXIST_NAME    = 375,
@@ -801,14 +801,14 @@ enum MangosStrings
     LANG_NEED_CHARACTER_NAME            = 807,
     LANG_PLAYER_NOT_EXIST_OR_OFFLINE    = 808,
     LANG_ACCOUNT_FOR_PLAYER_NOT_FOUND   = 809,
-    //                                    810 used in master branch
+    LANG_ACHIEVEMENT_EARNED             = 810,
     LANG_GUILD_MASTER                   = 811,
     LANG_GUILD_OFFICER                  = 812,
     LANG_GUILD_VETERAN                  = 813,
     LANG_GUILD_MEMBER                   = 814,
     LANG_GUILD_INITIATE                 = 815,
     LANG_FAIL_ENTER_SPECTRAL_REALM      = 816,
-    //                                    817 used in master branch
+    LANG_NO_FLY_ZONE                    = 817,
     LANG_TELEREQ_QUEST_BLACK_MORASS     = 818,
     // Room for in-game strings           819-999 not used
 
@@ -869,11 +869,11 @@ enum MangosStrings
     LANG_YOU_CHANGE_GENDER              = 1120,
     LANG_YOUR_GENDER_CHANGED            = 1121,
     LANG_SKILL_VALUES                   = 1122,
-    //                                    1123 used in master branch
-    //                                    1124 used in master branch
-    //                                    1125 used in master branch
-    //                                    1126 used in master branch
-    //                                    1127 used in master branch
+    LANG_NO_PET_FOUND                   = 1123,
+    LANG_WRONG_PET_TYPE                 = 1124,
+    LANG_COMMAND_LEARN_PET_TALENTS      = 1125,
+    LANG_RESET_PET_TALENTS              = 1126,
+    LANG_RESET_PET_TALENTS_ONLINE       = 1127,
     LANG_TAXINODE_ENTRY_LIST_CHAT       = 1128,
     LANG_TAXINODE_ENTRY_LIST_CONSOLE    = 1129,
     LANG_EVENT_STARTED                  = 1130,
@@ -907,10 +907,10 @@ enum MangosStrings
     LANG_CHANGE_HEX_FIELD               = 1158,
     LANG_CHANGE_FLOAT                   = 1159,             // log
     LANG_CHANGE_FLOAT_FIELD             = 1160,
-    //                                    1161 used in master branch
-    //                                    1162 used in master branch
-    //                                    1163 used in master branch
-    //                                    1164 used in master branch
+    LANG_COMMAND_ACHIEVEMENT_CRITERIA   = 1161,
+    LANG_COUNTER                        = 1162,
+    LANG_ACHIEVEMENT_NOT_EXIST          = 1163,
+    LANG_ACHIEVEMENT_CRITERIA_NOT_EXIST = 1164,
     LANG_SPELL_NO_HAVE_AURAS            = 1165,
     LANG_SCRIPTS_NOT_FOUND              = 1166,
     LANG_SCRIPTS_WRONG_API              = 1167,
@@ -939,14 +939,14 @@ enum MangosStrings
     LANG_AHBOT_ITEMS_AMOUNT             = 1190,
     LANG_AHBOT_ITEMS_RATIO              = 1191,
     LANG_MOVEGENS_EFFECT                = 1192,
-    //                                    1193 used in master branch
+    LANG_GEARSCORE                      = 1193,
     LANG_COMMAND_GO_STATUS              = 1194,
     LANG_COMMAND_GO_STATUS_DOOR         = 1195,
     // Room for more level 3              1196-1199 not used
 
     // Debug commands
     LANG_CINEMATIC_NOT_EXIST            = 1200,
-    //                                    1201 used in master branch
+    LANG_MOVIE_NOT_EXIST                = 1201,
     LANG_SPELLCOEFS                     = 1202,
     LANG_DIRECT_HEAL                    = 1203,
     LANG_DIRECT_DAMAGE                  = 1204,

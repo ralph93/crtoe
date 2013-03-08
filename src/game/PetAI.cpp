@@ -227,10 +227,6 @@ void PetAI::UpdateAI(const uint32 diff)
                     int32 cooldown = GetSpellRecoveryTime(spellInfo);
                     if (cooldown >= 0 && duration >= 0 && cooldown > duration)
                         continue;
-
-                    // not allow instant kill autocasts as full health cost
-                    if (IsSpellHaveEffect(spellInfo, SPELL_EFFECT_INSTAKILL))
-                        continue;
                 }
             }
             else
@@ -294,8 +290,6 @@ void PetAI::UpdateAI(const uint32 diff)
             }
 
             m_creature->AddCreatureSpellCooldown(spell->m_spellInfo->Id);
-            if (m_creature->IsPet())
-                ((Pet*)m_creature)->CheckLearning(spell->m_spellInfo->Id);
 
             spell->prepare(&targets);
         }

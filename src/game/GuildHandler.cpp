@@ -27,6 +27,7 @@
 #include "GuildMgr.h"
 #include "GossipDef.h"
 #include "SocialMgr.h"
+#include "Calendar.h"
 
 void WorldSession::HandleGuildQueryOpcode(WorldPacket& recvPacket)
 {
@@ -233,11 +234,9 @@ void WorldSession::HandleGuildInfoOpcode(WorldPacket& /*recvPacket*/)
         return;
     }
 
-    WorldPacket data(SMSG_GUILD_INFO, (5 * 4 + guild->GetName().size() + 1));
+    WorldPacket data(SMSG_GUILD_INFO, (guild->GetName().size() + 4 + 4 + 4));
     data << guild->GetName();
-    data << uint32(guild->GetCreatedDay());
-    data << uint32(guild->GetCreatedMonth());
-    data << uint32(guild->GetCreatedYear());
+    data << uint32(secsToTimeBitFields(guild->GetCreatedDate())); // 3.x (prev. day + month + year)
     data << uint32(guild->GetMemberSize());                 // amount of chars
     data << uint32(guild->GetAccountsNumber());             // amount of accounts
     SendPacket(&data);
@@ -381,6 +380,8 @@ void WorldSession::HandleGuildLeaveOpcode(WorldPacket& /*recvPacket*/)
         SendGuildCommandResult(GUILD_QUIT_S, "", ERR_GUILD_LEADER_LEAVE);
         return;
     }
+
+    sCalendarMgr.RemoveGuildCalendar(_player->GetObjectGuid(), guild->GetId());
 
     if (_player->GetObjectGuid() == guild->GetLeaderGuid())
     {
@@ -780,7 +781,7 @@ void WorldSession::HandleGuildEventLogQueryOpcode(WorldPacket& /* recvPacket */)
 
 /******  GUILD BANK  *******/
 
-void WorldSession::HandleGuildBankMoneyWithdrawn(WorldPacket & /* recv_data */)
+void WorldSession::HandleGuildBankMoneyWithdrawn(WorldPacket& /* recv_data */)
 {
     DEBUG_LOG("WORLD: Received (MSG_GUILD_BANK_MONEY_WITHDRAWN)");
 
@@ -987,8 +988,8 @@ void WorldSession::HandleGuildBankSwapItems(WorldPacket& recv_data)
     uint8 BankTabDst, BankTabSlotDst, unk2;
     uint8 ToChar = 1;
     uint32 ItemEntry, unk1;
-    uint8 AutoStoreCount = 0;
-    uint8 SplitedAmount = 0;
+    uint32 AutoStoreCount = 0;
+    uint32 SplitedAmount = 0;
 
     recv_data >> goGuid >> BankToBank;
 
@@ -1036,7 +1037,7 @@ void WorldSession::HandleGuildBankSwapItems(WorldPacket& recv_data)
         {
             recv_data >> AutoStoreCount;
             recv_data.read_skip<uint8>();                   // ToChar (?), always and expected to be 1 (autostore only triggered in guild->ToChar)
-            recv_data.read_skip<uint8>();                   // unknown, always 0
+            recv_data.read_skip<uint32>();                  // unknown, always 0
         }
         else
         {

@@ -32,7 +32,7 @@
 #include "Item.h"
 #include "Player.h"
 #include "World.h"
-#include "BattleGround/BattleGroundMgr.h"
+#include "Calendar.h"
 
 /**
  * Creates a new MailSender object.
@@ -50,11 +50,6 @@ MailSender::MailSender(Object* sender, MailStationery stationery) : m_stationery
             break;
         case TYPEID_GAMEOBJECT:
             m_messageType = MAIL_GAMEOBJECT;
-            m_senderId = sender->GetEntry();
-            break;
-        case TYPEID_ITEM:
-        case TYPEID_CONTAINER:
-            m_messageType = MAIL_ITEM;
             m_senderId = sender->GetEntry();
             break;
         case TYPEID_PLAYER:
@@ -79,6 +74,18 @@ MailSender::MailSender(AuctionEntry* sender)
 }
 
 /**
+ * Creates a new MailSender object from an event.
+ *
+ * @param sender the calendar event from which this mail is generated.
+ *
+ * Note : Actualy it seem no info from event is required. We need more research to correctly initialise m_senderId
+ */
+MailSender::MailSender(CalendarEvent const* sender)
+    : m_messageType(MAIL_CALENDAR), m_senderId(0), m_stationery(MAIL_STATIONERY_DEFAULT)
+{
+}
+
+/**
  * Creates a new MailReceiver object.
  *
  * @param receiver The player receiving the mail.
@@ -95,28 +102,6 @@ MailReceiver::MailReceiver(Player* receiver) : m_receiver(receiver), m_receiver_
 MailReceiver::MailReceiver(Player* receiver, ObjectGuid receiver_guid) : m_receiver(receiver), m_receiver_guid(receiver_guid)
 {
     MANGOS_ASSERT(!receiver || receiver->GetObjectGuid() == receiver_guid);
-}
-
-/**
- * Creates a new MailDraft object using subject and contect texts.
- *
- * @param subject The subject of the mail.
- * @param itemText The text of the body of the mail.
- */
-MailDraft::MailDraft(std::string subject, std::string text) : m_mailTemplateId(0), m_mailTemplateItemsNeed(false), m_subject(subject),
-    m_bodyId(!text.empty() ? sObjectMgr.CreateItemText(text) : 0), m_money(0), m_COD(0)
-{
-
-}
-
-MailDraft& MailDraft::SetSubjectAndBody(std::string subject, std::string text)
-{
-    m_subject = subject;
-
-    MANGOS_ASSERT(!m_bodyId);
-    m_bodyId = !text.empty() ? sObjectMgr.CreateItemText(text) : 0;
-
-    return *this;
 }
 
 /**
@@ -190,14 +175,7 @@ void MailDraft::CloneFrom(MailDraft const& draft)
     m_mailTemplateItemsNeed = draft.m_mailTemplateItemsNeed;
 
     m_subject = draft.GetSubject();
-
-    MANGOS_ASSERT(!m_bodyId);
-    if (uint32 bodyId = draft.GetBodyId())
-    {
-        std::string text = sObjectMgr.GetItemText(bodyId);
-        m_bodyId = sObjectMgr.CreateItemText(text);
-    }
-
+    m_body = draft.GetBody();
     m_money = draft.GetMoney();
     m_COD = draft.GetCOD();
 
@@ -294,14 +272,10 @@ void MailDraft::SendMailTo(MailReceiver const& receiver, MailSender const& sende
 
     time_t deliver_time = time(NULL) + deliver_delay;
 
-    // expire time if COD 3 days, if no COD 30 days, if auction sale pending 1 hour
     uint32 expire_delay;
     // auction mail without any items and money (auction sale note) pending 1 hour
     if (sender.GetMailMessageType() == MAIL_AUCTION && m_items.empty() && !m_money)
         expire_delay = HOUR;
-    // mail from battlemaster (rewardmarks) should last only one day
-    else if (sender.GetMailMessageType() == MAIL_CREATURE && sBattleGroundMgr.GetBattleMasterBG(sender.GetSenderId()) != BATTLEGROUND_TYPE_NONE)
-        expire_delay = DAY;
     // default case: expire time if COD 3 days, if no COD 30 days
     else
         expire_delay = (m_COD > 0) ? 3 * DAY : 30 * DAY;
@@ -310,12 +284,15 @@ void MailDraft::SendMailTo(MailReceiver const& receiver, MailSender const& sende
 
     // Add to DB
     std::string safe_subject = GetSubject();
+    CharacterDatabase.escape_string(safe_subject);
+
+    std::string safe_body = GetBody();
+    CharacterDatabase.escape_string(safe_body);
 
     CharacterDatabase.BeginTransaction();
-    CharacterDatabase.escape_string(safe_subject);
-    CharacterDatabase.PExecute("INSERT INTO mail (id,messageType,stationery,mailTemplateId,sender,receiver,subject,itemTextId,has_items,expire_time,deliver_time,money,cod,checked) "
-                               "VALUES ('%u', '%u', '%u', '%u', '%u', '%u', '%s', '%u', '%u', '" UI64FMTD "','" UI64FMTD "', '%u', '%u', '%u')",
-                               mailId, sender.GetMailMessageType(), sender.GetStationery(), GetMailTemplateId(), sender.GetSenderId(), receiver.GetPlayerGuid().GetCounter(), safe_subject.c_str(), GetBodyId(), (has_items ? 1 : 0), (uint64)expire_time, (uint64)deliver_time, m_money, m_COD, checked);
+    CharacterDatabase.PExecute("INSERT INTO mail (id,messageType,stationery,mailTemplateId,sender,receiver,subject,body,has_items,expire_time,deliver_time,money,cod,checked) "
+                               "VALUES ('%u', '%u', '%u', '%u', '%u', '%u', '%s', '%s', '%u', '" UI64FMTD "','" UI64FMTD "', '%u', '%u', '%u')",
+                               mailId, sender.GetMailMessageType(), sender.GetStationery(), GetMailTemplateId(), sender.GetSenderId(), receiver.GetPlayerGuid().GetCounter(), safe_subject.c_str(), safe_body.c_str(), (has_items ? 1 : 0), (uint64)expire_time, (uint64)deliver_time, m_money, m_COD, checked);
 
     for (MailItemMap::const_iterator mailItemIter = m_items.begin(); mailItemIter != m_items.end(); ++mailItemIter)
     {
@@ -334,7 +311,7 @@ void MailDraft::SendMailTo(MailReceiver const& receiver, MailSender const& sende
         m->messageID = mailId;
         m->mailTemplateId = GetMailTemplateId();
         m->subject = GetSubject();
-        m->itemTextId = GetBodyId();
+        m->body = GetBody();
         m->money = GetMoney();
         m->COD = GetCOD();
 

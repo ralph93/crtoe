@@ -32,7 +32,6 @@ struct Modifier
 
 class Unit;
 struct SpellEntry;
-struct SpellModifier;
 struct ProcTriggerSpell;
 
 // forward decl
@@ -52,6 +51,8 @@ class MANGOS_DLL_SPEC SpellAuraHolder
         void ApplyAuraModifiers(bool apply, bool real = false);
         void _AddSpellAuraHolder();
         void _RemoveSpellAuraHolder();
+        void BuildUpdatePacket(WorldPacket& data) const;
+        void SendAuraUpdate(bool remove) const;
         void HandleSpellSpecificBoosts(bool apply);
         void CleanupTriggeredSpells();
 
@@ -116,16 +117,19 @@ class MANGOS_DLL_SPEC SpellAuraHolder
 
         uint8 GetAuraSlot() const { return m_auraSlot; }
         void SetAuraSlot(uint8 slot) { m_auraSlot = slot; }
+        uint8 GetAuraFlags() const { return m_auraFlags; }
+        void SetAuraFlags(uint8 flags) { m_auraFlags = flags; }
         uint8 GetAuraLevel() const { return m_auraLevel; }
         void SetAuraLevel(uint8 level) { m_auraLevel = level; }
         uint32 GetAuraCharges() const { return m_procCharges; }
-        void SetAuraCharges(uint32 charges)
+        void SetAuraCharges(uint32 charges, bool update = true)
         {
             if (m_procCharges == charges)
                 return;
             m_procCharges = charges;
 
-            UpdateAuraApplication();
+            if (update)
+                SendAuraUpdate(false);
         }
         bool DropAuraCharge()                               // return true if last charge dropped
         {
@@ -133,12 +137,13 @@ class MANGOS_DLL_SPEC SpellAuraHolder
                 return false;
 
             --m_procCharges;
-            UpdateAuraApplication();
+            SendAuraUpdate(false);
             return m_procCharges == 0;
         }
 
         time_t GetAuraApplyTime() const { return m_applyTime; }
 
+        void SetVisibleAura(bool remove) { m_target->SetVisibleAura(m_auraSlot, remove ? 0 : GetId()); }
         void SetRemoveMode(AuraRemoveMode mode) { m_removeMode = mode; }
         void SetLoadedState(ObjectGuid const& casterGUID, ObjectGuid const& itemGUID, uint32 stackAmount, uint32 charges, int32 maxduration, int32 duration)
         {
@@ -153,17 +158,8 @@ class MANGOS_DLL_SPEC SpellAuraHolder
         bool HasMechanic(uint32 mechanic) const;
         bool HasMechanicMask(uint32 mechanicMask) const;
 
-        void UpdateAuraDuration();
-        void SendAuraDurationForCaster(Player* caster);
-
-        void SetAura(uint32 slot, bool remove) { m_target->SetUInt32Value(UNIT_FIELD_AURA + slot, remove ? 0 : GetId()); }
-        void SetAuraFlag(uint32 slot, bool add);
-        void SetAuraLevel(uint32 slot, uint32 level);
-
         ~SpellAuraHolder();
     private:
-        void UpdateAuraApplication();                       // called at charges or stack changes
-
         SpellEntry const* m_spellProto;
 
         Unit* m_target;
@@ -172,6 +168,7 @@ class MANGOS_DLL_SPEC SpellAuraHolder
         time_t m_applyTime;
 
         uint8 m_auraSlot;                                   // Aura slot on unit (for show in client)
+        uint8 m_auraFlags;                                  // Aura info flag (for send data to client)
         uint8 m_auraLevel;                                  // Aura level (store caster level for correct show level dep amount)
         uint32 m_procCharges;                               // Aura charges (0 for infinite)
         uint32 m_stackAmount;                               // Aura stack amount
@@ -261,6 +258,7 @@ class MANGOS_DLL_SPEC Aura
         void HandlePeriodicEnergize(bool Apply, bool Real);
         void HandleAuraModResistanceExclusive(bool Apply, bool Real);
         void HandleAuraSafeFall(bool Apply, bool Real);
+        void HandleAuraModPetTalentsPoints(bool Apply, bool Real);
         void HandleModStealth(bool Apply, bool Real);
         void HandleInvisibility(bool Apply, bool Real);
         void HandleInvisibilityDetect(bool Apply, bool Real);
@@ -271,6 +269,7 @@ class MANGOS_DLL_SPEC Aura
         void HandleAuraModSilence(bool Apply, bool Real);
         void HandleAuraModStat(bool Apply, bool Real);
         void HandleDetectAmore(bool Apply, bool Real);
+        void HandleAuraFakeInebriation(bool Apply, bool Real);
         void HandleAuraModIncreaseSpeed(bool Apply, bool Real);
         void HandleAuraModIncreaseMountedSpeed(bool Apply, bool Real);
         void HandleAuraModIncreaseFlightSpeed(bool Apply, bool Real);
@@ -305,6 +304,7 @@ class MANGOS_DLL_SPEC Aura
         void HandleModPowerRegen(bool Apply, bool Real);
         void HandleModPowerRegenPCT(bool Apply, bool Real);
         void HandleChannelDeathItem(bool Apply, bool Real);
+        void HandleDamagePercentTaken(bool Apply, bool Real);
         void HandlePeriodicDamagePCT(bool Apply, bool Real);
         void HandleAuraModAttackPower(bool Apply, bool Real);
         void HandleAuraTransform(bool Apply, bool Real);
@@ -335,10 +335,13 @@ class MANGOS_DLL_SPEC Aura
         void HandleAuraGhost(bool Apply, bool Real);
         void HandleAuraAllowFlight(bool Apply, bool Real);
         void HandleModRating(bool apply, bool Real);
+        void HandleModRatingFromStat(bool apply, bool Real);
         void HandleModTargetResistance(bool apply, bool Real);
         void HandleAuraModAttackPowerPercent(bool apply, bool Real);
         void HandleAuraModRangedAttackPowerPercent(bool apply, bool Real);
         void HandleAuraModRangedAttackPowerOfStatPercent(bool apply, bool Real);
+        void HandleAuraModAttackPowerOfStatPercent(bool apply, bool Real);
+        void HandleAuraModAttackPowerOfArmor(bool apply, bool Real);
         void HandleSpiritOfRedemption(bool apply, bool Real);
         void HandleModManaRegen(bool apply, bool Real);
         void HandleComprehendLanguage(bool apply, bool Real);
@@ -348,6 +351,7 @@ class MANGOS_DLL_SPEC Aura
         void HandleModSpellDamagePercentFromStat(bool apply, bool Real);
         void HandleModSpellHealingPercentFromStat(bool apply, bool Real);
         void HandleAuraModDispelResist(bool apply, bool Real);
+        void HandleAuraControlVehicle(bool apply, bool Real);
         void HandleModSpellDamagePercentFromAttackPower(bool apply, bool Real);
         void HandleModSpellHealingPercentFromAttackPower(bool apply, bool Real);
         void HandleAuraModPacifyAndSilence(bool Apply, bool Real);
@@ -361,6 +365,16 @@ class MANGOS_DLL_SPEC Aura
         void HandleManaShield(bool apply, bool Real);
         void HandleArenaPreparation(bool apply, bool Real);
         void HandleAuraMirrorImage(bool apply, bool Real);
+        void HandleAuraConvertRune(bool apply, bool Real);
+        void HandleAuraIncreaseBaseHealthPercent(bool Apply, bool Real);
+        void HandleNoReagentUseAura(bool Apply, bool Real);
+        void HandlePhase(bool Apply, bool Real);
+        void HandleModTargetArmorPct(bool Apply, bool Real);
+        void HandleAuraModAllCritChance(bool Apply, bool Real);
+        void HandleAuraOpenStable(bool apply, bool Real);
+        void HandleAuraAddMechanicAbilities(bool apply, bool Real);
+        void HandleAuraStopNaturalManaRegen(bool apply, bool Real);
+        void HandleAuraSetVehicleId(bool apply, bool Real);
 
         virtual ~Aura();
 
@@ -430,9 +444,9 @@ class MANGOS_DLL_SPEC Aura
         void TriggerSpell();
         void TriggerSpellWithValue();
 
-        // more limited that used in future versions (spell_affect table based only), so need be careful with backporting uses
+        ClassFamilyMask const& GetAuraSpellClassMask() const { return  m_spellAuraHolder->GetSpellProto()->GetEffectSpellClassMask(m_effIndex); }
         bool isAffectedOnSpell(SpellEntry const* spell) const;
-        bool CanProcFrom(SpellEntry const* spell, uint32 EventProcEx, uint32 procEx, bool active, bool useClassMask) const;
+        bool CanProcFrom(SpellEntry const* spell, uint32 procFlag, uint32 EventProcEx, uint32 procEx, bool active, bool useClassMask) const;
 
         SpellAuraHolder* GetHolder() { return m_spellAuraHolder; }
         SpellAuraHolder const* GetHolder() const { return m_spellAuraHolder; }
@@ -450,10 +464,10 @@ class MANGOS_DLL_SPEC Aura
         void PeriodicTick();
         void PeriodicDummyTick();
 
+        bool IsCritFromAbilityAura(Unit* caster, uint32& damage);
         void ReapplyAffectedPassiveAuras();
 
         Modifier m_modifier;
-        SpellModifier* m_spellmod;
 
         time_t m_applyTime;
 

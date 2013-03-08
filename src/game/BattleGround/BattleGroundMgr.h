@@ -85,7 +85,7 @@ class BattleGroundQueue
         bool CheckPremadeMatch(BattleGroundBracketId bracket_id, uint32 MinPlayersPerTeam, uint32 MaxPlayersPerTeam);
         bool CheckNormalMatch(BattleGround* bg_template, BattleGroundBracketId bracket_id, uint32 minPlayers, uint32 maxPlayers);
         bool CheckSkirmishForSameFaction(BattleGroundBracketId bracket_id, uint32 minPlayersPerTeam);
-        GroupQueueInfo* AddGroup(Player* leader, Group* group, BattleGroundTypeId bgTypeId, BattleGroundBracketId bracketId, ArenaType arenaType, bool isRated, bool isPremade, uint32 ArenaRating, uint32 ArenaTeamId = 0);
+        GroupQueueInfo* AddGroup(Player* leader, Group* group, BattleGroundTypeId bgTypeId, PvPDifficultyEntry const*  bracketEntry, ArenaType arenaType, bool isRated, bool isPremade, uint32 ArenaRating, uint32 ArenaTeamId = 0);
         void RemovePlayer(ObjectGuid guid, bool decreaseInvitedCount);
         bool IsPlayerInvited(ObjectGuid pl_guid, const uint32 bgInstanceGuid, const uint32 removeTime);
         bool GetPlayerGroupInfoData(ObjectGuid guid, GroupQueueInfo* ginfo);
@@ -95,7 +95,6 @@ class BattleGroundQueue
     private:
         // mutex that should not allow changing private data, nor allowing to update Queue during private data change.
         ACE_Recursive_Thread_Mutex  m_Lock;
-
 
         typedef std::map<ObjectGuid, PlayerQueueInfo> QueuedPlayersMap;
         QueuedPlayersMap m_QueuedPlayers;
@@ -195,8 +194,8 @@ class BattleGroundMgr
         /* Packet Building */
         void BuildPlayerJoinedBattleGroundPacket(WorldPacket* data, Player* plr);
         void BuildPlayerLeftBattleGroundPacket(WorldPacket* data, ObjectGuid guid);
-        void BuildBattleGroundListPacket(WorldPacket* data, ObjectGuid guid, Player* plr, BattleGroundTypeId bgTypeId);
-        void BuildGroupJoinedBattlegroundPacket(WorldPacket* data, BattleGroundTypeId bgTypeId);
+        void BuildBattleGroundListPacket(WorldPacket* data, ObjectGuid guid, Player* plr, BattleGroundTypeId bgTypeId, uint8 fromWhere);
+        void BuildGroupJoinedBattlegroundPacket(WorldPacket* data, GroupJoinBattlegroundResult result);
         void BuildUpdateWorldStatePacket(WorldPacket* data, uint32 field, uint32 value);
         void BuildPvpLogDataPacket(WorldPacket* data, BattleGround* bg);
         void BuildBattleGroundStatusPacket(WorldPacket* data, BattleGround* bg, uint8 QueueSlot, uint8 StatusID, uint32 Time1, uint32 Time2, ArenaType arenatype);
@@ -207,7 +206,7 @@ class BattleGroundMgr
         BattleGround* GetBattleGround(uint32 InstanceID, BattleGroundTypeId bgTypeId); // there must be uint32 because MAX_BATTLEGROUND_TYPE_ID means unknown
 
         BattleGround* GetBattleGroundTemplate(BattleGroundTypeId bgTypeId);
-        BattleGround* CreateNewBattleGround(BattleGroundTypeId bgTypeId, BattleGroundBracketId bracket_id, ArenaType arenaType, bool isRated);
+        BattleGround* CreateNewBattleGround(BattleGroundTypeId bgTypeId, PvPDifficultyEntry const* bracketEntry, ArenaType arenaType, bool isRated);
 
         uint32 CreateBattleGround(BattleGroundTypeId bgTypeId, bool IsArena, uint32 MinPlayersPerTeam, uint32 MaxPlayersPerTeam, uint32 LevelMin, uint32 LevelMax, char const* BattleGroundName, uint32 MapID, float Team1StartLocX, float Team1StartLocY, float Team1StartLocZ, float Team1StartLocO, float Team2StartLocX, float Team2StartLocY, float Team2StartLocZ, float Team2StartLocO);
 

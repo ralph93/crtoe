@@ -52,8 +52,9 @@ enum LootType
     LOOT_FISHING                = 3,
     LOOT_DISENCHANTING          = 4,
     // ignored always by client
-    LOOT_SKINNING               = 6,                        // unsupported by client, sending LOOT_PICKPOCKETING instead
-    LOOT_PROSPECTING            = 7,                        // unsupported by client, sending LOOT_PICKPOCKETING instead
+    LOOT_SKINNING               = 6,
+    LOOT_PROSPECTING            = 7,
+    LOOT_MILLING                = 8,
 
     LOOT_FISHINGHOLE            = 20,                       // unsupported by client, sending LOOT_FISHING instead
     LOOT_FISHING_FAIL           = 21,                       // unsupported by client, sending LOOT_FISHING instead
@@ -241,7 +242,7 @@ struct Loot
         LootItemList items;
         uint32 gold;
         uint8 unlootedCount;
-        LootType loot_type;                                 // required for for proper item loot finish (store internal loot types in different from 3.x version, in fact this meaning that it send same loot types for interesting cases like 3.x version code, skip pre-3.x client loot type limitaitons)
+        LootType loot_type;                                 // required for achievement system
 
         Loot(WorldObject const* lootTarget, uint32 _gold = 0) : gold(_gold), unlootedCount(0), loot_type(LOOT_CORPSE), m_lootTarget(lootTarget) {}
         ~Loot() { clear(); }
@@ -330,21 +331,25 @@ extern LootStore LootTemplates_Fishing;
 extern LootStore LootTemplates_Gameobject;
 extern LootStore LootTemplates_Item;
 extern LootStore LootTemplates_Mail;
+extern LootStore LootTemplates_Milling;
 extern LootStore LootTemplates_Pickpocketing;
 extern LootStore LootTemplates_Skinning;
 extern LootStore LootTemplates_Disenchant;
 extern LootStore LootTemplates_Prospecting;
+extern LootStore LootTemplates_Spell;
 
 void LoadLootTemplates_Creature();
 void LoadLootTemplates_Fishing();
 void LoadLootTemplates_Gameobject();
 void LoadLootTemplates_Item();
 void LoadLootTemplates_Mail();
+void LoadLootTemplates_Milling();
 void LoadLootTemplates_Pickpocketing();
 void LoadLootTemplates_Skinning();
 void LoadLootTemplates_Disenchant();
 void LoadLootTemplates_Prospecting();
 
+void LoadLootTemplates_Spell();
 void LoadLootTemplates_Reference();
 
 inline void LoadLootTables()
@@ -354,10 +359,12 @@ inline void LoadLootTables()
     LoadLootTemplates_Gameobject();
     LoadLootTemplates_Item();
     LoadLootTemplates_Mail();
+    LoadLootTemplates_Milling();
     LoadLootTemplates_Pickpocketing();
     LoadLootTemplates_Skinning();
     LoadLootTemplates_Disenchant();
     LoadLootTemplates_Prospecting();
+    LoadLootTemplates_Spell();
 
     LoadLootTemplates_Reference();
 }

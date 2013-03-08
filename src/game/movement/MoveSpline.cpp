@@ -37,9 +37,14 @@ namespace Movement
         if (seg_time > 0)
             u = (time_passed - spline.length(point_Idx)) / (float)seg_time;
         Location c;
+        c.orientation = initialOrientation;
         spline.evaluate_percent(point_Idx, u, c);
 
-        if (splineflags.falling)
+        if (splineflags.animation)
+            ;// MoveSplineFlag::Animation disables falling or parabolic movement
+        else if (splineflags.parabolic)
+            computeParabolicElevation(c.z);
+        else if (splineflags.falling)
             computeFallElevation(c.z);
 
         if (splineflags.done && splineflags.isFacing())
@@ -52,11 +57,30 @@ namespace Movement
         }
         else
         {
-            Vector3 hermite;
-            spline.evaluate_derivative(point_Idx, u, hermite);
-            c.orientation = atan2(hermite.y, hermite.x);
+            if (!splineflags.hasFlag(MoveSplineFlag::OrientationFixed | MoveSplineFlag::Falling))
+            {
+                Vector3 hermite;
+                spline.evaluate_derivative(point_Idx, u, hermite);
+                c.orientation = atan2(hermite.y, hermite.x);
+            }
+
+            if (splineflags.orientationInversed)
+                c.orientation = -c.orientation;
         }
         return c;
+    }
+
+    void MoveSpline::computeParabolicElevation(float& el) const
+    {
+        if (time_passed > effect_start_time)
+        {
+            float t_passedf = MSToSec(time_passed - effect_start_time);
+            float t_durationf = MSToSec(Duration() - effect_start_time); // client use not modified duration here
+
+            // -a*x*x + bx + c:
+            //(dur * v3->z_acceleration * dt)/2 - (v3->z_acceleration * dt * dt)/2 + Z;
+            el += (t_durationf - t_passedf) * 0.5f * vertical_acceleration * t_passedf;
+        }
     }
 
     void MoveSpline::computeFallElevation(float& el) const
@@ -144,12 +168,29 @@ namespace Movement
         facing = args.facing;
         m_Id = args.splineId;
         point_Idx_offset = args.path_Idx_offset;
+        initialOrientation = args.initialOrientation;
+
         time_passed = 0;
+        vertical_acceleration = 0.f;
+        effect_start_time = 0;
 
         init_spline(args);
+
+        // init parabolic / animation
+        // spline initialized, duration known and i able to compute parabolic acceleration
+        if (args.flags & (MoveSplineFlag::Parabolic | MoveSplineFlag::Animation))
+        {
+            effect_start_time = Duration() * args.time_perc;
+            if (args.flags.parabolic && effect_start_time < Duration())
+            {
+                float f_duration = MSToSec(Duration() - effect_start_time);
+                vertical_acceleration = args.parabolic_amplitude * 8.f / (f_duration * f_duration);
+            }
+        }
     }
 
-    MoveSpline::MoveSpline() : m_Id(0), time_passed(0), point_Idx(0), point_Idx_offset(0)
+    MoveSpline::MoveSpline() : m_Id(0), time_passed(0),
+        vertical_acceleration(0.f), initialOrientation(0.f), effect_start_time(0), point_Idx(0), point_Idx_offset(0)
     {
         splineflags.done = true;
     }
@@ -166,6 +207,7 @@ namespace Movement
     }
         CHECK(path.size() > 1);
         CHECK(velocity > 0.f);
+        CHECK(time_perc >= 0.f && time_perc <= 1.f);
         // CHECK(_checkPathBounds());
         return true;
 #undef CHECK

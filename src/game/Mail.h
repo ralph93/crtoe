@@ -42,6 +42,7 @@ struct AuctionEntry;
 class Item;
 class Object;
 class Player;
+class CalendarEvent;
 
 #define MAIL_BODY_ITEM_TEMPLATE 8383                        ///< - plain letter, A Dusty Unsent Letter: 889
 /// The maximal amount of items a mail can contain.
@@ -56,7 +57,7 @@ enum MailMessageType
     MAIL_AUCTION        = 2,
     MAIL_CREATURE       = 3,                                /// client send CMSG_CREATURE_QUERY on this mailmessagetype
     MAIL_GAMEOBJECT     = 4,                                /// client send CMSG_GAMEOBJECT_QUERY on this mailmessagetype
-    MAIL_ITEM           = 5,                                /// client send CMSG_ITEM_QUERY on this mailmessagetype
+    MAIL_CALENDAR       = 5,
 };
 /**
  * A Mask representing the status of the mail.
@@ -77,12 +78,13 @@ enum MailCheckMask
  */
 enum MailStationery
 {
-    MAIL_STATIONERY_UNKNOWN =  1,
+    MAIL_STATIONERY_TEST    = 1,
     MAIL_STATIONERY_DEFAULT = 41,
     MAIL_STATIONERY_GM      = 61,
     MAIL_STATIONERY_AUCTION = 62,
     MAIL_STATIONERY_VAL     = 64,
     MAIL_STATIONERY_CHR     = 65,
+    MAIL_STATIONERY_ORP     = 67,                           // new in 3.2.2
 };
 /**
  * Representation of the State of a mail.
@@ -129,6 +131,7 @@ class MailSender
         }
         MailSender(Object* sender, MailStationery stationery = MAIL_STATIONERY_DEFAULT);
         MailSender(AuctionEntry* sender);
+        MailSender(CalendarEvent const* event);
     public:                                                 // Accessors
         /// The Messagetype of this MailSender.
         MailMessageType GetMailMessageType() const { return m_messageType; }
@@ -189,7 +192,7 @@ class MailDraft
          *
          */
         MailDraft()
-            : m_mailTemplateId(0), m_mailTemplateItemsNeed(false), m_bodyId(0), m_money(0), m_COD(0) {}
+            : m_mailTemplateId(0), m_mailTemplateItemsNeed(false), m_money(0), m_COD(0) {}
         /**
          * Creates a new MailDraft object using mail template id.
          *
@@ -198,39 +201,31 @@ class MailDraft
          *
          */
         explicit MailDraft(uint16 mailTemplateId, bool need_items = true)
-            : m_mailTemplateId(mailTemplateId), m_mailTemplateItemsNeed(need_items), m_bodyId(0), m_money(0), m_COD(0)
+            : m_mailTemplateId(mailTemplateId), m_mailTemplateItemsNeed(need_items), m_money(0), m_COD(0)
         {}
         /**
-         * Creates a new MailDraft object using subject text and content text id.
-         *
-         * @param subject The subject of the mail.
-         * @param itemTextId The id of the body of the mail.
-         */
-        MailDraft(std::string subject, uint32 itemTextId = 0)
-            : m_mailTemplateId(0), m_mailTemplateItemsNeed(false), m_subject(subject), m_bodyId(itemTextId), m_money(0), m_COD(0) {}
-        /**
-         * Creates a new MailDraft object using subject and contect texts.
+         * Creates a new MailDraft object using subject and content texts.
          *
          * @param subject The subject of the mail.
          * @param itemText The text of the body of the mail.
          */
-        MailDraft(std::string subject, std::string text);
+        MailDraft(std::string subject, std::string body)
+            : m_mailTemplateId(0), m_mailTemplateItemsNeed(false), m_subject(subject), m_body(body), m_money(0), m_COD(0) {}
     public:                                                 // Accessors
         /// Returns the template ID used for this MailDraft.
         uint16 GetMailTemplateId() const { return m_mailTemplateId; }
         /// Returns the subject of this MailDraft.
         std::string const& GetSubject() const { return m_subject; }
-        /// Returns the ID of the text of this MailDraft.
-        uint32 GetBodyId() const { return m_bodyId; }
+        /// Returns the subject of this MailDraft.
+        std::string const& GetBody() const { return m_body; }
         /// Returns the amount of money in this MailDraft.
         uint32 GetMoney() const { return m_money; }
         /// Returns the Cost of delivery of this MailDraft.
         uint32 GetCOD() const { return m_COD; }
     public:                                                 // modifiers
 
-        // this two modifiers expected to be applied in normal case to blank draft and exclusively, It DON'T must overwrite already set itemTextId, in other cases it will work and with mixed cases but this will be not normal way use.
-        MailDraft& SetSubjectAndBodyId(std::string subject, uint32 itemTextId) { m_subject = subject; MANGOS_ASSERT(!m_bodyId); m_bodyId = itemTextId; return *this; }
-        MailDraft& SetSubjectAndBody(std::string subject, std::string text);
+        // this two modifiers expected to be applied in normal case to blank draft and exclusively, it will work and with mixed cases but this will be not normal way use.
+        MailDraft& SetSubjectAndBody(std::string subject, std::string body) { m_subject = subject; m_body = body; return *this; }
         MailDraft& SetMailTemplate(uint16 mailTemplateId, bool need_items = true) { m_mailTemplateId = mailTemplateId, m_mailTemplateItemsNeed = need_items; return *this; }
 
         MailDraft& AddItem(Item* item);
@@ -264,8 +259,8 @@ class MailDraft
         bool        m_mailTemplateItemsNeed;
         /// The subject of the MailDraft.
         std::string m_subject;
-        /// The ID of the body of the MailDraft.
-        uint32      m_bodyId;
+        /// The body of the MailDraft.
+        std::string m_body;
         /// A map of items in this MailDraft.
         MailItemMap m_items;                                ///< Keep the items in a map to avoid duplicate guids (which can happen), store only low part of guid
 
@@ -303,8 +298,8 @@ struct Mail
     ObjectGuid receiverGuid;
     /// the subject of the mail
     std::string subject;
-    /// The ID of the itemtext.
-    uint32 itemTextId;
+    /// the body of the mail
+    std::string body;
     /// flag mark mail that already has items, or already generate none items for template
     bool has_items;
     /// A vector containing Information about the items in this mail.

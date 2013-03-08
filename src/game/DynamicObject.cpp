@@ -32,8 +32,8 @@ DynamicObject::DynamicObject() : WorldObject()
 {
     m_objectType |= TYPEMASK_DYNAMICOBJECT;
     m_objectTypeId = TYPEID_DYNAMICOBJECT;
-    // 2.3.2 - 0x58
-    m_updateFlag = (UPDATEFLAG_LOWGUID | UPDATEFLAG_HIGHGUID | UPDATEFLAG_HAS_POSITION);
+
+    m_updateFlag = (UPDATEFLAG_HIGHGUID | UPDATEFLAG_HAS_POSITION | UPDATEFLAG_POSITION);
 
     m_valuesCount = DYNAMICOBJECT_END;
 }
@@ -61,7 +61,7 @@ void DynamicObject::RemoveFromWorld()
 
 bool DynamicObject::Create(uint32 guidlow, Unit* caster, uint32 spellId, SpellEffectIndex effIndex, float x, float y, float z, int32 duration, float radius, DynamicObjectType type)
 {
-    WorldObject::_Create(guidlow, HIGHGUID_DYNAMICOBJECT);
+    WorldObject::_Create(guidlow, HIGHGUID_DYNAMICOBJECT, caster->GetPhaseMask());
     SetMap(caster->GetMap());
     Relocate(x, y, z, 0);
 
@@ -91,9 +91,6 @@ bool DynamicObject::Create(uint32 guidlow, Unit* caster, uint32 spellId, SpellEf
 
     SetUInt32Value(DYNAMICOBJECT_SPELLID, spellId);
     SetFloatValue(DYNAMICOBJECT_RADIUS, radius);
-    SetFloatValue(DYNAMICOBJECT_POS_X, x);
-    SetFloatValue(DYNAMICOBJECT_POS_Y, y);
-    SetFloatValue(DYNAMICOBJECT_POS_Z, z);
     SetUInt32Value(DYNAMICOBJECT_CASTTIME, WorldTimer::getMSTime());    // new 2.4.0
 
     SpellEntry const* spellProto = sSpellStore.LookupEntry(spellId);

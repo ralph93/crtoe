@@ -63,7 +63,8 @@ enum GuildRankRights
     GR_RIGHT_WITHDRAW_GOLD_LOCK = 0x00020000,               // remove money withdraw capacity
     GR_RIGHT_WITHDRAW_REPAIR    = 0x00040000,               // withdraw for repair
     GR_RIGHT_WITHDRAW_GOLD      = 0x00080000,               // withdraw gold
-    GR_RIGHT_ALL                = 0x000DF1FF
+    GR_RIGHT_CREATE_GUILD_EVENT = 0x00100000,               // wotlk
+    GR_RIGHT_ALL                = 0x001DF1FF
 };
 
 enum Typecommand
@@ -99,10 +100,10 @@ enum CommandErrors
     ERR_GUILD_RANK_IN_USE           = 0x12,
     ERR_GUILD_IGNORING_YOU_S        = 0x13,
     ERR_GUILD_UNK1                  = 0x14,
-    ERR_GUILD_WITHDRAW_LIMIT        = 0x18,
-    ERR_GUILD_NOT_ENOUGH_MONEY      = 0x19,
-    ERR_GUILD_BANK_FULL             = 0x1B,
-    ERR_GUILD_ITEM_NOT_FOUND        = 0x1C
+    ERR_GUILD_WITHDRAW_LIMIT        = 0x19,
+    ERR_GUILD_NOT_ENOUGH_MONEY      = 0x1A,
+    ERR_GUILD_BANK_FULL             = 0x1C,
+    ERR_GUILD_ITEM_NOT_FOUND        = 0x1D
 };
 
 enum GuildEvents
@@ -164,6 +165,8 @@ enum GuildBankEventLogTypes
     GUILD_BANK_LOG_WITHDRAW_MONEY   = 5,
     GUILD_BANK_LOG_REPAIR_MONEY     = 6,
     GUILD_BANK_LOG_MOVE_ITEM2       = 7,
+    GUILD_BANK_LOG_UNK1             = 8,
+    GUILD_BANK_LOG_UNK2             = 9,
 };
 
 enum GuildEventLogTypes
@@ -244,7 +247,7 @@ struct GuildItemPosCount
     bool isContainedIn(std::vector<GuildItemPosCount> const& vec) const;
 
     uint8 Slot;
-    uint8 Count;
+    uint32 Count;
 };
 typedef std::vector<GuildItemPosCount> GuildItemPosCountVec;
 
@@ -310,9 +313,7 @@ class Guild
         std::string const& GetMOTD() const { return MOTD; }
         std::string const& GetGINFO() const { return GINFO; }
 
-        uint32 GetCreatedYear() const { return m_CreatedYear; }
-        uint32 GetCreatedMonth() const { return m_CreatedMonth; }
-        uint32 GetCreatedDay() const { return m_CreatedDay; }
+        time_t GetCreatedDate() const { return m_CreatedDate; }
 
         uint32 GetEmblemStyle() const { return m_EmblemStyle; }
         uint32 GetEmblemColor() const { return m_EmblemColor; }
@@ -342,6 +343,8 @@ class Guild
         void BroadcastToOfficers(WorldSession* session, const std::string& msg, uint32 language = LANG_UNIVERSAL);
         void BroadcastPacketToRank(WorldPacket* packet, uint32 rankId);
         void BroadcastPacket(WorldPacket* packet);
+        // for calendar
+        void MassInviteToEvent(WorldSession* session, uint32 minLevel, uint32 maxLevel, uint32 minRank);
 
         void BroadcastEvent(GuildEvents event, ObjectGuid guid, char const* str1 = NULL, char const* str2 = NULL, char const* str3 = NULL);
         void BroadcastEvent(GuildEvents event, char const* str1 = NULL, char const* str2 = NULL, char const* str3 = NULL)
@@ -450,9 +453,7 @@ class Guild
         ObjectGuid m_LeaderGuid;
         std::string MOTD;
         std::string GINFO;
-        uint32 m_CreatedYear;
-        uint32 m_CreatedMonth;
-        uint32 m_CreatedDay;
+        time_t m_CreatedDate;
 
         uint32 m_EmblemStyle;
         uint32 m_EmblemColor;

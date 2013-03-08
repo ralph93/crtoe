@@ -37,9 +37,14 @@ struct DumpTable
 static DumpTable dumpTables[] =
 {
     { "characters",                       DTT_CHARACTER  }, // -> guid, must be first for name check
+    { "character_account_data",           DTT_CHAR_TABLE },
+    { "character_achievement",            DTT_CHAR_TABLE },
+    { "character_achievement_progress",   DTT_CHAR_TABLE },
     { "character_action",                 DTT_CHAR_TABLE },
     { "character_aura",                   DTT_CHAR_TABLE },
     { "character_declinedname",           DTT_CHAR_NAME_TABLE },
+    { "character_equipmentsets",          DTT_EQSET_TABLE},
+    { "character_glyphs",                 DTT_CHAR_TABLE },
     { "character_homebind",               DTT_CHAR_TABLE },
     { "character_inventory",              DTT_INVENTORY  }, // -> item guids
     { "character_queststatus",            DTT_CHAR_TABLE },
@@ -49,6 +54,7 @@ static DumpTable dumpTables[] =
     { "character_skills",                 DTT_CHAR_TABLE },
     { "character_spell",                  DTT_CHAR_TABLE },
     { "character_spell_cooldown",         DTT_CHAR_TABLE },
+    { "character_talent",                 DTT_CHAR_TABLE },
     { "character_ticket",                 DTT_CHAR_TABLE },
     { "mail",                             DTT_MAIL       }, // -> mail guids
     { "mail_items",                       DTT_MAIL_ITEM  }, // -> item guids    <- mail guids
@@ -58,7 +64,6 @@ static DumpTable dumpTables[] =
     { "character_gifts",                  DTT_ITEM_GIFT  }, //                  <- item guids
     { "item_instance",                    DTT_ITEM       }, //                  <- item guids
     { "item_loot",                        DTT_ITEM_LOOT  }, //                  <- item guids
-    { "item_text",                        DTT_ITEM_TEXT  },
     { NULL,                               DTT_CHAR_TABLE }, // end marker
 };
 
@@ -97,7 +102,7 @@ bool findnth(std::string& str, int n, std::string::size_type& s, std::string::si
         if (e == std::string::npos)
             return false;
     }
-    while (str[e-1] == '\\');
+    while (str[e - 1] == '\\');
 
     for (int i = 1; i < n; ++i)
     {
@@ -108,7 +113,7 @@ bool findnth(std::string& str, int n, std::string::size_type& s, std::string::si
             if (e == std::string::npos)
                 return false;
         }
-        while (str[e-1] == '\\');
+        while (str[e - 1] == '\\');
     }
     return true;
 }
@@ -163,7 +168,7 @@ bool changetoknth(std::string& str, int n, const char* with, bool insert = false
     return true;
 }
 
-uint32 registerNewGuid(uint32 oldGuid, std::map<uint32, uint32> &guidMap, uint32 hiGuid)
+uint32 registerNewGuid(uint32 oldGuid, std::map<uint32, uint32>& guidMap, uint32 hiGuid)
 {
     std::map<uint32, uint32>::const_iterator itr = guidMap.find(oldGuid);
     if (itr != guidMap.end())
@@ -174,7 +179,7 @@ uint32 registerNewGuid(uint32 oldGuid, std::map<uint32, uint32> &guidMap, uint32
     return newguid;
 }
 
-bool changeGuid(std::string& str, int n, std::map<uint32, uint32> &guidMap, uint32 hiGuid, bool nonzero = false)
+bool changeGuid(std::string& str, int n, std::map<uint32, uint32>& guidMap, uint32 hiGuid, bool nonzero = false)
 {
     char chritem[20];
     uint32 oldGuid = atoi(getnth(str, n).c_str());
@@ -187,7 +192,7 @@ bool changeGuid(std::string& str, int n, std::map<uint32, uint32> &guidMap, uint
     return changenth(str, n, chritem, false, nonzero);
 }
 
-bool changetokGuid(std::string& str, int n, std::map<uint32, uint32> &guidMap, uint32 hiGuid, bool nonzero = false)
+bool changetokGuid(std::string& str, int n, std::map<uint32, uint32>& guidMap, uint32 hiGuid, bool nonzero = false)
 {
     char chritem[20];
     uint32 oldGuid = atoi(gettoknth(str, n).c_str());
@@ -289,7 +294,6 @@ void PlayerDumpWriter::DumpTableContent(std::string& dump, uint32 guid, char con
         case DTT_PET_DECL:  fieldname = "id";                        break;
         case DTT_MAIL:      fieldname = "receiver";                  break;
         case DTT_MAIL_ITEM: fieldname = "mail_id";   guids = &mails; break;
-        case DTT_ITEM_TEXT: fieldname = "id";        guids = &texts; break;
         default:            fieldname = "guid";                      break;
     }
 
@@ -321,15 +325,11 @@ void PlayerDumpWriter::DumpTableContent(std::string& dump, uint32 guid, char con
             switch (type)
             {
                 case DTT_INVENTORY:
-                    StoreGUID(result, 3, items); break;     // item guid collection
-                case DTT_ITEM:
-                    StoreGUID(result, 0, ITEM_FIELD_ITEM_TEXT_ID, texts); break;
-                    // item text id collection
+                    StoreGUID(result, 3, items); break;     // item guid collection (character_inventory.item)
                 case DTT_PET:
                     StoreGUID(result, 0, pets);  break;     // pet petnumber collection (character_pet.id)
                 case DTT_MAIL:
                     StoreGUID(result, 0, mails);            // mail id collection (mail.id)
-                    StoreGUID(result, 7, texts); break;     // item text id collection
                 case DTT_MAIL_ITEM:
                     StoreGUID(result, 1, items); break;     // item guid collection (mail_items.item_guid)
                 default:                       break;
@@ -462,7 +462,7 @@ DumpReturn PlayerDumpReader::LoadDump(const std::string& file, uint32 account, s
 
     std::map<uint32, uint32> items;
     std::map<uint32, uint32> mails;
-    std::map<uint32, uint32> itemTexts;
+    std::map<uint32, uint32> eqsets;
     char buf[32000] = "";
 
     typedef std::map<uint32, uint32> PetIds;                // old->new petid relation
@@ -602,8 +602,6 @@ DumpReturn PlayerDumpReader::LoadDump(const std::string& file, uint32 account, s
                     ROLLBACK(DUMP_FILE_BROKEN);             // item_instance.data.OBJECT_FIELD_GUID update
                 if (!changetoknth(vals, ITEM_FIELD_OWNER + 1, newguid))
                     ROLLBACK(DUMP_FILE_BROKEN);             // item_instance.data.ITEM_FIELD_OWNER update
-                if (!changetokGuid(vals, ITEM_FIELD_ITEM_TEXT_ID + 1, itemTexts, sObjectMgr.m_ItemTextIds.GetNextAfterMaxUsed(), true))
-                    ROLLBACK(DUMP_FILE_BROKEN);
                 if (!changenth(line, 3, vals.c_str()))      // item_instance.data update
                     ROLLBACK(DUMP_FILE_BROKEN);
                 break;
@@ -693,8 +691,6 @@ DumpReturn PlayerDumpReader::LoadDump(const std::string& file, uint32 account, s
                     ROLLBACK(DUMP_FILE_BROKEN);             // mail.id update
                 if (!changenth(line, 6, newguid))           // mail.receiver update
                     ROLLBACK(DUMP_FILE_BROKEN);
-                if (!changeGuid(line, 8, itemTexts, sObjectMgr.m_ItemTextIds.GetNextAfterMaxUsed()))
-                    ROLLBACK(DUMP_FILE_BROKEN);
                 break;
             }
             case DTT_MAIL_ITEM:                             // mail_items
@@ -707,16 +703,15 @@ DumpReturn PlayerDumpReader::LoadDump(const std::string& file, uint32 account, s
                     ROLLBACK(DUMP_FILE_BROKEN);
                 break;
             }
-            case DTT_ITEM_TEXT:                             // item_text
+            case DTT_EQSET_TABLE:
             {
-                // id
-                if (!changeGuid(line, 1, itemTexts, sObjectMgr.m_ItemTextIds.GetNextAfterMaxUsed()))
+                if (!changenth(line, 1, newguid))           // character_equipmentsets.guid update
                     ROLLBACK(DUMP_FILE_BROKEN);
-
-                // add it to cache
-                uint32 id = atoi(getnth(line, 1).c_str());
-                std::string text = getnth(line, 2);
-                sObjectMgr.AddItemText(id, text);
+                if (!changeGuid(line, 2, eqsets, sObjectMgr.m_EquipmentSetIds.GetNextAfterMaxUsed()))
+                    ROLLBACK(DUMP_FILE_BROKEN);             // character_equipmentsets.setguid
+                for (int i = 0; i < 19; ++i)                // character_equipmentsets.item0..item18
+                    if (!changeGuid(line, 6 + i, items, sObjectMgr.m_ItemGuids.GetNextAfterMaxUsed()))
+                        ROLLBACK(DUMP_FILE_BROKEN);
                 break;
             }
             default:
@@ -733,7 +728,7 @@ DumpReturn PlayerDumpReader::LoadDump(const std::string& file, uint32 account, s
     // FIXME: current code with post-updating guids not safe for future per-map threads
     sObjectMgr.m_ItemGuids.Set(sObjectMgr.m_ItemGuids.GetNextAfterMaxUsed() + items.size());
     sObjectMgr.m_MailIds.Set(sObjectMgr.m_MailIds.GetNextAfterMaxUsed() +  mails.size());
-    sObjectMgr.m_ItemTextIds.Set(sObjectMgr.m_ItemTextIds.GetNextAfterMaxUsed() + itemTexts.size());
+    sObjectMgr.m_EquipmentSetIds.Set(sObjectMgr.m_EquipmentSetIds.GetNextAfterMaxUsed() + eqsets.size());
 
     if (incHighest)
         sObjectMgr.m_CharGuids.Set(sObjectMgr.m_CharGuids.GetNextAfterMaxUsed() + 1);

@@ -61,11 +61,11 @@ void CreatureEventAI::GetAIInformation(ChatHandler& reader)
     reader.PSendSysMessage(LANG_NPC_EVENTAI_COMBAT, reader.GetOnOffStr(m_MeleeEnabled));
 }
 
-// For Non Dungeon map only allow non-difficulty flags or EFLAG_NORMAL mode
+// For Non Dungeon map only allow non-difficulty flags or EFLAG_DIFFICULTY_0 mode
 inline bool IsEventFlagsFitForNormalMap(uint8 eFlags)
 {
-    return !(eFlags & (EFLAG_NORMAL | EFLAG_HEROIC)) ||
-                (eFlags & EFLAG_NORMAL);
+    return !(eFlags & (EFLAG_DIFFICULTY_0 | EFLAG_DIFFICULTY_1 | EFLAG_DIFFICULTY_2 | EFLAG_DIFFICULTY_3)) ||
+           (eFlags & EFLAG_DIFFICULTY_0);
 }
 
 CreatureEventAI::CreatureEventAI(Creature* c) : CreatureAI(c)

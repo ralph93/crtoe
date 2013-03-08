@@ -18,7 +18,6 @@
 
 #include "Common.h"
 #include "Database/DatabaseEnv.h"
-#include "DBCStores.h"
 #include "WorldPacket.h"
 #include "WorldSession.h"
 #include "World.h"
@@ -302,8 +301,8 @@ bool ChatHandler::HandleGPSCommand(char* args)
     }
 
     Map const* map = obj->GetMap();
-    float ground_z = map->GetHeight(obj->GetPositionX(), obj->GetPositionY(), MAX_HEIGHT);
-    float floor_z = map->GetHeight(obj->GetPositionX(), obj->GetPositionY(), obj->GetPositionZ());
+    float ground_z = map->GetHeight(obj->GetPhaseMask(), obj->GetPositionX(), obj->GetPositionY(), MAX_HEIGHT);
+    float floor_z = map->GetHeight(obj->GetPhaseMask(), obj->GetPositionX(), obj->GetPositionY(), obj->GetPositionZ());
 
     GridPair p = MaNGOS::ComputeGridPair(obj->GetPositionX(), obj->GetPositionY());
 
@@ -328,6 +327,7 @@ bool ChatHandler::HandleGPSCommand(char* args)
                     obj->GetMapId(), (mapEntry ? mapEntry->name[GetSessionDbcLocale()] : "<unknown>"),
                     zone_id, (zoneEntry ? zoneEntry->area_name[GetSessionDbcLocale()] : "<unknown>"),
                     area_id, (areaEntry ? areaEntry->area_name[GetSessionDbcLocale()] : "<unknown>"),
+                    obj->GetPhaseMask(),
                     obj->GetPositionX(), obj->GetPositionY(), obj->GetPositionZ(), obj->GetOrientation(),
                     cell.GridX(), cell.GridY(), cell.CellX(), cell.CellY(), obj->GetInstanceId(),
                     zone_x, zone_y, ground_z, floor_z, have_map, have_vmap);
@@ -341,6 +341,7 @@ bool ChatHandler::HandleGPSCommand(char* args)
               obj->GetMapId(), (mapEntry ? mapEntry->name[sWorld.GetDefaultDbcLocale()] : "<unknown>"),
               zone_id, (zoneEntry ? zoneEntry->area_name[sWorld.GetDefaultDbcLocale()] : "<unknown>"),
               area_id, (areaEntry ? areaEntry->area_name[sWorld.GetDefaultDbcLocale()] : "<unknown>"),
+              obj->GetPhaseMask(),
               obj->GetPositionX(), obj->GetPositionY(), obj->GetPositionZ(), obj->GetOrientation(),
               cell.GridX(), cell.GridY(), cell.CellX(), cell.CellY(), obj->GetInstanceId(),
               zone_x, zone_y, ground_z, floor_z, have_map, have_vmap);
@@ -357,7 +358,7 @@ bool ChatHandler::HandleGPSCommand(char* args)
     PSendSysMessage("Static terrain height (maps only): %f", obj->GetTerrain()->GetHeightStatic(obj->GetPositionX(), obj->GetPositionY(), obj->GetPositionZ(), false));
 
     if (VMAP::IVMapManager* vmgr = VMAP::VMapFactory::createOrGetVMapManager())
-        PSendSysMessage("Vmap Terrain Height %f", vmgr->getHeight(obj->GetMapId(), obj->GetPositionX(), obj->GetPositionY(), obj->GetPositionZ()+2.0f, 10000.0f));
+        PSendSysMessage("Vmap Terrain Height %f", vmgr->getHeight(obj->GetMapId(), obj->GetPositionX(), obj->GetPositionY(), obj->GetPositionZ() + 2.0f, 10000.0f));
 
     PSendSysMessage("Static map height (maps and vmaps): %f", obj->GetTerrain()->GetHeightStatic(obj->GetPositionX(), obj->GetPositionY(), obj->GetPositionZ()));
 #endif
@@ -502,7 +503,6 @@ bool ChatHandler::HandleGonameCommand(char* args)
         return false;
     }
 
-
     if (target)
     {
         // check online security
@@ -563,7 +563,7 @@ bool ChatHandler::HandleGonameCommand(char* args)
 
             // if the player or the player's group is bound to another instance
             // the player will not be bound to another one
-            InstancePlayerBind* pBind = _player->GetBoundInstance(target->GetMapId(), target->GetDifficulty());
+            InstancePlayerBind* pBind = _player->GetBoundInstance(target->GetMapId(), target->GetDifficulty(cMap->IsRaid()));
             if (!pBind)
             {
                 Group* group = _player->GetGroup();
@@ -582,7 +582,10 @@ bool ChatHandler::HandleGonameCommand(char* args)
                 }
             }
 
-            _player->SetDifficulty(target->GetDifficulty());
+            if (cMap->IsRaid())
+                _player->SetRaidDifficulty(target->GetRaidDifficulty());
+            else
+                _player->SetDungeonDifficulty(target->GetDungeonDifficulty());
         }
 
         PSendSysMessage(LANG_APPEARING_AT, chrNameLink.c_str());
@@ -803,6 +806,40 @@ bool ChatHandler::HandleModifyRageCommand(char* args)
     return true;
 }
 
+// Edit Player Runic Power
+bool ChatHandler::HandleModifyRunicPowerCommand(char* args)
+{
+    if (!*args)
+        return false;
+
+    int32 rune = atoi(args) * 10;
+    int32 runem = atoi(args) * 10;
+
+    if (rune <= 0 || runem <= 0 || runem < rune)
+    {
+        SendSysMessage(LANG_BAD_VALUE);
+        SetSentErrorMessage(true);
+        return false;
+    }
+
+    Player* chr = getSelectedPlayer();
+    if (chr == NULL)
+    {
+        SendSysMessage(LANG_NO_CHAR_SELECTED);
+        SetSentErrorMessage(true);
+        return false;
+    }
+
+    PSendSysMessage(LANG_YOU_CHANGE_RUNIC_POWER, GetNameLink(chr).c_str(), rune / 10, runem / 10);
+    if (needReportToTarget(chr))
+        ChatHandler(chr).PSendSysMessage(LANG_YOURS_RUNIC_POWER_CHANGED, GetNameLink().c_str(), rune / 10, runem / 10);
+
+    chr->SetMaxPower(POWER_RUNIC_POWER, runem);
+    chr->SetPower(POWER_RUNIC_POWER, rune);
+
+    return true;
+}
+
 // Edit Player Faction
 bool ChatHandler::HandleModifyFactionCommand(char* args)
 {
@@ -877,7 +914,7 @@ bool ChatHandler::HandleModifyTalentCommand(char* args)
     if (tp < 0)
         return false;
 
-    Player* target = getSelectedPlayer();
+    Unit* target = getSelectedUnit();
     if (!target)
     {
         SendSysMessage(LANG_NO_CHAR_SELECTED);
@@ -885,12 +922,34 @@ bool ChatHandler::HandleModifyTalentCommand(char* args)
         return false;
     }
 
-    // check online security
-    if (HasLowerSecurity(target))
-        return false;
+    if (target->GetTypeId() == TYPEID_PLAYER)
+    {
+        // check online security
+        if (HasLowerSecurity((Player*)target))
+            return false;
 
-    target->SetFreeTalentPoints(tp);
-    return true;
+        ((Player*)target)->SetFreeTalentPoints(tp);
+        ((Player*)target)->SendTalentsInfoData(false);
+        return true;
+    }
+    else if (((Creature*)target)->IsPet())
+    {
+        Unit* owner = target->GetOwner();
+        if (owner && owner->GetTypeId() == TYPEID_PLAYER && ((Pet*)target)->IsPermanentPetFor((Player*)owner))
+        {
+            // check online security
+            if (HasLowerSecurity((Player*)owner))
+                return false;
+
+            ((Pet*)target)->SetFreeTalentPoints(tp);
+            ((Player*)owner)->SendTalentsInfoData(true);
+            return true;
+        }
+    }
+
+    SendSysMessage(LANG_NO_CHAR_SELECTED);
+    SetSentErrorMessage(true);
+    return false;
 }
 
 // Enable On\OFF all taxi paths
@@ -2060,8 +2119,6 @@ bool ChatHandler::HandleGoCommand(char* args)
 
     return HandleGoHelper(_player, mapid, x, y, &z);
 }
-
-
 
 // teleport at coordinates
 bool ChatHandler::HandleGoXYCommand(char* args)

@@ -82,6 +82,28 @@ void BattleGroundWS::Update(uint32 diff)
                 RespawnDroppedFlag(HORDE);
             }
         }
+
+        if (m_EndTimer <= diff)
+        {
+            if (m_TeamScores[BG_TEAM_ALLIANCE] > m_TeamScores[BG_TEAM_HORDE])
+                EndBattleGround(ALLIANCE);
+            else if (m_TeamScores[BG_TEAM_ALLIANCE] < m_TeamScores[BG_TEAM_HORDE])
+                EndBattleGround(HORDE);
+            else
+            {
+                // if 0 => tie
+                EndBattleGround(m_LastCapturedFlagTeam);
+            }
+        }
+        else
+        {
+            uint32 minutesLeftPrev = GetRemainingTimeInMinutes();
+            m_EndTimer -= diff;
+            uint32 minutesLeft = GetRemainingTimeInMinutes();
+
+            if (minutesLeft != minutesLeftPrev)
+                UpdateWorldState(BG_WS_TIME_REMAINING, minutesLeft);
+        }
     }
 }
 
@@ -94,6 +116,9 @@ void BattleGroundWS::StartingEventOpenDoors()
     SpawnEvent(WS_EVENT_SPIRITGUIDES_SPAWN, 0, true);
     SpawnEvent(WS_EVENT_FLAG_A, 0, true);
     SpawnEvent(WS_EVENT_FLAG_H, 0, true);
+
+    // Players that join battleground after start are not eligible to get achievement.
+    StartTimedAchievement(ACHIEVEMENT_CRITERIA_TYPE_WIN_BG, BG_WS_EVENT_START_BATTLE);
 }
 
 void BattleGroundWS::AddPlayer(Player* plr)
@@ -156,6 +181,8 @@ void BattleGroundWS::EventPlayerCapturedFlag(Player* source)
 {
     if (GetStatus() != STATUS_IN_PROGRESS)
         return;
+
+    m_LastCapturedFlagTeam = source->GetTeam();
 
     source->RemoveAurasWithInterruptFlags(AURA_INTERRUPT_FLAG_ENTER_PVP_COMBAT);
     if (source->GetTeam() == ALLIANCE)
@@ -513,6 +540,9 @@ void BattleGroundWS::Reset()
     m_ReputationCapture = (isBGWeekend) ? 45 : 35;
     m_HonorWinKills = (isBGWeekend) ? 3 : 1;
     m_HonorEndKills = (isBGWeekend) ? 4 : 2;
+
+    m_EndTimer = BG_WS_TIME_LIMIT;
+    m_LastCapturedFlagTeam = TEAM_NONE;
 }
 
 void BattleGroundWS::EndBattleGround(Team winner)
@@ -613,4 +643,7 @@ void BattleGroundWS::FillInitialWorldStates(WorldPacket& data, uint32& count)
         FillInitialWorldState(data, count, BG_WS_FLAG_STATE_ALLIANCE, 2);
     else
         FillInitialWorldState(data, count, BG_WS_FLAG_STATE_ALLIANCE, 1);
+
+    FillInitialWorldState(data, count, BG_WS_TIME_ENABLED, WORLD_STATE_ADD);
+    FillInitialWorldState(data, count, BG_WS_TIME_REMAINING, GetRemainingTimeInMinutes());
 }

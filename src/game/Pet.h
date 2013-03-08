@@ -30,10 +30,11 @@ enum PetType
     HUNTER_PET              = 1,
     GUARDIAN_PET            = 2,
     MINI_PET                = 3,
-    MAX_PET_TYPE            = 4
+    PROTECTOR_PET           = 4,                            // work as defensive guardian with mini pet suffix in name
+    MAX_PET_TYPE            = 5
 };
 
-#define MAX_PET_STABLES         2
+#define MAX_PET_STABLES         4
 
 // stored in character_pet.slot
 enum PetSaveMode
@@ -62,16 +63,6 @@ enum HappinessState
     UNHAPPY = 1,
     CONTENT = 2,
     HAPPY   = 3
-};
-
-enum LoyaltyLevel
-{
-    REBELLIOUS  = 1,
-    UNRULY      = 2,
-    SUBMISSIVE  = 3,
-    DEPENDABLE  = 4,
-    FAITHFUL    = 5,
-    BEST_FRIEND = 6
 };
 
 enum PetSpellState
@@ -131,13 +122,9 @@ enum PetNameInvalidReason
 };
 
 typedef UNORDERED_MAP<uint32, PetSpell> PetSpellMap;
-typedef std::map<uint32, uint32> TeachSpellMap;
 typedef std::vector<uint32> AutoSpellList;
 
 #define HAPPINESS_LEVEL_SIZE        333000
-
-extern const uint32 LevelUpLoyalty[6];
-extern const uint32 LevelStartLoyalty[6];
 
 #define ACTIVE_SPELLS_MAX           4
 
@@ -159,6 +146,7 @@ class MANGOS_DLL_SPEC Pet : public Creature
         void setPetType(PetType type) { m_petType = type; }
         bool isControlled() const { return getPetType() == SUMMON_PET || getPetType() == HUNTER_PET; }
         bool isTemporarySummoned() const { return m_duration > 0; }
+
         bool IsPermanentPetFor(Player* owner);              // pet have tab in character windows and set UNIT_FIELD_PETNUMBER
 
         bool Create(uint32 guidlow, CreatureCreatePos& cPos, CreatureInfo const* cinfo, uint32 pet_number);
@@ -181,16 +169,9 @@ class MANGOS_DLL_SPEC Pet : public Creature
         }
 
         void RegenerateAll(uint32 update_diff) override;    // overwrite Creature::RegenerateAll
-        void RegenerateFocus();
+        void Regenerate(Powers power);
         void LooseHappiness();
-        void TickLoyaltyChange();
-        void ModifyLoyalty(int32 addvalue);
         HappinessState GetHappinessState();
-        uint32 GetMaxLoyaltyPoints(uint32 level);
-        uint32 GetStartLoyaltyPoints(uint32 level);
-        void KillLoyaltyBonus(uint32 level);
-        uint32 GetLoyaltyLevel() { return GetByteValue(UNIT_FIELD_BYTES_1, 1); }
-        void SetLoyaltyLevel(LoyaltyLevel level);
         void GivePetXP(uint32 xp);
         void GivePetLevel(uint32 level);
         void SynchronizeLevelWithOwner();
@@ -211,16 +192,13 @@ class MANGOS_DLL_SPEC Pet : public Creature
         void UpdateAttackPowerAndDamage(bool ranged = false) override;
         void UpdateDamagePhysical(WeaponAttackType attType) override;
 
-        bool   CanTakeMoreActiveSpells(uint32 SpellIconID);
-        void   ToggleAutocast(uint32 spellid, bool apply);
-        bool   HasTPForSpell(uint32 spellid);
-        int32  GetTPForSpell(uint32 spellid);
+        bool CanTakeMoreActiveSpells(uint32 SpellIconID);
+        void ToggleAutocast(uint32 spellid, bool apply);
 
         void ApplyModeFlags(PetModeFlags mode, bool apply);
         PetModeFlags GetModeFlags() const { return m_petModeFlags; }
 
         bool HasSpell(uint32 spell) const override;
-        void AddTeachSpell(uint32 learned_id, uint32 source_id) { m_teachspells[learned_id] = source_id; }
 
         void LearnPetPassives();
         void CastPetAuras(bool current);
@@ -235,24 +213,30 @@ class MANGOS_DLL_SPEC Pet : public Creature
 
         bool addSpell(uint32 spell_id, ActiveStates active = ACT_DECIDE, PetSpellState state = PETSPELL_NEW, PetSpellType type = PETSPELL_NORMAL);
         bool learnSpell(uint32 spell_id);
+        void learnSpellHighRank(uint32 spellid);
+        void InitLevelupSpellsForLevel();
         bool unlearnSpell(uint32 spell_id, bool learn_prev, bool clear_ab = true);
         bool removeSpell(uint32 spell_id, bool learn_prev, bool clear_ab = true);
         void CleanupActionBar();
 
         PetSpellMap     m_spells;
-        TeachSpellMap   m_teachspells;
         AutoSpellList   m_autospells;
 
         void InitPetCreateSpells();
-        void CheckLearning(uint32 spellid);
+
+        bool resetTalents(bool no_cost = false);
+        static void resetTalentsForAllPetsOf(Player* owner, Pet* online_pet = NULL);
         uint32 resetTalentsCost() const;
+        void InitTalentForLevel();
 
-        void  SetTP(int32 TP);
-        int32 GetDispTP();
+        uint8 GetMaxTalentPointsForLevel(uint32 level);
+        uint8 GetFreeTalentPoints() { return GetByteValue(UNIT_FIELD_BYTES_1, 1); }
+        void SetFreeTalentPoints(uint8 points) { SetByteValue(UNIT_FIELD_BYTES_1, 1, points); }
+        void UpdateFreeTalentPoints(bool resetIfNeed = true);
 
-        int32   m_TrainingPoints;
         uint32  m_resetTalentsCost;
         time_t  m_resetTalentsTime;
+        uint32  m_usedTalentCount;
 
         const uint64& GetAuraUpdateMask() const { return m_auraUpdateMask; }
         void SetAuraUpdateMask(uint8 slot) { m_auraUpdateMask |= (uint64(1) << slot); }
@@ -266,10 +250,8 @@ class MANGOS_DLL_SPEC Pet : public Creature
         bool    m_removed;                                  // prevent overwrite pet state in DB at next Pet::Update if pet already removed(saved)
     protected:
         uint32  m_happinessTimer;
-        uint32  m_loyaltyTimer;
         PetType m_petType;
         int32   m_duration;                                 // time until unsummon (used mostly for summoned guardians and not used for controlled pets)
-        int32   m_loyaltyPoints;
         int32   m_bonusdamage;
         uint64  m_auraUpdateMask;
         bool    m_loading;
@@ -279,7 +261,7 @@ class MANGOS_DLL_SPEC Pet : public Creature
     private:
         PetModeFlags m_petModeFlags;
 
-        void SaveToDB(uint32, uint8) override               // overwrited of Creature::SaveToDB     - don't must be called
+        void SaveToDB(uint32, uint8, uint32) override       // overwrite of Creature::SaveToDB     - don't must be called
         {
             MANGOS_ASSERT(false);
         }

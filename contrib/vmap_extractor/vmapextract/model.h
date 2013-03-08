@@ -35,9 +35,9 @@ class Model
 {
     public:
         ModelHeader header;
-        ModelVertex* origVertices;
-        Vec3D* vertices;
-        uint16* indices;
+        uint32 offsBB_vertices, offsBB_indices;
+        Vec3D* BB_vertices, *vertices;
+        uint16* BB_indices, *indices;
         size_t nIndices;
 
         bool open(StringSet& failedPaths);
@@ -72,7 +72,6 @@ class ModelInstance
 
         ModelInstance() {}
         ModelInstance(MPQFile& f, const char* ModelInstName, uint32 mapID, uint32 tileX, uint32 tileY, FILE* pDirfile);
-
 };
 
 #endif

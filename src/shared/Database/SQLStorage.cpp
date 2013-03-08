@@ -131,10 +131,10 @@ void SQLStorage::Free()
     m_Index = NULL;
 }
 
-void SQLStorage::Load(bool error_at_empty /*= true*/)
+void SQLStorage::Load()
 {
     SQLStorageLoader loader;
-    loader.Load(*this, error_at_empty);
+    loader.Load(*this);
 }
 
 SQLStorage::SQLStorage(const char* fmt, const char* _entry_field, const char* sqlname)

@@ -58,10 +58,10 @@ CanCastResult CreatureAI::CanCastSpell(Unit* pTarget, const SpellEntry* pSpell, 
             // pTarget is out of range of this spell (also done by Spell::CheckCast())
             float fDistance = m_creature->GetCombatDistance(pTarget);
 
-            if (fDistance > pSpellRange->maxRange)
+            if (fDistance > (m_creature->IsHostileTo(pTarget) ? pSpellRange->maxRange : pSpellRange->maxRangeFriendly))
                 return CAST_FAIL_TOO_FAR;
 
-            float fMinRange = pSpellRange->minRange;
+            float fMinRange = m_creature->IsHostileTo(pTarget) ? pSpellRange->minRange : pSpellRange->minRangeFriendly;
 
             if (fMinRange && fDistance < fMinRange)
                 return CAST_FAIL_TOO_CLOSE;

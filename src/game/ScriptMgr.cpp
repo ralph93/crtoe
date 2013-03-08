@@ -458,6 +458,11 @@ void ScriptMgr::LoadScripts(ScriptMapMapName& scripts, const char* tablename)
                                     tablename, tmp.playSound.soundId, tmp.id);
                     continue;
                 }
+                // bitmask: 0/1=target-player, 0/2=with distance dependent, 0/4=map wide, 0/8=zone wide
+                if (tmp.playSound.flags & ~(1 | 2 | 4 | 8))
+                    sLog.outErrorDb("Table `%s` using unsupported sound flags (datalong2: %u) in SCRIPT_COMMAND_PLAY_SOUND for script id %u, unsupported flags will be ignored", tablename, tmp.playSound.flags, tmp.id);
+                if ((tmp.playSound.flags & (1 | 2)) > 0 && (tmp.playSound.flags & (4 | 8)) > 0)
+                    sLog.outErrorDb("Table `%s` uses sound flags (datalong2: %u) in SCRIPT_COMMAND_PLAY_SOUND for script id %u, combining (1|2) with (4|8) makes no sense", tablename, tmp.playSound.flags, tmp.id);
                 break;
             }
             case SCRIPT_COMMAND_CREATE_ITEM:                // 17
@@ -483,9 +488,13 @@ void ScriptMgr::LoadScripts(ScriptMapMapName& scripts, const char* tablename)
             }
             case SCRIPT_COMMAND_PLAY_MOVIE:                 // 19
             {
-                sLog.outErrorDb("Table `%s` use unsupported SCRIPT_COMMAND_PLAY_MOVIE for script id %u",
-                                tablename, tmp.id);
-                continue;
+                if (!sMovieStore.LookupEntry(tmp.playMovie.movieId))
+                {
+                    sLog.outErrorDb("Table `%s` use non-existing movie_id (id: %u) in SCRIPT_COMMAND_PLAY_MOVIE for script id %u",
+                                    tablename, tmp.playMovie.movieId, tmp.id);
+                    continue;
+                }
+                break;
             }
             case SCRIPT_COMMAND_MOVEMENT:                   // 20
             {
@@ -763,7 +772,7 @@ void ScriptMgr::LoadCreatureDeathScripts()
     LoadScripts(sCreatureDeathScripts, "dbscripts_on_creature_death");
 
     // check ids
-    for(ScriptMapMap::const_iterator itr = sCreatureDeathScripts.second.begin(); itr != sCreatureDeathScripts.second.end(); ++itr)
+    for (ScriptMapMap::const_iterator itr = sCreatureDeathScripts.second.begin(); itr != sCreatureDeathScripts.second.end(); ++itr)
     {
         if (!sObjectMgr.GetCreatureTemplate(itr->first))
             sLog.outErrorDb("Table `dbscripts_on_creature_death` has not existing creature (Entry: %u) as script id", itr->first);
@@ -833,6 +842,7 @@ bool ScriptAction::GetScriptCommandObject(const ObjectGuid guid, bool includeIte
     switch (guid.GetHigh())
     {
         case HIGHGUID_UNIT:
+        case HIGHGUID_VEHICLE:
             resultObject = m_map->GetCreature(guid);
             break;
         case HIGHGUID_PET:
@@ -1029,7 +1039,7 @@ bool ScriptAction::HandleScriptStep()
                 }
 
                 // Use one random
-                textId = m_script->textId[urand(0, i-1)];
+                textId = m_script->textId[urand(0, i - 1)];
             }
 
             switch (m_script->talk.chatType)
@@ -1378,7 +1388,7 @@ bool ScriptAction::HandleScriptStep()
                 break;
             }
 
-            // bitmask: 0/1=anyone/target, 0/2=with distance dependent
+            // bitmask: 0/1=target-player, 0/2=with distance dependent, 0/4=map wide, 0/8=zone wide
             Player* pSoundTarget = NULL;
             if (m_script->playSound.flags & 1)
             {
@@ -1387,9 +1397,10 @@ bool ScriptAction::HandleScriptStep()
                     break;
             }
 
-            // bitmask: 0/1=anyone/target, 0/2=with distance dependent
             if (m_script->playSound.flags & 2)
                 pSource->PlayDistanceSound(m_script->playSound.soundId, pSoundTarget);
+            else if (m_script->playSound.flags & (4 | 8))
+                m_map->PlayDirectSoundToMap(m_script->playSound.soundId, m_script->playSound.flags & 8 ? pSource->GetZoneId() : 0);
             else
                 pSource->PlayDirectSound(m_script->playSound.soundId, pSoundTarget);
 
@@ -1424,7 +1435,13 @@ bool ScriptAction::HandleScriptStep()
         }
         case SCRIPT_COMMAND_PLAY_MOVIE:                     // 19
         {
-            break;                                      // must be skipped at loading
+            Player* pPlayer = GetPlayerTargetOrSourceAndLog(pSource, pTarget);
+            if (!pPlayer)
+                break;
+
+            pPlayer->SendMovieStart(m_script->playMovie.movieId);
+
+            break;
         }
         case SCRIPT_COMMAND_MOVEMENT:                       // 20
         {
@@ -1642,12 +1659,12 @@ bool ScriptAction::HandleScriptStep()
 
             if (result)                                    // Terminate further steps of this script
             {
-                 if (m_script->textId[0] && !LogIfNotCreature(pSource))
-                 {
-                     Creature* cSource = static_cast<Creature*>(pSource);
-                     if (cSource->GetMotionMaster()->GetCurrentMovementGeneratorType() == WAYPOINT_MOTION_TYPE)
-                         (static_cast<WaypointMovementGenerator<Creature>* >(cSource->GetMotionMaster()->top()))->AddToWaypointPauseTime(m_script->textId[0]);
-                 }
+                if (m_script->textId[0] && !LogIfNotCreature(pSource))
+                {
+                    Creature* cSource = static_cast<Creature*>(pSource);
+                    if (cSource->GetMotionMaster()->GetCurrentMovementGeneratorType() == WAYPOINT_MOTION_TYPE)
+                        (static_cast<WaypointMovementGenerator<Creature>* >(cSource->GetMotionMaster()->top()))->AddToWaypointPauseTime(m_script->textId[0]);
+                }
 
                 return true;
             }
@@ -2000,7 +2017,7 @@ ScriptLoadResult ScriptMgr::LoadScriptLibrary(const char* libName)
         }
 
     // let check used mangosd revision for build library (unsafe use with different revision because changes in inline functions, define and etc)
-    char const*(MANGOS_IMPORT * pGetMangosRevStr)();
+    char const* (MANGOS_IMPORT * pGetMangosRevStr)();
 
     GET_SCRIPT_HOOK_PTR(pGetMangosRevStr,              "GetMangosRevStr");
 
@@ -2112,6 +2129,12 @@ void ScriptMgr::CollectPossibleEventIds(std::set<uint32>& eventIds)
                 eventIds.insert(itr->capturePoint.progressEventID2);
                 eventIds.insert(itr->capturePoint.winEventID1);
                 eventIds.insert(itr->capturePoint.winEventID2);
+                break;
+            case GAMEOBJECT_TYPE_DESTRUCTIBLE_BUILDING:
+                eventIds.insert(itr->destructibleBuilding.damagedEvent);
+                eventIds.insert(itr->destructibleBuilding.destroyedEvent);
+                eventIds.insert(itr->destructibleBuilding.intactEvent);
+                eventIds.insert(itr->destructibleBuilding.rebuildingEvent);
                 break;
             default:
                 break;

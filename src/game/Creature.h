@@ -70,7 +70,7 @@ enum CreatureFlagsExtra
 struct CreatureInfo
 {
     uint32  Entry;
-    uint32  HeroicEntry;
+    uint32  DifficultyEntry[MAX_DIFFICULTY - 1];
     uint32  KillCredit[MAX_KILL_CREDIT];
     uint32  ModelId[MAX_CREATURE_MODEL];
     char*   Name;
@@ -129,7 +129,10 @@ struct CreatureInfo
     float   healthModifier;
     float   powerModifier;
     bool    RacialLeader;
+    uint32  questItems[6];
+    uint32  movementId;
     bool    RegenHealth;
+    uint32  vehicleId;
     uint32  equipmentId;
     uint32  trainerId;
     uint32  vendorId;
@@ -138,9 +141,9 @@ struct CreatureInfo
     uint32  ScriptID;
 
     // helpers
-    static HighGuid GetHighGuid()
+    HighGuid GetHighGuid() const
     {
-        return HIGHGUID_UNIT;                               // in pre-3.x always HIGHGUID_UNIT
+        return vehicleId ? HIGHGUID_VEHICLE : HIGHGUID_UNIT;
     }
 
     ObjectGuid GetObjectGuid(uint32 lowguid) const { return ObjectGuid(GetHighGuid(), Entry, lowguid); }
@@ -151,13 +154,24 @@ struct CreatureInfo
             return SKILL_HERBALISM;
         else if (type_flags & CREATURE_TYPEFLAGS_MININGLOOT)
             return SKILL_MINING;
+        else if (type_flags & CREATURE_TYPEFLAGS_ENGINEERLOOT)
+            return SKILL_ENGINEERING;
         else
             return SKILL_SKINNING;                          // normal case
     }
 
-    bool isTameable() const
+    bool IsExotic() const
     {
-        return type == CREATURE_TYPE_BEAST && family != 0 && (type_flags & CREATURE_TYPEFLAGS_TAMEABLE);
+        return (type_flags & CREATURE_TYPEFLAGS_EXOTIC);
+    }
+
+    bool isTameable(bool exotic) const
+    {
+        if (type != CREATURE_TYPE_BEAST || family == 0 || (type_flags & CREATURE_TYPEFLAGS_TAMEABLE) == 0)
+            return false;
+
+        // if can tame exotic then can tame any temable
+        return exotic || !IsExotic();
     }
 };
 
@@ -173,20 +187,12 @@ struct EquipmentInfo
     uint32  equipentry[3];
 };
 
-// depricated old way
-struct EquipmentInfoRaw
-{
-    uint32  entry;
-    uint32  equipmodel[3];
-    uint32  equipinfo[3];
-    uint32  equipslot[3];
-};
-
 // from `creature` table
 struct CreatureData
 {
     uint32 id;                                              // entry in creature_template
     uint16 mapid;
+    uint16 phaseMask;
     uint32 modelid_override;                                // overrides any model defined in creature_template
     int32 equipmentId;
     float posX;
@@ -203,13 +209,13 @@ struct CreatureData
     uint8 spawnMask;
 
     // helper function
-    ObjectGuid GetObjectGuid(uint32 lowguid) const { return ObjectGuid(CreatureInfo::GetHighGuid(), id, lowguid); }
+    ObjectGuid GetObjectGuid(uint32 lowguid) const;
 };
 
 enum SplineFlags
 {
-    SPLINEFLAG_WALKMODE     = 0x0000100,
-    SPLINEFLAG_FLYING       = 0x0000200,
+    SPLINEFLAG_WALKMODE     = 0x00001000,
+    SPLINEFLAG_FLYING       = 0x00002000,
 };
 
 // from `creature_addon` and `creature_template_addon`tables
@@ -219,9 +225,9 @@ struct CreatureDataAddon
     uint32 mount;
     uint32 bytes1;
     uint8  sheath_state;                                    // SheathState
-    uint8  flags;                                           // UnitBytes2_Flags
+    uint8  pvp_state;                                       // UnitPVPStateFlags
     uint32 emote;
-    uint32 move_flags;
+    uint32 splineFlags;
     uint32 const* auras;                                    // loaded as char* "spell1 spell2 ... "
 };
 
@@ -302,6 +308,7 @@ enum SelectFlags
     SELECT_FLAG_POWER_MANA          = 0x004,                // For Energy based spells, like manaburn
     SELECT_FLAG_POWER_RAGE          = 0x008,
     SELECT_FLAG_POWER_ENERGY        = 0x010,
+    SELECT_FLAG_POWER_RUNIC         = 0x020,
     SELECT_FLAG_IN_MELEE_RANGE      = 0x040,
     SELECT_FLAG_NOT_IN_MELEE_RANGE  = 0x080,
 };
@@ -336,8 +343,7 @@ struct VendorItemData
         m_items.push_back(new VendorItem(item, maxcount, ptime, ExtendedCost, conditonId));
     }
     bool RemoveItem(uint32 item_id);
-    VendorItem const* FindItem(uint32 item_id) const;
-    size_t FindItemSlot(uint32 item_id) const;
+    VendorItem const* FindItemCostPair(uint32 item_id, uint32 extendedCost) const;
 
     void Clear()
     {
@@ -361,10 +367,10 @@ typedef std::list<VendorItemCount> VendorItemCounts;
 
 struct TrainerSpell
 {
-    TrainerSpell() : spell(0), spellCost(0), reqSkill(0), reqSkillValue(0), reqLevel(0), isProvidedReqLevel(false) {}
+    TrainerSpell() : spell(0), spellCost(0), reqSkill(0), reqSkillValue(0), reqLevel(0), learnedSpell(0), isProvidedReqLevel(false) {}
 
-    TrainerSpell(uint32 _spell, uint32 _spellCost, uint32 _reqSkill, uint32 _reqSkillValue, uint32 _reqLevel, bool _isProvidedReqLevel)
-        : spell(_spell), spellCost(_spellCost), reqSkill(_reqSkill), reqSkillValue(_reqSkillValue), reqLevel(_reqLevel), isProvidedReqLevel(_isProvidedReqLevel)
+    TrainerSpell(uint32 _spell, uint32 _spellCost, uint32 _reqSkill, uint32 _reqSkillValue, uint32 _reqLevel, uint32 _learnedspell, bool _isProvidedReqLevel)
+        : spell(_spell), spellCost(_spellCost), reqSkill(_reqSkill), reqSkillValue(_reqSkillValue), reqLevel(_reqLevel), learnedSpell(_learnedspell), isProvidedReqLevel(_isProvidedReqLevel)
     {}
 
     uint32 spell;
@@ -372,7 +378,11 @@ struct TrainerSpell
     uint32 reqSkill;
     uint32 reqSkillValue;
     uint32 reqLevel;
+    uint32 learnedSpell;
     bool isProvidedReqLevel;
+
+    // helpers
+    bool IsCastable() const { return learnedSpell != spell; }
 };
 
 typedef UNORDERED_MAP < uint32 /*spellid*/, TrainerSpell > TrainerSpellMap;
@@ -393,7 +403,7 @@ typedef std::map<uint32, time_t> CreatureSpellCooldowns;
 // max different by z coordinate for creature aggro reaction
 #define CREATURE_Z_ATTACK_RANGE 3
 
-#define MAX_VENDOR_ITEMS 255                                // Limitation in item count field size in SMSG_LIST_INVENTORY
+#define MAX_VENDOR_ITEMS 150                                // Limitation in 3.x.x item count in SMSG_LIST_INVENTORY
 
 enum VirtualItemSlot
 {
@@ -404,29 +414,19 @@ enum VirtualItemSlot
 
 #define MAX_VIRTUAL_ITEM_SLOT 3
 
-enum VirtualItemInfoByteOffset
-{
-    VIRTUAL_ITEM_INFO_0_OFFSET_CLASS         = 0,
-    VIRTUAL_ITEM_INFO_0_OFFSET_SUBCLASS      = 1,
-    VIRTUAL_ITEM_INFO_0_OFFSET_UNK0          = 2,
-    VIRTUAL_ITEM_INFO_0_OFFSET_MATERIAL      = 3,
-
-    VIRTUAL_ITEM_INFO_1_OFFSET_INVENTORYTYPE = 0,
-    VIRTUAL_ITEM_INFO_1_OFFSET_SHEATH        = 1,
-};
-
 struct CreatureCreatePos
 {
     public:
         // exactly coordinates used
-        CreatureCreatePos(Map* map, float x, float y, float z, float o)
-            : m_map(map), m_closeObject(NULL), m_angle(0.0f), m_dist(0.0f) { m_pos.x = x; m_pos.y = y; m_pos.z = z; m_pos.o = o; }
+        CreatureCreatePos(Map* map, float x, float y, float z, float o, uint32 phaseMask)
+            : m_map(map), m_phaseMask(phaseMask), m_closeObject(NULL), m_angle(0.0f), m_dist(0.0f) { m_pos.x = x; m_pos.y = y; m_pos.z = z; m_pos.o = o; }
         // if dist == 0.0f -> exactly object coordinates used, in other case close point to object (CONTACT_DIST can be used as minimal distances)
         CreatureCreatePos(WorldObject* closeObject, float ori, float dist = 0.0f, float angle = 0.0f)
-            : m_map(closeObject->GetMap()),
+            : m_map(closeObject->GetMap()), m_phaseMask(closeObject->GetPhaseMask()),
               m_closeObject(closeObject), m_angle(angle), m_dist(dist) { m_pos.o = ori; }
     public:
         Map* GetMap() const { return m_map; }
+        uint32 GetPhaseMask() const { return m_phaseMask; }
         void SelectFinalPoint(Creature* cr);
         bool Relocate(Creature* cr) const;
 
@@ -434,6 +434,7 @@ struct CreatureCreatePos
         Position m_pos;
     private:
         Map* m_map;
+        uint32 m_phaseMask;
         WorldObject* m_closeObject;
         float m_angle;
         float m_dist;
@@ -530,6 +531,8 @@ class MANGOS_DLL_SPEC Creature : public Unit
 
         uint32 GetLevelForTarget(Unit const* target) const override; // overwrite Unit::GetLevelForTarget for boss level support
 
+        uint8 getRace() const override;
+
         bool IsInEvadeMode() const;
 
         bool AIM_Initialize();
@@ -596,7 +599,7 @@ class MANGOS_DLL_SPEC Creature : public Unit
         bool LoadFromDB(uint32 guid, Map* map);
         void SaveToDB();
         // overwrited in Pet
-        virtual void SaveToDB(uint32 mapid, uint8 spawnMask);
+        virtual void SaveToDB(uint32 mapid, uint8 spawnMask, uint32 phaseMask);
         virtual void DeleteFromDB();                        // overwrited in Pet
         static void DeleteFromDB(uint32 lowguid, CreatureData const* data);
 
@@ -678,7 +681,7 @@ class MANGOS_DLL_SPEC Creature : public Unit
         bool HasQuest(uint32 quest_id) const override;
         bool HasInvolvedQuest(uint32 quest_id)  const override;
 
-        GridReference<Creature> &GetGridRef() { return m_gridRef; }
+        GridReference<Creature>& GetGridRef() { return m_gridRef; }
         bool IsRegeneratingHealth() { return m_regenHealth; }
         virtual uint8 GetPetAutoSpellSize() const { return CREATURE_MAX_SPELLS; }
         virtual uint32 GetPetAutoSpellOnPos(uint8 pos) const
@@ -704,8 +707,8 @@ class MANGOS_DLL_SPEC Creature : public Unit
 
         void SendAreaSpiritHealerQueryOpcode(Player* pl);
 
-        void SetVirtualItem(VirtualItemSlot slot, uint32 item_id);
-        void SetVirtualItemRaw(VirtualItemSlot slot, uint32 display_id, uint32 info0, uint32 info1);
+        void SetVirtualItem(VirtualItemSlot slot, uint32 item_id) { SetUInt32Value(UNIT_VIRTUAL_ITEM_SLOT_ID + slot, item_id); }
+
     protected:
         bool MeetsSelectAttackingRequirement(Unit* pTarget, SpellEntry const* pSpellInfo, uint32 selectFlags) const;
 
@@ -761,7 +764,7 @@ class MANGOS_DLL_SPEC Creature : public Unit
 
     private:
         GridReference<Creature> m_gridRef;
-        CreatureInfo const* m_creatureInfo;                 // in heroic mode can different from sObjectMgr::GetCreatureTemplate(GetEntry())
+        CreatureInfo const* m_creatureInfo;                 // in difficulty mode > 0 can different from ObjMgr::GetCreatureTemplate(GetEntry())
 };
 
 class AssistDelayEvent : public BasicEvent

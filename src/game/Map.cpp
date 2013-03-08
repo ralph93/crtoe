@@ -29,6 +29,7 @@
 #include "ObjectAccessor.h"
 #include "ObjectMgr.h"
 #include "World.h"
+#include "ScriptMgr.h"
 #include "Group.h"
 #include "MapRefManager.h"
 #include "DBCEnums.h"
@@ -36,8 +37,7 @@
 #include "VMapFactory.h"
 #include "MoveMap.h"
 #include "BattleGround/BattleGroundMgr.h"
-
-#define MAX_GRID_LOAD_TIME      50
+#include "Calendar.h"
 
 Map::~Map()
 {
@@ -381,7 +381,7 @@ void Map::MessageBroadcast(WorldObject* obj, WorldPacket* msg)
 
     // TODO: currently on continents when Visibility.Distance.InFlight > Visibility.Distance.Continents
     // we have alot of blinking mobs because monster move packet send is broken...
-    MaNGOS::ObjectMessageDeliverer post_man(msg);
+    MaNGOS::ObjectMessageDeliverer post_man(*obj, msg);
     TypeContainerVisitor<MaNGOS::ObjectMessageDeliverer, WorldTypeMapContainer > message(post_man);
     cell.Visit(p, message, *this, *obj, GetVisibilityDistance());
 }
@@ -826,17 +826,31 @@ void Map::UnloadAll(bool pForce)
     }
 }
 
+MapDifficultyEntry const* Map::GetMapDifficulty() const
+{
+    return GetMapDifficultyData(GetId(), GetDifficulty());
+}
+
 uint32 Map::GetMaxPlayers() const
 {
-    InstanceTemplate const* iTemplate = ObjectMgr::GetInstanceTemplate(GetId());
-    if (!iTemplate)
+    if (MapDifficultyEntry const* mapDiff = GetMapDifficulty())
+    {
+        if (mapDiff->maxPlayers || IsRegularDifficulty())   // Normal case (expect that regular difficulty always have correct maxplayers)
+            return mapDiff->maxPlayers;
+        else                                                // DBC have 0 maxplayers for heroic instances with expansion < 2
+        {
+            // The heroic entry exists, so we don't have to check anything, simply return normal max players
+            MapDifficultyEntry const* normalDiff = GetMapDifficultyData(i_id, REGULAR_DIFFICULTY);
+            return normalDiff ? normalDiff->maxPlayers : 0;
+        }
+    }
+    else                                                    // I'd rather ASSERT(false);
         return 0;
-    return iTemplate->maxPlayers;
 }
 
 uint32 Map::GetMaxResetDelay() const
 {
-    return DungeonResetScheduler::GetMaxResetTimeFor(ObjectMgr::GetInstanceTemplate(GetId()));
+    return DungeonResetScheduler::GetMaxResetTimeFor(GetMapDifficulty());
 }
 
 bool Map::CheckGridIntegrity(Creature* c, bool moved) const
@@ -877,12 +891,9 @@ void Map::SendInitSelf(Player* player)
 
     UpdateData data;
 
-    bool hasTransport = false;
-
     // attach to player data current transport data
     if (Transport* transport = player->GetTransport())
     {
-        hasTransport = true;
         transport->BuildCreateUpdateBlockForPlayer(&data, player);
     }
 
@@ -896,14 +907,13 @@ void Map::SendInitSelf(Player* player)
         {
             if (player != (*itr) && player->HaveAtClient(*itr))
             {
-                hasTransport = true;
                 (*itr)->BuildCreateUpdateBlockForPlayer(&data, player);
             }
         }
     }
 
     WorldPacket packet;
-    data.BuildPacket(&packet, hasTransport);
+    data.BuildPacket(&packet);
     player->GetSession()->SendPacket(&packet);
 }
 
@@ -920,20 +930,17 @@ void Map::SendInitTransports(Player* player)
 
     MapManager::TransportSet& tset = tmap[player->GetMapId()];
 
-    bool hasTransport = false;
-
     for (MapManager::TransportSet::const_iterator i = tset.begin(); i != tset.end(); ++i)
     {
         // send data for current transport in other place
         if ((*i) != player->GetTransport() && (*i)->GetMapId() == i_id)
         {
-            hasTransport = true;
             (*i)->BuildCreateUpdateBlockForPlayer(&transData, player);
         }
     }
 
     WorldPacket packet;
-    transData.BuildPacket(&packet, hasTransport);
+    transData.BuildPacket(&packet);
     player->GetSession()->SendPacket(&packet);
 }
 
@@ -1326,6 +1333,7 @@ bool DungeonMap::Add(Player* player)
                     data << uint32(0);
                     player->GetSession()->SendPacket(&data);
                     player->BindToInstance(GetPersistanceState(), true);
+                    sCalendarMgr.SendCalendarRaidLockoutAdd(player, GetPersistanceState());
                 }
             }
         }
@@ -1432,6 +1440,7 @@ void DungeonMap::PermBindAllPlayers(Player* player)
             WorldPacket data(SMSG_INSTANCE_SAVE_CREATED, 4);
             data << uint32(0);
             plr->GetSession()->SendPacket(&data);
+            sCalendarMgr.SendCalendarRaidLockoutAdd(plr, GetPersistanceState());
         }
 
         // if the leader is not in the instance the group will not get a perm bind
@@ -1461,7 +1470,7 @@ void DungeonMap::UnloadAll(bool pForce)
 void DungeonMap::SendResetWarnings(uint32 timeLeft) const
 {
     for (MapRefManager::const_iterator itr = m_mapRefManager.begin(); itr != m_mapRefManager.end(); ++itr)
-        itr->getSource()->SendInstanceResetWarning(GetId(), timeLeft);
+        itr->getSource()->SendInstanceResetWarning(GetId(), itr->getSource()->GetDifficulty(IsRaid()), timeLeft);
 }
 
 void DungeonMap::SetResetSchedule(bool on)
@@ -1470,7 +1479,7 @@ void DungeonMap::SetResetSchedule(bool on)
     // the reset time is only scheduled when there are no payers inside
     // it is assumed that the reset time will rarely (if ever) change while the reset is scheduled
     if (!HavePlayers() && !IsRaidOrHeroicDungeon())
-        sMapPersistentStateMgr.GetScheduler().ScheduleReset(on, GetPersistanceState()->GetResetTime(), DungeonResetEvent(RESET_EVENT_NORMAL_DUNGEON, GetId(), GetInstanceId()));
+        sMapPersistentStateMgr.GetScheduler().ScheduleReset(on, GetPersistanceState()->GetResetTime(), DungeonResetEvent(RESET_EVENT_NORMAL_DUNGEON, GetId(), Difficulty(GetSpawnMode()), GetInstanceId()));
 }
 
 DungeonPersistentState* DungeonMap::GetPersistanceState() const
@@ -1478,11 +1487,10 @@ DungeonPersistentState* DungeonMap::GetPersistanceState() const
     return (DungeonPersistentState*)Map::GetPersistentState();
 }
 
-
 /* ******* Battleground Instance Maps ******* */
 
-BattleGroundMap::BattleGroundMap(uint32 id, time_t expiry, uint32 InstanceId)
-    : Map(id, expiry, InstanceId, REGULAR_DIFFICULTY)
+BattleGroundMap::BattleGroundMap(uint32 id, time_t expiry, uint32 InstanceId, uint8 spawnMode)
+    : Map(id, expiry, InstanceId, spawnMode)
 {
     // lets initialize visibility distance for BG/Arenas
     BattleGroundMap::InitVisibilityDistance();
@@ -1503,7 +1511,6 @@ BattleGroundPersistentState* BattleGroundMap::GetPersistanceState() const
 {
     return (BattleGroundPersistentState*)Map::GetPersistentState();
 }
-
 
 void BattleGroundMap::InitVisibilityDistance()
 {
@@ -1594,8 +1601,8 @@ bool Map::ScriptsStart(ScriptMapMapName const& scripts, uint32 id, Object* sourc
         for (ScriptScheduleMap::const_iterator searchItr = m_scriptSchedule.begin(); searchItr != m_scriptSchedule.end(); ++searchItr)
         {
             if (searchItr->second.IsSameScript(scripts.first, id,
-                    execParams & SCRIPT_EXEC_PARAM_UNIQUE_BY_SOURCE ? sourceGuid : ObjectGuid(),
-                    execParams & SCRIPT_EXEC_PARAM_UNIQUE_BY_TARGET ? targetGuid : ObjectGuid(), ownerGuid))
+                                               execParams & SCRIPT_EXEC_PARAM_UNIQUE_BY_SOURCE ? sourceGuid : ObjectGuid(),
+                                               execParams & SCRIPT_EXEC_PARAM_UNIQUE_BY_TARGET ? targetGuid : ObjectGuid(), ownerGuid))
             {
                 DEBUG_LOG("DB-SCRIPTS: Process table `%s` id %u. Skip script as script already started for source %s, target %s - ScriptsStartParams %u", scripts.first, id, sourceGuid.GetString().c_str(), targetGuid.GetString().c_str(), execParams);
                 return true;
@@ -1691,7 +1698,7 @@ Player* Map::GetPlayer(ObjectGuid guid)
 /**
  * Function return creature (non-pet and then most summoned by spell creatures) that in world at CURRENT map
  *
- * @param guid must be creature guid (HIGHGUID_UNIT)
+ * @param guid must be creature or vehicle guid (HIGHGUID_UNIT HIGHGUID_VEHICLE)
  */
 Creature* Map::GetCreature(ObjectGuid guid)
 {
@@ -1722,15 +1729,16 @@ Corpse* Map::GetCorpse(ObjectGuid guid)
 }
 
 /**
- * Function return non-player unit object that in world at CURRENT map, so creature, or pet
+ * Function return non-player unit object that in world at CURRENT map, so creature, or pet, or vehicle
  *
- * @param guid must be non-player unit guid (HIGHGUID_PET HIGHGUID_UNIT)
+ * @param guid must be non-player unit guid (HIGHGUID_PET HIGHGUID_UNIT HIGHGUID_VEHICLE)
  */
 Creature* Map::GetAnyTypeCreature(ObjectGuid guid)
 {
     switch (guid.GetHigh())
     {
-        case HIGHGUID_UNIT:         return GetCreature(guid);
+        case HIGHGUID_UNIT:
+        case HIGHGUID_VEHICLE:      return GetCreature(guid);
         case HIGHGUID_PET:          return GetPet(guid);
         default:                    break;
     }
@@ -1764,7 +1772,7 @@ DynamicObject* Map::GetDynamicObject(ObjectGuid guid)
  * Note: in case player guid not always expected need player at current map only.
  *       For example in spell casting can be expected any in world player targeting in some cases
  *
- * @param guid must be unit guid (HIGHGUID_PLAYER HIGHGUID_PET HIGHGUID_UNIT)
+ * @param guid must be unit guid (HIGHGUID_PLAYER HIGHGUID_PET HIGHGUID_UNIT HIGHGUID_VEHICLE)
  */
 Unit* Map::GetUnit(ObjectGuid guid)
 {
@@ -1783,9 +1791,10 @@ WorldObject* Map::GetWorldObject(ObjectGuid guid)
     {
         case HIGHGUID_PLAYER:       return GetPlayer(guid);
         case HIGHGUID_GAMEOBJECT:   return GetGameObject(guid);
-        case HIGHGUID_UNIT:         return GetCreature(guid);
+        case HIGHGUID_UNIT:
+        case HIGHGUID_VEHICLE:      return GetCreature(guid);
         case HIGHGUID_PET:          return GetPet(guid);
-        case HIGHGUID_DYNAMICOBJECT:return GetDynamicObject(guid);
+        case HIGHGUID_DYNAMICOBJECT: return GetDynamicObject(guid);
         case HIGHGUID_CORPSE:
         {
             // corpse special case, it can be not in world
@@ -1833,6 +1842,8 @@ uint32 Map::GenerateLocalLowGuid(HighGuid guidhigh)
             return m_DynObjectGuids.Generate();
         case HIGHGUID_PET:
             return m_PetGuids.Generate();
+        case HIGHGUID_VEHICLE:
+            return m_VehicleGuids.Generate();
         default:
             MANGOS_ASSERT(false);
             return 0;
@@ -1871,7 +1882,6 @@ class StaticMonsterChatBuilder
         Unit* i_target;
 };
 
-
 /**
  * Function simulates yell of creature
  *
@@ -1899,7 +1909,6 @@ void Map::MonsterYellToMap(ObjectGuid guid, int32 textId, uint32 language, Unit*
         return;
     }
 }
-
 
 /**
  * Function simulates yell of creature
@@ -1941,17 +1950,17 @@ void Map::PlayDirectSoundToMap(uint32 soundId, uint32 zoneId /*=0*/)
 /**
  * Function to check if a point is in line of sight from an other point
  */
-bool Map::IsInLineOfSight(float srcX, float srcY, float srcZ, float destX, float destY, float destZ) const
+bool Map::IsInLineOfSight(float srcX, float srcY, float srcZ, float destX, float destY, float destZ, uint32 phasemask) const
 {
     return VMAP::VMapFactory::createOrGetVMapManager()->isInLineOfSight(GetId(), srcX, srcY, srcZ, destX, destY, destZ)
-           && m_dyn_tree.isInLineOfSight(srcX, srcY, srcZ, destX, destY, destZ);
+           && m_dyn_tree.isInLineOfSight(srcX, srcY, srcZ, destX, destY, destZ, phasemask);
 }
 
 /**
  * get the hit position and return true if we hit something (in this case the dest position will hold the hit-position)
  * otherwise the result pos will be the dest pos
  */
-bool Map::GetHitPosition(float srcX, float srcY, float srcZ, float& destX, float& destY, float& destZ, float modifyDist) const
+bool Map::GetHitPosition(float srcX, float srcY, float srcZ, float& destX, float& destY, float& destZ, uint32 phasemask, float modifyDist) const
 {
     // at first check all static objects
     float tempX, tempY, tempZ = 0.0f;
@@ -1964,7 +1973,7 @@ bool Map::GetHitPosition(float srcX, float srcY, float srcZ, float& destX, float
         destZ = tempZ;
     }
     // at second all dynamic objects, if static check has an hit, then we can calculate only to this closer point
-    bool result1 = m_dyn_tree.getObjectHitPos(srcX, srcY, srcZ, destX, destY, destZ, tempX, tempY, tempZ, modifyDist);
+    bool result1 = m_dyn_tree.getObjectHitPos(phasemask, srcX, srcY, srcZ, destX, destY, destZ, tempX, tempY, tempZ, modifyDist);
     if (result1)
     {
         DEBUG_LOG("Map::GetHitPosition vmaps corrects gained with dynamic objects! new dest coords are X:%f Y:%f Z:%f", destX, destY, destZ);
@@ -1975,13 +1984,13 @@ bool Map::GetHitPosition(float srcX, float srcY, float srcZ, float& destX, float
     return result0 || result1;
 }
 
-float Map::GetHeight(float x, float y, float z) const
+float Map::GetHeight(uint32 phasemask, float x, float y, float z) const
 {
     float staticHeight = m_TerrainData->GetHeightStatic(x, y, z);
 
     // Get Dynamic Height around static Height (if valid)
     float dynSearchHeight = 2.0f + (z < staticHeight ? staticHeight : z);
-    return std::max<float>(staticHeight, m_dyn_tree.getHeight(x, y, dynSearchHeight, dynSearchHeight - staticHeight));
+    return std::max<float>(staticHeight, m_dyn_tree.getHeight(x, y, dynSearchHeight, dynSearchHeight - staticHeight, phasemask));
 }
 
 void Map::InsertGameObjectModel(const GameObjectModel& mdl)

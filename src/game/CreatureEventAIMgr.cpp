@@ -144,7 +144,6 @@ void CreatureEventAIMgr::CheckUnusedAITexts()
                     }
                     default: break;
                 }
-
             }
         }
     }
@@ -236,7 +235,6 @@ void CreatureEventAIMgr::CheckUnusedAISummons()
                     }
                     default: break;
                 }
-
             }
         }
     }
@@ -497,7 +495,7 @@ void CreatureEventAIMgr::LoadCreatureEventAI_Scripts()
 
             for (uint32 j = 0; j < MAX_ACTIONS; ++j)
             {
-                uint16 action_type = fields[10+(j*4)].GetUInt16();
+                uint16 action_type = fields[10 + (j * 4)].GetUInt16();
                 if (action_type >= ACTION_T_END)
                 {
                     sLog.outErrorEventAI("Event %u Action %u has incorrect action type (%u), replace by ACTION_T_NONE.", i, j + 1, action_type);
@@ -508,9 +506,9 @@ void CreatureEventAIMgr::LoadCreatureEventAI_Scripts()
                 CreatureEventAI_Action& action = temp.action[j];
 
                 action.type = EventAI_ActionType(action_type);
-                action.raw.param1 = fields[11+(j*4)].GetUInt32();
-                action.raw.param2 = fields[12+(j*4)].GetUInt32();
-                action.raw.param3 = fields[13+(j*4)].GetUInt32();
+                action.raw.param1 = fields[11 + (j * 4)].GetUInt32();
+                action.raw.param2 = fields[12 + (j * 4)].GetUInt32();
+                action.raw.param3 = fields[13 + (j * 4)].GetUInt32();
 
                 // Report any errors in actions
                 switch (action.type)
@@ -636,12 +634,13 @@ void CreatureEventAIMgr::LoadCreatureEventAI_Scripts()
                         {
                             // used TARGET_T_ACTION_INVOKER, but likely should be _INVOKER_OWNER instead
                             if (action.cast.target == TARGET_T_ACTION_INVOKER &&
-                                    (IsSpellHaveEffect(spell, SPELL_EFFECT_QUEST_COMPLETE) || IsSpellHaveEffect(spell, SPELL_EFFECT_DUMMY) || IsSpellHaveEffect(spell, SPELL_EFFECT_KILL_CREDIT_GROUP)))
+                                    (IsSpellHaveEffect(spell, SPELL_EFFECT_QUEST_COMPLETE) || IsSpellHaveEffect(spell, SPELL_EFFECT_CREATE_RANDOM_ITEM) || IsSpellHaveEffect(spell, SPELL_EFFECT_DUMMY)
+                                     || IsSpellHaveEffect(spell, SPELL_EFFECT_KILL_CREDIT_PERSONAL) || IsSpellHaveEffect(spell, SPELL_EFFECT_KILL_CREDIT_GROUP)))
                                 sLog.outErrorEventAI("Event %u Action %u has TARGET_T_ACTION_INVOKER(%u) target type, but should have TARGET_T_ACTION_INVOKER_OWNER(%u).", i, j + 1, TARGET_T_ACTION_INVOKER, TARGET_T_ACTION_INVOKER_OWNER);
 
                             // Spell that should only target players, but could get any
                             if (spell->HasAttribute(SPELL_ATTR_EX3_TARGET_ONLY_PLAYER) &&
-                                  (action.cast.target == TARGET_T_ACTION_INVOKER || action.cast.target == TARGET_T_HOSTILE_RANDOM || action.cast.target == TARGET_T_HOSTILE_RANDOM_NOT_TOP))
+                                    (action.cast.target == TARGET_T_ACTION_INVOKER || action.cast.target == TARGET_T_HOSTILE_RANDOM || action.cast.target == TARGET_T_HOSTILE_RANDOM_NOT_TOP))
                                 sLog.outErrorEventAI("Event %u Action %u uses Target type %u for a spell (%u) that should only target players. This could be wrong.", i, j + 1, action.cast.target, action.cast.spellId);
                         }
                         break;

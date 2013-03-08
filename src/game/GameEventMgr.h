@@ -97,6 +97,7 @@ class GameEventMgr
         void GameEventUnspawn(int16 event_id);
         void UpdateCreatureData(int16 event_id, bool activate);
         void UpdateEventQuests(uint16 event_id, bool activate);
+        void UpdateWorldStates(uint16 event_id, bool activate);
         void SendEventMails(int16 event_id);
     protected:
         typedef std::list<uint32> GuidList;

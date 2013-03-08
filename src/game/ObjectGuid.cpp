@@ -33,9 +33,11 @@ char const* ObjectGuid::GetTypeName(HighGuid high)
         case HIGHGUID_TRANSPORT:    return "Transport";
         case HIGHGUID_UNIT:         return "Creature";
         case HIGHGUID_PET:          return "Pet";
-        case HIGHGUID_DYNAMICOBJECT:return "DynObject";
+        case HIGHGUID_VEHICLE:      return "Vehicle";
+        case HIGHGUID_DYNAMICOBJECT: return "DynObject";
         case HIGHGUID_CORPSE:       return "Corpse";
         case HIGHGUID_MO_TRANSPORT: return "MoTransport";
+        case HIGHGUID_INSTANCE:     return "InstanceID";
         case HIGHGUID_GROUP:        return "Group";
         default:
             return "<unknown>";
@@ -102,6 +104,8 @@ template uint32 ObjectGuidGenerator<HIGHGUID_GAMEOBJECT>::Generate();
 template uint32 ObjectGuidGenerator<HIGHGUID_TRANSPORT>::Generate();
 template uint32 ObjectGuidGenerator<HIGHGUID_UNIT>::Generate();
 template uint32 ObjectGuidGenerator<HIGHGUID_PET>::Generate();
+template uint32 ObjectGuidGenerator<HIGHGUID_VEHICLE>::Generate();
 template uint32 ObjectGuidGenerator<HIGHGUID_DYNAMICOBJECT>::Generate();
 template uint32 ObjectGuidGenerator<HIGHGUID_CORPSE>::Generate();
+template uint32 ObjectGuidGenerator<HIGHGUID_INSTANCE>::Generate();
 template uint32 ObjectGuidGenerator<HIGHGUID_GROUP>::Generate();

@@ -23,7 +23,6 @@
 #include "Player.h"
 #include "ObjectMgr.h"
 #include "SpellMgr.h"
-#include "DBCStores.h"
 #include "CreatureAI.h"
 #include "InstanceData.h"
 
@@ -36,6 +35,7 @@ Totem::Totem() : Creature(CREATURE_SUBTYPE_TOTEM)
 bool Totem::Create(uint32 guidlow, CreatureCreatePos& cPos, CreatureInfo const* cinfo, Unit* owner)
 {
     SetMap(cPos.GetMap());
+    SetPhaseMask(cPos.GetPhaseMask(), false);
 
     Team team = owner->GetTypeId() == TYPEID_PLAYER ? ((Player*)owner)->GetTeam() : TEAM_NONE;
 
@@ -94,10 +94,6 @@ void Totem::Summon(Unit* owner)
     AIM_Initialize();
     owner->GetMap()->Add((Creature*)this);
 
-    WorldPacket data(SMSG_GAMEOBJECT_SPAWN_ANIM_OBSOLETE, 8);
-    data << GetObjectGuid();
-    SendMessageToSet(&data, true);
-
     if (owner->GetTypeId() == TYPEID_UNIT && ((Creature*)owner)->AI())
         ((Creature*)owner)->AI()->JustSummoned((Creature*)this);
 
@@ -119,8 +115,6 @@ void Totem::Summon(Unit* owner)
 
 void Totem::UnSummon()
 {
-    SendObjectDeSpawnAnim(GetObjectGuid());
-
     CombatStop();
     RemoveAurasDueToSpell(GetSpell());
 
@@ -132,6 +126,8 @@ void Totem::UnSummon()
         // remove aura all party members too
         if (owner->GetTypeId() == TYPEID_PLAYER)
         {
+            ((Player*)owner)->SendAutoRepeatCancel(this);
+
             // Not only the player can summon the totem (scripted AI)
             if (Group* pGroup = ((Player*)owner)->GetGroup())
             {
@@ -187,18 +183,6 @@ void Totem::SetTypeBySummonSpell(SpellEntry const* spellProto)
 
 bool Totem::IsImmuneToSpellEffect(SpellEntry const* spellInfo, SpellEffectIndex index, bool castOnSelf) const
 {
-    // Check for Mana Spring & Healing Stream totems
-    switch (spellInfo->SpellFamilyName)
-    {
-        case SPELLFAMILY_SHAMAN:
-            if (spellInfo->IsFitToFamilyMask(UI64LIT(0x00000002000)) ||
-                    spellInfo->IsFitToFamilyMask(UI64LIT(0x00000004000)))
-                return false;
-            break;
-        default:
-            break;
-    }
-
     switch (spellInfo->Effect[index])
     {
         case SPELL_EFFECT_ATTACK_ME:

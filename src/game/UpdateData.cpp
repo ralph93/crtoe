@@ -102,14 +102,13 @@ void UpdateData::Compress(void* dst, uint32* dst_size, void* src, int src_size)
     *dst_size = c_stream.total_out;
 }
 
-bool UpdateData::BuildPacket(WorldPacket* packet, bool hasTransport)
+bool UpdateData::BuildPacket(WorldPacket* packet)
 {
     MANGOS_ASSERT(packet->empty());                         // shouldn't happen
 
-    ByteBuffer buf(4 + 1 + (m_outOfRangeGUIDs.empty() ? 0 : 1 + 4 + 9 * m_outOfRangeGUIDs.size()) + m_data.wpos());
+    ByteBuffer buf(4 + (m_outOfRangeGUIDs.empty() ? 0 : 1 + 4 + 9 * m_outOfRangeGUIDs.size()) + m_data.wpos());
 
     buf << (uint32)(!m_outOfRangeGUIDs.empty() ? m_blockCount + 1 : m_blockCount);
-    buf << (uint8)(hasTransport ? 1 : 0);
 
     if (!m_outOfRangeGUIDs.empty())
     {

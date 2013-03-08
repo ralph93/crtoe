@@ -73,7 +73,6 @@ struct SellerItemClassInfo
     uint32 AmountOfItems;
     uint32 MissItems;
     uint32 Quantity;
-
 };
 
 struct SellerItemInfo
@@ -191,7 +190,7 @@ class AuctionBotSeller : public AuctionBotAgent
         void addNewAuctions(AHB_Seller_Config& config);
         void SetItemsRatio(uint32 al, uint32 ho, uint32 ne);
         void SetItemsRatioForHouse(AuctionHouseType house, uint32 val);
-        void SetItemsAmount(uint32(&vals)[MAX_AUCTION_QUALITY]);
+        void SetItemsAmount(uint32(&vals) [MAX_AUCTION_QUALITY]);
         void SetItemsAmountForQuality(AuctionQuality quality, uint32 val);
         void LoadConfig();
 
@@ -357,6 +356,7 @@ void AuctionBotConfig::GetConfigFromFile()
     setConfigMax(CONFIG_UINT32_AHBOT_CLASS_QUEST_AMOUNT      , "AuctionHouseBot.Class.Quest"                 ,  1, 10);
     setConfigMax(CONFIG_UINT32_AHBOT_CLASS_KEY_AMOUNT        , "AuctionHouseBot.Class.Key"                   ,  1, 10);
     setConfigMax(CONFIG_UINT32_AHBOT_CLASS_MISC_AMOUNT       , "AuctionHouseBot.Class.Misc"                  ,  5, 10);
+    setConfigMax(CONFIG_UINT32_AHBOT_CLASS_GLYPH_AMOUNT      , "AuctionHouseBot.Class.Glyph"                 ,  3, 10);
 
     setConfig(CONFIG_UINT32_AHBOT_ALLIANCE_PRICE_RATIO       , "AuctionHouseBot.Alliance.Price.Ratio"        , 200);
     setConfig(CONFIG_UINT32_AHBOT_HORDE_PRICE_RATIO          , "AuctionHouseBot.Horde.Price.Ratio"           , 200);
@@ -380,6 +380,10 @@ void AuctionBotConfig::GetConfigFromFile()
     setConfig(CONFIG_UINT32_AHBOT_CLASS_MISC_MOUNT_MAX_REQ_LEVEL   , "AuctionHouseBot.Class.Misc.Mount.ReqLevel.Max" , 0);
     setConfig(CONFIG_UINT32_AHBOT_CLASS_MISC_MOUNT_MIN_SKILL_RANK  , "AuctionHouseBot.Class.Misc.Mount.ReqSkill.Min" , 0);
     setConfig(CONFIG_UINT32_AHBOT_CLASS_MISC_MOUNT_MAX_SKILL_RANK  , "AuctionHouseBot.Class.Misc.Mount.ReqSkill.Max" , 0);
+    setConfig(CONFIG_UINT32_AHBOT_CLASS_GLYPH_MIN_REQ_LEVEL        , "AuctionHouseBot.Class.Glyph.ReqLevel.Min"      , 0);
+    setConfig(CONFIG_UINT32_AHBOT_CLASS_GLYPH_MAX_REQ_LEVEL        , "AuctionHouseBot.Class.Glyph.ReqLevel.Max"      , 0);
+    setConfig(CONFIG_UINT32_AHBOT_CLASS_GLYPH_MIN_ITEM_LEVEL       , "AuctionHouseBot.Class.Glyph.ItemLevel.Min"     , 0);
+    setConfig(CONFIG_UINT32_AHBOT_CLASS_GLYPH_MAX_ITEM_LEVEL       , "AuctionHouseBot.Class.Glyph.ItemLevel.Max"     , 0);
     setConfig(CONFIG_UINT32_AHBOT_CLASS_TRADEGOOD_MIN_ITEM_LEVEL   , "AuctionHouseBot.Class.TradeGood.ItemLevel.Min" , 0);
     setConfig(CONFIG_UINT32_AHBOT_CLASS_TRADEGOOD_MAX_ITEM_LEVEL   , "AuctionHouseBot.Class.TradeGood.ItemLevel.Max" , 0);
     setConfig(CONFIG_UINT32_AHBOT_CLASS_CONTAINER_MIN_ITEM_LEVEL   , "AuctionHouseBot.Class.Container.ItemLevel.Min" , 0);
@@ -436,8 +440,8 @@ uint32 AuctionBotConfig::getConfigItemQualityAmount(AuctionQuality quality) cons
         case AUCTION_QUALITY_WHITE: return getConfig(CONFIG_UINT32_AHBOT_ITEM_WHITE_AMOUNT);
         case AUCTION_QUALITY_GREEN: return getConfig(CONFIG_UINT32_AHBOT_ITEM_GREEN_AMOUNT);
         case AUCTION_QUALITY_BLUE:  return getConfig(CONFIG_UINT32_AHBOT_ITEM_BLUE_AMOUNT);
-        case AUCTION_QUALITY_PURPLE:return getConfig(CONFIG_UINT32_AHBOT_ITEM_PURPLE_AMOUNT);
-        case AUCTION_QUALITY_ORANGE:return getConfig(CONFIG_UINT32_AHBOT_ITEM_ORANGE_AMOUNT);
+        case AUCTION_QUALITY_PURPLE: return getConfig(CONFIG_UINT32_AHBOT_ITEM_PURPLE_AMOUNT);
+        case AUCTION_QUALITY_ORANGE: return getConfig(CONFIG_UINT32_AHBOT_ITEM_ORANGE_AMOUNT);
         default:                    return getConfig(CONFIG_UINT32_AHBOT_ITEM_YELLOW_AMOUNT);
     }
 }
@@ -733,7 +737,7 @@ void AuctionBotBuyer::addNewAuctionBuyerBotBid(AHB_Buyer_Config& config)
     for (CheckEntryMap::iterator itr = config.CheckedEntry.begin(); itr != config.CheckedEntry.end();)
     {
         AuctionEntry* auction = auctionHouse->GetAuction(itr->second.AuctionId);
-        if (!auction)                                       // is auction not active now
+        if (!auction || auction->moneyDeliveryTime)         // is auction not active now
         {
             DEBUG_FILTER_LOG(LOG_FILTER_AHBOT_BUYER, "AHBot: Entry %u on ah %u doesn't exists, perhaps bought already?",
                              itr->second.AuctionId, auction->GetHouseId());
@@ -883,7 +887,6 @@ bool AuctionBotSeller::Initialize()
         std::string temp;
         while (getline(excludeStream, temp, ','))
             excludeItems.push_back(atoi(temp.c_str()));
-
     }
     sLog.outString("Forced Inclusion " SIZEFMTD " items", includeItems.size());
     sLog.outString("Forced Exclusion " SIZEFMTD " items", excludeItems.size());
@@ -898,7 +901,6 @@ bool AuctionBotSeller::Initialize()
             bar.step();
             Field* fields = result->Fetch();
             npcItems.push_back(fields[0].GetUInt32());
-
         }
         while (result->NextRow());
         delete result;
@@ -918,9 +920,11 @@ bool AuctionBotSeller::Initialize()
                                   "SELECT item FROM fishing_loot_template UNION "
                                   "SELECT item FROM gameobject_loot_template UNION "
                                   "SELECT item FROM item_loot_template UNION "
+                                  "SELECT item FROM milling_loot_template UNION "
                                   "SELECT item FROM pickpocketing_loot_template UNION "
                                   "SELECT item FROM prospecting_loot_template UNION "
-                                  "SELECT item FROM skinning_loot_template"))
+                                  "SELECT item FROM skinning_loot_template UNION "
+                                  "SELECT item FROM spell_loot_template"))
     {
         BarGoLink bar(result->GetRowCount());
         do
@@ -1136,6 +1140,22 @@ bool AuctionBotSeller::Initialize()
                 }
 
                 break;
+            case ITEM_CLASS_GLYPH:
+            {
+                if (uint32 value = sAuctionBotConfig.getConfig(CONFIG_UINT32_AHBOT_CLASS_GLYPH_MIN_REQ_LEVEL))
+                    if (prototype->RequiredLevel < value)
+                        continue;
+                if (uint32 value = sAuctionBotConfig.getConfig(CONFIG_UINT32_AHBOT_CLASS_GLYPH_MAX_REQ_LEVEL))
+                    if (prototype->RequiredLevel > value)
+                        continue;
+                if (uint32 value = sAuctionBotConfig.getConfig(CONFIG_UINT32_AHBOT_CLASS_GLYPH_MIN_ITEM_LEVEL))
+                    if (prototype->RequiredLevel < value)
+                        continue;
+                if (uint32 value = sAuctionBotConfig.getConfig(CONFIG_UINT32_AHBOT_CLASS_GLYPH_MAX_ITEM_LEVEL))
+                    if (prototype->RequiredLevel > value)
+                        continue;
+                break;
+            }
             case ITEM_CLASS_TRADE_GOODS:
             {
                 if (uint32 value = sAuctionBotConfig.getConfig(CONFIG_UINT32_AHBOT_CLASS_TRADEGOOD_MIN_ITEM_LEVEL))
@@ -1227,6 +1247,7 @@ void AuctionBotSeller::LoadItemsQuantity(AHB_Seller_Config& config)
     config.SetItemsQuantityPerClass(AUCTION_QUALITY_GREY, ITEM_CLASS_QUEST, sAuctionBotConfig.getConfig(CONFIG_UINT32_AHBOT_CLASS_QUEST_AMOUNT));
     config.SetItemsQuantityPerClass(AUCTION_QUALITY_GREY, ITEM_CLASS_KEY, 0);
     config.SetItemsQuantityPerClass(AUCTION_QUALITY_GREY, ITEM_CLASS_MISC, sAuctionBotConfig.getConfig(CONFIG_UINT32_AHBOT_CLASS_MISC_AMOUNT));
+    config.SetItemsQuantityPerClass(AUCTION_QUALITY_GREY, ITEM_CLASS_GLYPH, 0);
 
     config.SetItemsQuantityPerClass(AUCTION_QUALITY_WHITE, ITEM_CLASS_CONSUMABLE, sAuctionBotConfig.getConfig(CONFIG_UINT32_AHBOT_CLASS_CONSUMABLE_AMOUNT));
     config.SetItemsQuantityPerClass(AUCTION_QUALITY_WHITE, ITEM_CLASS_CONTAINER, sAuctionBotConfig.getConfig(CONFIG_UINT32_AHBOT_CLASS_CONTAINER_AMOUNT));
@@ -1242,6 +1263,7 @@ void AuctionBotSeller::LoadItemsQuantity(AHB_Seller_Config& config)
     config.SetItemsQuantityPerClass(AUCTION_QUALITY_WHITE, ITEM_CLASS_QUEST, sAuctionBotConfig.getConfig(CONFIG_UINT32_AHBOT_CLASS_QUEST_AMOUNT));
     config.SetItemsQuantityPerClass(AUCTION_QUALITY_WHITE, ITEM_CLASS_KEY, sAuctionBotConfig.getConfig(CONFIG_UINT32_AHBOT_CLASS_KEY_AMOUNT));
     config.SetItemsQuantityPerClass(AUCTION_QUALITY_WHITE, ITEM_CLASS_MISC, sAuctionBotConfig.getConfig(CONFIG_UINT32_AHBOT_CLASS_MISC_AMOUNT));
+    config.SetItemsQuantityPerClass(AUCTION_QUALITY_WHITE, ITEM_CLASS_GLYPH, sAuctionBotConfig.getConfig(CONFIG_UINT32_AHBOT_CLASS_GLYPH_AMOUNT));
 
     config.SetItemsQuantityPerClass(AUCTION_QUALITY_GREEN, ITEM_CLASS_CONSUMABLE, sAuctionBotConfig.getConfig(CONFIG_UINT32_AHBOT_CLASS_CONSUMABLE_AMOUNT));
     config.SetItemsQuantityPerClass(AUCTION_QUALITY_GREEN, ITEM_CLASS_CONTAINER, sAuctionBotConfig.getConfig(CONFIG_UINT32_AHBOT_CLASS_CONTAINER_AMOUNT));
@@ -1257,6 +1279,7 @@ void AuctionBotSeller::LoadItemsQuantity(AHB_Seller_Config& config)
     config.SetItemsQuantityPerClass(AUCTION_QUALITY_GREEN, ITEM_CLASS_QUEST, sAuctionBotConfig.getConfig(CONFIG_UINT32_AHBOT_CLASS_QUEST_AMOUNT));
     config.SetItemsQuantityPerClass(AUCTION_QUALITY_GREEN, ITEM_CLASS_KEY, sAuctionBotConfig.getConfig(CONFIG_UINT32_AHBOT_CLASS_KEY_AMOUNT));
     config.SetItemsQuantityPerClass(AUCTION_QUALITY_GREEN, ITEM_CLASS_MISC, sAuctionBotConfig.getConfig(CONFIG_UINT32_AHBOT_CLASS_MISC_AMOUNT));
+    config.SetItemsQuantityPerClass(AUCTION_QUALITY_GREEN, ITEM_CLASS_GLYPH, 0);
 
     config.SetItemsQuantityPerClass(AUCTION_QUALITY_BLUE, ITEM_CLASS_CONSUMABLE, sAuctionBotConfig.getConfig(CONFIG_UINT32_AHBOT_CLASS_CONSUMABLE_AMOUNT));
     config.SetItemsQuantityPerClass(AUCTION_QUALITY_BLUE, ITEM_CLASS_CONTAINER, sAuctionBotConfig.getConfig(CONFIG_UINT32_AHBOT_CLASS_CONTAINER_AMOUNT));
@@ -1272,6 +1295,7 @@ void AuctionBotSeller::LoadItemsQuantity(AHB_Seller_Config& config)
     config.SetItemsQuantityPerClass(AUCTION_QUALITY_BLUE, ITEM_CLASS_QUEST, sAuctionBotConfig.getConfig(CONFIG_UINT32_AHBOT_CLASS_QUEST_AMOUNT));
     config.SetItemsQuantityPerClass(AUCTION_QUALITY_BLUE, ITEM_CLASS_KEY, 0);
     config.SetItemsQuantityPerClass(AUCTION_QUALITY_BLUE, ITEM_CLASS_MISC, sAuctionBotConfig.getConfig(CONFIG_UINT32_AHBOT_CLASS_MISC_AMOUNT));
+    config.SetItemsQuantityPerClass(AUCTION_QUALITY_BLUE, ITEM_CLASS_GLYPH, 0);
 
     config.SetItemsQuantityPerClass(AUCTION_QUALITY_PURPLE, ITEM_CLASS_CONSUMABLE, sAuctionBotConfig.getConfig(CONFIG_UINT32_AHBOT_CLASS_CONSUMABLE_AMOUNT));
     config.SetItemsQuantityPerClass(AUCTION_QUALITY_PURPLE, ITEM_CLASS_CONTAINER, sAuctionBotConfig.getConfig(CONFIG_UINT32_AHBOT_CLASS_CONTAINER_AMOUNT));
@@ -1287,6 +1311,7 @@ void AuctionBotSeller::LoadItemsQuantity(AHB_Seller_Config& config)
     config.SetItemsQuantityPerClass(AUCTION_QUALITY_PURPLE, ITEM_CLASS_QUEST, sAuctionBotConfig.getConfig(CONFIG_UINT32_AHBOT_CLASS_QUEST_AMOUNT));
     config.SetItemsQuantityPerClass(AUCTION_QUALITY_PURPLE, ITEM_CLASS_KEY, 0);
     config.SetItemsQuantityPerClass(AUCTION_QUALITY_PURPLE, ITEM_CLASS_MISC, sAuctionBotConfig.getConfig(CONFIG_UINT32_AHBOT_CLASS_MISC_AMOUNT));
+    config.SetItemsQuantityPerClass(AUCTION_QUALITY_PURPLE, ITEM_CLASS_GLYPH, 0);
 
     config.SetItemsQuantityPerClass(AUCTION_QUALITY_ORANGE, ITEM_CLASS_CONSUMABLE, 0);
     config.SetItemsQuantityPerClass(AUCTION_QUALITY_ORANGE, ITEM_CLASS_CONTAINER, 0);
@@ -1302,6 +1327,7 @@ void AuctionBotSeller::LoadItemsQuantity(AHB_Seller_Config& config)
     config.SetItemsQuantityPerClass(AUCTION_QUALITY_ORANGE, ITEM_CLASS_QUEST, 0);
     config.SetItemsQuantityPerClass(AUCTION_QUALITY_ORANGE, ITEM_CLASS_KEY, 0);
     config.SetItemsQuantityPerClass(AUCTION_QUALITY_ORANGE, ITEM_CLASS_MISC, 0);
+    config.SetItemsQuantityPerClass(AUCTION_QUALITY_ORANGE, ITEM_CLASS_GLYPH, 0);
 
     config.SetItemsQuantityPerClass(AUCTION_QUALITY_YELLOW, ITEM_CLASS_CONSUMABLE, 0);
     config.SetItemsQuantityPerClass(AUCTION_QUALITY_YELLOW, ITEM_CLASS_CONTAINER, 0);
@@ -1317,6 +1343,7 @@ void AuctionBotSeller::LoadItemsQuantity(AHB_Seller_Config& config)
     config.SetItemsQuantityPerClass(AUCTION_QUALITY_YELLOW, ITEM_CLASS_QUEST, 0);
     config.SetItemsQuantityPerClass(AUCTION_QUALITY_YELLOW, ITEM_CLASS_KEY, 0);
     config.SetItemsQuantityPerClass(AUCTION_QUALITY_YELLOW, ITEM_CLASS_MISC, 0);
+    config.SetItemsQuantityPerClass(AUCTION_QUALITY_YELLOW, ITEM_CLASS_GLYPH, 0);
     // ============================================================================================
 
     // Set the best value to get nearest amount of items wanted
@@ -1327,7 +1354,7 @@ void AuctionBotSeller::LoadItemsQuantity(AHB_Seller_Config& config)
                          sAuctionBotConfig.getConfig(CONFIG_UINT32_AHBOT_CLASS_GEM_AMOUNT) + sAuctionBotConfig.getConfig(CONFIG_UINT32_AHBOT_CLASS_ARMOR_AMOUNT) + sAuctionBotConfig.getConfig(CONFIG_UINT32_AHBOT_CLASS_REAGENT_AMOUNT) +
                          sAuctionBotConfig.getConfig(CONFIG_UINT32_AHBOT_CLASS_PROJECTILE_AMOUNT) + sAuctionBotConfig.getConfig(CONFIG_UINT32_AHBOT_CLASS_TRADEGOOD_AMOUNT) + sAuctionBotConfig.getConfig(CONFIG_UINT32_AHBOT_CLASS_GENERIC_AMOUNT) +
                          sAuctionBotConfig.getConfig(CONFIG_UINT32_AHBOT_CLASS_RECIPE_AMOUNT) + sAuctionBotConfig.getConfig(CONFIG_UINT32_AHBOT_CLASS_QUIVER_AMOUNT) + sAuctionBotConfig.getConfig(CONFIG_UINT32_AHBOT_CLASS_QUEST_AMOUNT) +
-                         sAuctionBotConfig.getConfig(CONFIG_UINT32_AHBOT_CLASS_KEY_AMOUNT) + sAuctionBotConfig.getConfig(CONFIG_UINT32_AHBOT_CLASS_MISC_AMOUNT));
+                         sAuctionBotConfig.getConfig(CONFIG_UINT32_AHBOT_CLASS_KEY_AMOUNT) + sAuctionBotConfig.getConfig(CONFIG_UINT32_AHBOT_CLASS_MISC_AMOUNT) + sAuctionBotConfig.getConfig(CONFIG_UINT32_AHBOT_CLASS_GLYPH_AMOUNT));
         for (uint32 i = 0; i < MAX_ITEM_CLASS; ++i)
             config.SetItemsAmountPerClass(AuctionQuality(j), ItemClass(i), indice);
     }
@@ -1372,7 +1399,6 @@ void AuctionBotSeller::LoadSellerValues(AHB_Seller_Config& config)
     DEBUG_FILTER_LOG(LOG_FILTER_AHBOT_SELLER, "AHBot: PurpleItems = %u", config.GetItemsAmountPerQuality(AUCTION_QUALITY_PURPLE));
     DEBUG_FILTER_LOG(LOG_FILTER_AHBOT_SELLER, "AHBot: OrangeItems = %u", config.GetItemsAmountPerQuality(AUCTION_QUALITY_ORANGE));
     DEBUG_FILTER_LOG(LOG_FILTER_AHBOT_SELLER, "AHBot: YellowItems = %u", config.GetItemsAmountPerQuality(AUCTION_QUALITY_YELLOW));
-
 }
 
 // Set static of items on one AH faction.
@@ -1486,7 +1512,7 @@ void AuctionBotSeller::SetItemsRatioForHouse(AuctionHouseType house, uint32 val)
     LoadItemsQuantity(m_HouseConfig[house]);
 }
 
-void AuctionBotSeller::SetItemsAmount(uint32(&vals)[MAX_AUCTION_QUALITY])
+void AuctionBotSeller::SetItemsAmount(uint32(&vals) [MAX_AUCTION_QUALITY])
 {
     sAuctionBotConfig.setConfig(CONFIG_UINT32_AHBOT_ITEM_GREY_AMOUNT, vals[AUCTION_QUALITY_GREY]);
     sAuctionBotConfig.setConfig(CONFIG_UINT32_AHBOT_ITEM_WHITE_AMOUNT, vals[AUCTION_QUALITY_WHITE]);
@@ -1508,8 +1534,8 @@ void AuctionBotSeller::SetItemsAmountForQuality(AuctionQuality quality, uint32 v
         case AUCTION_QUALITY_WHITE: sAuctionBotConfig.setConfig(CONFIG_UINT32_AHBOT_ITEM_WHITE_AMOUNT, val); break;
         case AUCTION_QUALITY_GREEN: sAuctionBotConfig.setConfig(CONFIG_UINT32_AHBOT_ITEM_GREEN_AMOUNT, val); break;
         case AUCTION_QUALITY_BLUE:  sAuctionBotConfig.setConfig(CONFIG_UINT32_AHBOT_ITEM_BLUE_AMOUNT, val); break;
-        case AUCTION_QUALITY_PURPLE:sAuctionBotConfig.setConfig(CONFIG_UINT32_AHBOT_ITEM_PURPLE_AMOUNT, val); break;
-        case AUCTION_QUALITY_ORANGE:sAuctionBotConfig.setConfig(CONFIG_UINT32_AHBOT_ITEM_ORANGE_AMOUNT, val); break;
+        case AUCTION_QUALITY_PURPLE: sAuctionBotConfig.setConfig(CONFIG_UINT32_AHBOT_ITEM_PURPLE_AMOUNT, val); break;
+        case AUCTION_QUALITY_ORANGE: sAuctionBotConfig.setConfig(CONFIG_UINT32_AHBOT_ITEM_ORANGE_AMOUNT, val); break;
         default:                    sAuctionBotConfig.setConfig(CONFIG_UINT32_AHBOT_ITEM_YELLOW_AMOUNT, val); break;
     }
 
@@ -1572,7 +1598,6 @@ void AuctionBotSeller::addNewAuctions(AHB_Seller_Config& config)
         }
 
         uint32 stackCount = urand(1, prototype->GetMaxStackSize());
-
 
         Item* item = Item::CreateItem(itemID, stackCount);
         if (!item)
@@ -1662,7 +1687,7 @@ void AuctionHouseBot::SetItemsRatioForHouse(AuctionHouseType house, uint32 val)
         seller->SetItemsRatioForHouse(house, val);
 }
 
-void AuctionHouseBot::SetItemsAmount(uint32(&vals)[MAX_AUCTION_QUALITY])
+void AuctionHouseBot::SetItemsAmount(uint32(&vals) [MAX_AUCTION_QUALITY])
 {
     if (AuctionBotSeller* seller = dynamic_cast<AuctionBotSeller*>(m_Seller))
         seller->SetItemsAmount(vals);

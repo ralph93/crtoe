@@ -29,34 +29,34 @@ enum BG_AB_WorldStates
     BG_AB_OP_RESOURCES_HORDE            = 1777,
     BG_AB_OP_RESOURCES_MAX              = 1780,
     BG_AB_OP_RESOURCES_WARNING          = 1955
-    /*
-        BG_AB_OP_STABLE_ICON                = 1842,         // Stable map icon (NONE)
-        BG_AB_OP_STABLE_STATE_ALIENCE       = 1767,         // Stable map state (ALIENCE)
-        BG_AB_OP_STABLE_STATE_HORDE         = 1768,         // Stable map state (HORDE)
-        BG_AB_OP_STABLE_STATE_CON_ALI       = 1769,         // Stable map state (CON ALIENCE)
-        BG_AB_OP_STABLE_STATE_CON_HOR       = 1770,         // Stable map state (CON HORDE)
-        BG_AB_OP_FARM_ICON                  = 1845,         // Farm map icon (NONE)
-        BG_AB_OP_FARM_STATE_ALIENCE         = 1772,         // Farm state (ALIENCE)
-        BG_AB_OP_FARM_STATE_HORDE           = 1773,         // Farm state (HORDE)
-        BG_AB_OP_FARM_STATE_CON_ALI         = 1774,         // Farm state (CON ALIENCE)
-        BG_AB_OP_FARM_STATE_CON_HOR         = 1775,         // Farm state (CON HORDE)
+            /*
+                BG_AB_OP_STABLE_ICON                = 1842, // Stable map icon (NONE)
+                BG_AB_OP_STABLE_STATE_ALIENCE       = 1767, // Stable map state (ALIENCE)
+                BG_AB_OP_STABLE_STATE_HORDE         = 1768, // Stable map state (HORDE)
+                BG_AB_OP_STABLE_STATE_CON_ALI       = 1769, // Stable map state (CON ALIENCE)
+                BG_AB_OP_STABLE_STATE_CON_HOR       = 1770, // Stable map state (CON HORDE)
+                BG_AB_OP_FARM_ICON                  = 1845, // Farm map icon (NONE)
+                BG_AB_OP_FARM_STATE_ALIENCE         = 1772, // Farm state (ALIENCE)
+                BG_AB_OP_FARM_STATE_HORDE           = 1773, // Farm state (HORDE)
+                BG_AB_OP_FARM_STATE_CON_ALI         = 1774, // Farm state (CON ALIENCE)
+                BG_AB_OP_FARM_STATE_CON_HOR         = 1775, // Farm state (CON HORDE)
 
-        BG_AB_OP_BLACKSMITH_ICON            = 1846,         // Blacksmith map icon (NONE)
-        BG_AB_OP_BLACKSMITH_STATE_ALIENCE   = 1782,         // Blacksmith map state (ALIENCE)
-        BG_AB_OP_BLACKSMITH_STATE_HORDE     = 1783,         // Blacksmith map state (HORDE)
-        BG_AB_OP_BLACKSMITH_STATE_CON_ALI   = 1784,         // Blacksmith map state (CON ALIENCE)
-        BG_AB_OP_BLACKSMITH_STATE_CON_HOR   = 1785,         // Blacksmith map state (CON HORDE)
-        BG_AB_OP_LUMBERMILL_ICON            = 1844,         // Lumber Mill map icon (NONE)
-        BG_AB_OP_LUMBERMILL_STATE_ALIENCE   = 1792,         // Lumber Mill map state (ALIENCE)
-        BG_AB_OP_LUMBERMILL_STATE_HORDE     = 1793,         // Lumber Mill map state (HORDE)
-        BG_AB_OP_LUMBERMILL_STATE_CON_ALI   = 1794,         // Lumber Mill map state (CON ALIENCE)
-        BG_AB_OP_LUMBERMILL_STATE_CON_HOR   = 1795,         // Lumber Mill map state (CON HORDE)
-        BG_AB_OP_GOLDMINE_ICON              = 1843,         // Gold Mine map icon (NONE)
-        BG_AB_OP_GOLDMINE_STATE_ALIENCE     = 1787,         // Gold Mine map state (ALIENCE)
-        BG_AB_OP_GOLDMINE_STATE_HORDE       = 1788,         // Gold Mine map state (HORDE)
-        BG_AB_OP_GOLDMINE_STATE_CON_ALI     = 1789,         // Gold Mine map state (CON ALIENCE
-        BG_AB_OP_GOLDMINE_STATE_CON_HOR     = 1790,         // Gold Mine map state (CON HORDE)
-    */
+                BG_AB_OP_BLACKSMITH_ICON            = 1846, // Blacksmith map icon (NONE)
+                BG_AB_OP_BLACKSMITH_STATE_ALIENCE   = 1782, // Blacksmith map state (ALIENCE)
+                BG_AB_OP_BLACKSMITH_STATE_HORDE     = 1783, // Blacksmith map state (HORDE)
+                BG_AB_OP_BLACKSMITH_STATE_CON_ALI   = 1784, // Blacksmith map state (CON ALIENCE)
+                BG_AB_OP_BLACKSMITH_STATE_CON_HOR   = 1785, // Blacksmith map state (CON HORDE)
+                BG_AB_OP_LUMBERMILL_ICON            = 1844, // Lumber Mill map icon (NONE)
+                BG_AB_OP_LUMBERMILL_STATE_ALIENCE   = 1792, // Lumber Mill map state (ALIENCE)
+                BG_AB_OP_LUMBERMILL_STATE_HORDE     = 1793, // Lumber Mill map state (HORDE)
+                BG_AB_OP_LUMBERMILL_STATE_CON_ALI   = 1794, // Lumber Mill map state (CON ALIENCE)
+                BG_AB_OP_LUMBERMILL_STATE_CON_HOR   = 1795, // Lumber Mill map state (CON HORDE)
+                BG_AB_OP_GOLDMINE_ICON              = 1843, // Gold Mine map icon (NONE)
+                BG_AB_OP_GOLDMINE_STATE_ALIENCE     = 1787, // Gold Mine map state (ALIENCE)
+                BG_AB_OP_GOLDMINE_STATE_HORDE       = 1788, // Gold Mine map state (HORDE)
+                BG_AB_OP_GOLDMINE_STATE_CON_ALI     = 1789, // Gold Mine map state (CON ALIENCE
+                BG_AB_OP_GOLDMINE_STATE_CON_HOR     = 1790, // Gold Mine map state (CON HORDE)
+            */
 };
 
 const uint32 BG_AB_OP_NODESTATES[5] =    {1767, 1782, 1772, 1792, 1787};
@@ -74,8 +74,8 @@ enum BG_AB_Timers
 
 enum BG_AB_Score
 {
-    BG_AB_WARNING_NEAR_VICTORY_SCORE    = 1800,
-    BG_AB_MAX_TEAM_SCORE                = 2000
+    BG_AB_WARNING_NEAR_VICTORY_SCORE    = 1400,
+    BG_AB_MAX_TEAM_SCORE                = 1600
 };
 
 /* do NOT change the order, else wrong behaviour */
@@ -112,10 +112,11 @@ enum BG_AB_Sounds
     BG_AB_SOUND_NEAR_VICTORY            = 8456
 };
 
-#define AB_NORMAL_HONOR_INTERVAL        330
-#define AB_WEEKEND_HONOR_INTERVAL       200
-#define AB_NORMAL_REPUTATION_INTERVAL   200
-#define AB_WEEKEND_REPUTATION_INTERVAL  150
+#define AB_NORMAL_HONOR_INTERVAL        260
+#define AB_WEEKEND_HONOR_INTERVAL       160
+#define AB_NORMAL_REPUTATION_INTERVAL   160
+#define AB_WEEKEND_REPUTATION_INTERVAL  120
+#define AB_EVENT_START_BATTLE           9158
 
 // Tick intervals and given points: case 0,1,2,3,4,5 captured nodes
 const uint32 BG_AB_TickIntervals[6] = {0, 12000, 9000, 6000, 3000, 1000};
@@ -175,6 +176,9 @@ class BattleGroundAB : public BattleGround
         /* Nodes occupying */
         virtual void EventPlayerClickedOnFlag(Player* source, GameObject* target_obj) override;
 
+        /* achievement req. */
+        bool IsAllNodesControlledByTeam(Team team) const override;
+        bool IsTeamScores500Disadvantage(Team team) const { return m_TeamScores500Disadvantage[GetTeamIndexByTeamId(team)]; }
     private:
         /* Gameobject spawning/despawning */
         void _CreateBanner(uint8 node, uint8 type, uint8 teamIndex, bool delay);
@@ -203,5 +207,7 @@ class BattleGroundAB : public BattleGround
         bool                m_IsInformedNearVictory;
         uint32              m_honorTicks;
         uint32              m_ReputationTics;
+        // need for achievements
+        bool                m_TeamScores500Disadvantage[BG_TEAMS_COUNT];
 };
 #endif

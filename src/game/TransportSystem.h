@@ -21,6 +21,7 @@
  * The Transport System in MaNGOS consists of these files:
  * - TransportSystem.h to provide the basic classes TransportBase and TransportInfo
  * - TransportSystem.cpp which implements these classes
+ * - Vehicle.h as a vehicle is a transporter it will inherit itr transporter-information from TransportBase
  * - Transports.h to implement the MOTransporter (subclas of gameobject) - Remains TODO
  * as well of
  * - impacts to various files
@@ -66,9 +67,12 @@ class TransportBase
 
         void CalculateGlobalPositionOf(float lx, float ly, float lz, float lo, float& gx, float& gy, float& gz, float& go) const;
 
+        // Helper function to check if a unit is boarded onto this transporter (or a transporter boarded onto this)*
+        bool HasOnBoard(WorldObject const* passenger) const;
+
     protected:
         // Helper functions to add/ remove a passenger from the list
-        void BoardPassenger(WorldObject* passenger, float lx, float ly, float lz, float lo);
+        void BoardPassenger(WorldObject* passenger, float lx, float ly, float lz, float lo, uint8 seat);
         void UnBoardPassenger(WorldObject* passenger);
 
         WorldObject* m_owner;                               ///< The transporting unit
@@ -89,16 +93,24 @@ class TransportBase
 class TransportInfo
 {
     public:
-        explicit TransportInfo(WorldObject* owner, TransportBase* transport, float lx, float ly, float lz, float lo);
+        explicit TransportInfo(WorldObject* owner, TransportBase* transport, float lx, float ly, float lz, float lo, uint8 seat);
 
         // Set local positions
         void SetLocalPosition(float lx, float ly, float lz, float lo);
+        void SetTransportSeat(uint8 seat) { m_seat = seat; }
 
         // Accessors
         WorldObject* GetTransport() const { return m_transport->GetOwner(); }
         ObjectGuid GetTransportGuid() const { return m_transport->GetOwner()->GetObjectGuid(); }
 
-        // Get local position
+        // Required for chain-updating (passenger on transporter on transporter)
+        bool IsOnVehicle() const { return m_transport->GetOwner()->GetTypeId() == TYPEID_PLAYER || m_transport->GetOwner()->GetTypeId() == TYPEID_UNIT; }
+
+        // Helper function if a passenger is already boarded somewhere onto the boarded transports
+        bool HasOnBoard(WorldObject const* passenger) const { return m_transport->HasOnBoard(passenger); }
+
+        // Get local position and seat
+        uint8 GetTransportSeat() const { return m_seat; }
         float GetLocalOrientation() const { return m_localPosition.o; }
         float GetLocalPositionX() const { return m_localPosition.x; }
         float GetLocalPositionY() const { return m_localPosition.y; }
@@ -115,6 +127,7 @@ class TransportInfo
         WorldObject* m_owner;                               ///< Passenger
         TransportBase* m_transport;                         ///< Transporter
         Position m_localPosition;
+        uint8 m_seat;
 };
 
 #endif

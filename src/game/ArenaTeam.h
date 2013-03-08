@@ -53,7 +53,10 @@ enum ArenaTeamCommandErrors
     ERR_ARENA_TEAM_NOT_ALLIED               = 0x0C,
     ERR_ARENA_TEAM_IGNORING_YOU_S           = 0x13,
     ERR_ARENA_TEAM_TARGET_TOO_LOW_S         = 0x15,
-    ERR_ARENA_TEAM_TOO_MANY_MEMBERS_S       = 0x16,
+    ERR_ARENA_TEAM_TARGET_TOO_HIGH_S        = 0x16,
+    ERR_ARENA_TEAM_TOO_MANY_MEMBERS_S       = 0x17,
+    ERR_ARENA_TEAM_NOT_FOUND                = 0x1B,
+    ERR_ARENA_TEAMS_LOCKED                  = 0x1E
 };
 
 enum ArenaTeamEvents
@@ -197,12 +200,15 @@ class ArenaTeam
         void MemberLost(Player* plr, uint32 againstRating);
         void OfflineMemberLost(ObjectGuid guid, uint32 againstRating);
 
-        void UpdateArenaPointsHelper(std::map<uint32, uint32> & PlayerPoints);
+        void UpdateArenaPointsHelper(std::map<uint32, uint32>& PlayerPoints);
 
         void NotifyStatsChanged();
 
         void FinishWeek();
         void FinishGame(int32 mod);
+
+        // Calendar
+        void MassInviteToEvent(WorldSession* session);
 
     protected:
 

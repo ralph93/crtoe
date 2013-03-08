@@ -128,7 +128,7 @@ void WaypointManager::Load()
             // the cleanup queries make sure the following is true
             MANGOS_ASSERT(point >= 1 && point <= path.size());
 
-            WaypointNode& node  = path[point-1];
+            WaypointNode& node  = path[point - 1];
 
             node.x              = fields[2].GetFloat();
             node.y              = fields[3].GetFloat();
@@ -301,7 +301,7 @@ void WaypointManager::Load()
             // the cleanup queries make sure the following is true
             MANGOS_ASSERT(point >= 1 && point <= path.size());
 
-            WaypointNode& node  = path[point-1];
+            WaypointNode& node  = path[point - 1];
 
             node.x              = fields[2].GetFloat();
             node.y              = fields[3].GetFloat();
@@ -344,7 +344,7 @@ void WaypointManager::Load()
 
             for (int i = 0; i < MAX_WAYPOINT_TEXT; ++i)
             {
-                be.textid[i]    = fields[7+i].GetUInt32();
+                be.textid[i]    = fields[7 + i].GetUInt32();
 
                 if (be.textid[i])
                 {
@@ -518,9 +518,9 @@ void WaypointManager::SetNodePosition(uint32 id, uint32 point, float x, float y,
     WaypointPathMap::iterator itr = m_pathMap.find(id);
     if (itr != m_pathMap.end() && point <= itr->second.size())
     {
-        itr->second[point-1].x = x;
-        itr->second[point-1].y = y;
-        itr->second[point-1].z = z;
+        itr->second[point - 1].x = x;
+        itr->second[point - 1].y = y;
+        itr->second[point - 1].z = z;
     }
 }
 
@@ -545,7 +545,7 @@ void WaypointManager::SetNodeText(uint32 id, uint32 point, const char* text_fiel
     WaypointPathMap::iterator itr = m_pathMap.find(id);
     if (itr != m_pathMap.end() && point <= itr->second.size())
     {
-        WaypointNode& node = itr->second[point-1];
+        WaypointNode& node = itr->second[point - 1];
         if (!node.behavior) node.behavior = new WaypointBehavior();
 
 //        if(field == "text1") node.behavior->text[0] = text ? text : "";

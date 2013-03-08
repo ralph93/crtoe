@@ -18,7 +18,6 @@
 
 #include "Common.h"
 #include "Database/DatabaseEnv.h"
-#include "DBCStores.h"
 #include "WorldPacket.h"
 #include "Player.h"
 #include "Opcodes.h"
@@ -51,6 +50,7 @@ bool ChatHandler::HandleDebugSendSpellFailCommand(char* args)
         return false;
 
     WorldPacket data(SMSG_CAST_FAILED, 5);
+    data << uint8(0);
     data << uint32(133);
     data << uint8(failnum);
     if (failarg1 || failarg2)
@@ -223,6 +223,25 @@ bool ChatHandler::HandleDebugPlayCinematicCommand(char* args)
     }
 
     m_session->GetPlayer()->SendCinematicStart(dwId);
+    return true;
+}
+
+bool ChatHandler::HandleDebugPlayMovieCommand(char* args)
+{
+    // USAGE: .debug play movie #movieid
+    // #movieid - ID decimal number from Movie.dbc (1st column)
+    uint32 dwId;
+    if (!ExtractUInt32(&args, dwId))
+        return false;
+
+    if (!sMovieStore.LookupEntry(dwId))
+    {
+        PSendSysMessage(LANG_MOVIE_NOT_EXIST, dwId);
+        SetSentErrorMessage(true);
+        return false;
+    }
+
+    m_session->GetPlayer()->SendMovieStart(dwId);
     return true;
 }
 
@@ -402,7 +421,7 @@ bool ChatHandler::HandleDebugGetItemStateCommand(char* args)
 
     if (list_queue)
     {
-        std::vector<Item*> &updateQueue = player->GetItemUpdateQueue();
+        std::vector<Item*>& updateQueue = player->GetItemUpdateQueue();
         for (size_t i = 0; i < updateQueue.size(); ++i)
         {
             Item* item = updateQueue[i];
@@ -430,7 +449,7 @@ bool ChatHandler::HandleDebugGetItemStateCommand(char* args)
     if (check_all)
     {
         bool error = false;
-        std::vector<Item*> &updateQueue = player->GetItemUpdateQueue();
+        std::vector<Item*>& updateQueue = player->GetItemUpdateQueue();
         for (uint8 i = PLAYER_SLOT_START; i < PLAYER_SLOT_END; ++i)
         {
             if (i >= BUYBACK_SLOT_START && i < BUYBACK_SLOT_END)
@@ -629,6 +648,26 @@ bool ChatHandler::HandleDebugSpellCheckCommand(char* /*args*/)
 {
     sLog.outString("Check expected in code spell properties base at table 'spell_check' content...");
     sSpellMgr.CheckUsedSpells("spell_check");
+    return true;
+}
+
+bool ChatHandler::HandleDebugSendLargePacketCommand(char* /*args*/)
+{
+    const char* stuffingString = "This is a dummy string to push the packet's size beyond 128000 bytes. ";
+    std::ostringstream ss;
+    while (ss.str().size() < 128000)
+        ss << stuffingString;
+    SendSysMessage(ss.str().c_str());
+    return true;
+}
+
+bool ChatHandler::HandleDebugSendSetPhaseShiftCommand(char* args)
+{
+    if (!*args)
+        return false;
+
+    uint32 PhaseShift = atoi(args);
+    m_session->SendSetPhaseShift(PhaseShift);
     return true;
 }
 
@@ -1067,7 +1106,7 @@ bool ChatHandler::HandleDebugSpellModsCommand(char* args)
         return false;
 
     uint32 effidx;
-    if (!ExtractUInt32(&args, effidx) || effidx >= 64)
+    if (!ExtractUInt32(&args, effidx) || effidx >= 64 + 32)
         return false;
 
     uint32 spellmodop;

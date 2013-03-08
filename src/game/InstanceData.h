@@ -86,16 +86,16 @@ class MANGOS_DLL_SPEC InstanceData
         virtual void OnObjectCreate(GameObject*) {}
 
         // called on creature creation
-        virtual void OnCreatureCreate(Creature * /*creature*/) {}
+        virtual void OnCreatureCreate(Creature* /*creature*/) {}
 
         // called on creature enter combat
-        virtual void OnCreatureEnterCombat(Creature * /*creature*/) {}
+        virtual void OnCreatureEnterCombat(Creature* /*creature*/) {}
 
         // called on creature evade
-        virtual void OnCreatureEvade(Creature * /*creature*/) {}
+        virtual void OnCreatureEvade(Creature* /*creature*/) {}
 
         // called on creature death
-        virtual void OnCreatureDeath(Creature * /*creature*/) {}
+        virtual void OnCreatureDeath(Creature* /*creature*/) {}
 
         // All-purpose data storage 64 bit
         virtual uint64 GetData64(uint32 /*Data*/) const { return 0; }
@@ -108,6 +108,10 @@ class MANGOS_DLL_SPEC InstanceData
         // All-purpose data storage 32 bit
         virtual uint32 GetData(uint32 /*Type*/) const { return 0; }
         virtual void SetData(uint32 /*Type*/, uint32 /*Data*/) {}
+
+        // Achievement criteria additional requirements check
+        // NOTE: not use this if same can be checked existing requirement types from AchievementCriteriaRequirementType
+        virtual bool CheckAchievementCriteriaMeet(uint32 criteria_id, Player const* source, Unit const* target = NULL, uint32 miscvalue1 = 0) const;
 
         // Condition criteria additional requirements check
         // This is used for such things are heroic loot

@@ -23,6 +23,7 @@
 #include "World.h"
 #include "Util.h"
 #include "SharedDefines.h"
+#include "SpellMgr.h"
 #include "DBCStores.h"
 #include "SQLStorages.h"
 
@@ -43,10 +44,12 @@ LootStore LootTemplates_Fishing("fishing_loot_template",      "area id",        
 LootStore LootTemplates_Gameobject("gameobject_loot_template",   "gameobject lootid",              true);
 LootStore LootTemplates_Item("item_loot_template",         "item entry with ITEM_FLAG_LOOTABLE", true);
 LootStore LootTemplates_Mail("mail_loot_template",         "mail template id",               false);
+LootStore LootTemplates_Milling("milling_loot_template",      "item entry (herb)",              true);
 LootStore LootTemplates_Pickpocketing("pickpocketing_loot_template", "creature pickpocket lootid",     true);
 LootStore LootTemplates_Prospecting("prospecting_loot_template",  "item entry (ore)",               true);
 LootStore LootTemplates_Reference("reference_loot_template",    "reference id",                   false);
 LootStore LootTemplates_Skinning("skinning_loot_template",     "creature skinning id",           true);
+LootStore LootTemplates_Spell("spell_loot_template",        "spell id (random item creating)", false);
 
 class LootTemplate::LootGroup                               // A set of loot definitions for items (refs are not allowed)
 {
@@ -162,7 +165,6 @@ void LootStore::LoadLootTable()
             // Adds current row to the template
             tab->second->AddEntry(storeitem);
             ++count;
-
         }
         while (result->NextRow());
 
@@ -298,7 +300,6 @@ bool LootStoreItem::IsValid(LootStore const& store, uint32 entry) const
             sLog.outErrorDb("Table '%s' entry %d item %d: max count (%u) less that min count (%i) - skipped", store.GetName(), entry, itemid, uint32(maxcount), mincountOrRef);
             return false;
         }
-
     }
     else                                                    // mincountOrRef < 0
     {
@@ -368,6 +369,13 @@ bool LootItem::AllowedForPlayer(Player const* player, WorldObject const* lootTar
 
     ItemPrototype const* pProto = ObjectMgr::GetItemPrototype(itemid);
     if (!pProto)
+        return false;
+
+    // not show loot for not own team
+    if ((pProto->Flags2 & ITEM_FLAG2_HORDE_ONLY) && player->GetTeam() != HORDE)
+        return false;
+
+    if ((pProto->Flags2 & ITEM_FLAG2_ALLIANCE_ONLY) && player->GetTeam() != ALLIANCE)
         return false;
 
     if (needs_quest)
@@ -755,7 +763,6 @@ ByteBuffer& operator<<(ByteBuffer& b, LootView const& lv)
     if (lv.permission == NONE_PERMISSION)
         return b;                                           // nothing output more
 
-
     for (uint8 i = 0; i < l.items.size(); ++i)
     {
         LootSlotType slot_type = l.items[i].GetSlotTypeForSharedLoot(lv.permission, lv.viewer, l.GetLootTarget());
@@ -861,7 +868,7 @@ LootStoreItem const* LootTemplate::LootGroup::Roll() const
         }
     }
     if (!EqualChanced.empty())                              // If nothing selected yet - an item is taken from equal-chanced part
-        return &EqualChanced[irand(0, EqualChanced.size()-1)];
+        return &EqualChanced[irand(0, EqualChanced.size() - 1)];
 
     return NULL;                                            // Empty drop from the group
 }
@@ -971,7 +978,7 @@ void LootTemplate::AddEntry(LootStoreItem& item)
     {
         if (item.group >= Groups.size())
             Groups.resize(item.group);                      // Adds new group the the loot template if needed
-        Groups[item.group-1].AddEntry(item);                // Adds new entry to the group
+        Groups[item.group - 1].AddEntry(item);              // Adds new entry to the group
     }
     else                                                    // Non-grouped entries and references are stored together
         Entries.push_back(item);
@@ -985,7 +992,7 @@ void LootTemplate::Process(Loot& loot, LootStore const& store, bool rate, uint8 
         if (groupId > Groups.size())
             return;                                         // Error message already printed at loading stage
 
-        Groups[groupId-1].Process(loot);
+        Groups[groupId - 1].Process(loot);
         return;
     }
 
@@ -1025,7 +1032,7 @@ bool LootTemplate::HasQuestDrop(LootTemplateMap const& store, uint8 groupId) con
     {
         if (groupId > Groups.size())
             return false;                                   // Error message [should be] already printed at loading stage
-        return Groups[groupId-1].HasQuestDrop();
+        return Groups[groupId - 1].HasQuestDrop();
     }
 
     for (LootStoreItemList::const_iterator i = Entries.begin(); i != Entries.end(); ++i)
@@ -1057,7 +1064,7 @@ bool LootTemplate::HasQuestDropForPlayer(LootTemplateMap const& store, Player co
     {
         if (groupId > Groups.size())
             return false;                                   // Error message already printed at loading stage
-        return Groups[groupId-1].HasQuestDropForPlayer(player);
+        return Groups[groupId - 1].HasQuestDropForPlayer(player);
     }
 
     // Checking non-grouped entries
@@ -1233,6 +1240,31 @@ void LoadLootTemplates_Item()
     LootTemplates_Item.ReportUnusedIds(ids_set);
 }
 
+void LoadLootTemplates_Milling()
+{
+    LootIdSet ids_set;
+    LootTemplates_Milling.LoadAndCollectLootIds(ids_set);
+
+    // remove real entries and check existence loot
+    for (uint32 i = 1; i < sItemStorage.GetMaxEntry(); ++i)
+    {
+        ItemPrototype const* proto = sItemStorage.LookupEntry<ItemPrototype>(i);
+        if (!proto)
+            continue;
+
+        if (!(proto->Flags & ITEM_FLAG_MILLABLE))
+            continue;
+
+        if (ids_set.find(proto->ItemId) != ids_set.end())
+            ids_set.erase(proto->ItemId);
+        else
+            LootTemplates_Milling.ReportNotExistedId(proto->ItemId);
+    }
+
+    // output error for any still listed (not referenced from appropriate table) ids
+    LootTemplates_Milling.ReportUnusedIds(ids_set);
+}
+
 void LoadLootTemplates_Pickpocketing()
 {
     LootIdSet ids_set, ids_setUsed;
@@ -1325,6 +1357,39 @@ void LoadLootTemplates_Skinning()
     LootTemplates_Skinning.ReportUnusedIds(ids_set);
 }
 
+void LoadLootTemplates_Spell()
+{
+    LootIdSet ids_set;
+    LootTemplates_Spell.LoadAndCollectLootIds(ids_set);
+
+    // remove real entries and check existence loot
+    for (uint32 spell_id = 1; spell_id < sSpellStore.GetNumRows(); ++spell_id)
+    {
+        SpellEntry const* spellInfo = sSpellStore.LookupEntry(spell_id);
+        if (!spellInfo)
+            continue;
+
+        // possible cases
+        if (!IsLootCraftingSpell(spellInfo))
+            continue;
+
+        if (ids_set.find(spell_id) == ids_set.end())
+        {
+            // not report about not trainable spells (optionally supported by DB)
+            // ignore 61756 (Northrend Inscription Research (FAST QA VERSION) for example
+            if (!spellInfo->HasAttribute(SPELL_ATTR_NOT_SHAPESHIFT) || spellInfo->HasAttribute(SPELL_ATTR_TRADESPELL))
+            {
+                LootTemplates_Spell.ReportNotExistedId(spell_id);
+            }
+        }
+        else
+            ids_set.erase(spell_id);
+    }
+
+    // output error for any still listed (not referenced from appropriate table) ids
+    LootTemplates_Spell.ReportUnusedIds(ids_set);
+}
+
 void LoadLootTemplates_Reference()
 {
     LootIdSet ids_set;
@@ -1335,6 +1400,7 @@ void LoadLootTemplates_Reference()
     LootTemplates_Fishing.CheckLootRefs(&ids_set);
     LootTemplates_Gameobject.CheckLootRefs(&ids_set);
     LootTemplates_Item.CheckLootRefs(&ids_set);
+    LootTemplates_Milling.CheckLootRefs(&ids_set);
     LootTemplates_Pickpocketing.CheckLootRefs(&ids_set);
     LootTemplates_Skinning.CheckLootRefs(&ids_set);
     LootTemplates_Disenchant.CheckLootRefs(&ids_set);

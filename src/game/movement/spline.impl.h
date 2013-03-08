@@ -55,7 +55,7 @@ namespace Movement
 
         index_type i = index_lo;
         index_type N = index_hi;
-        while (i + 1 < N && lengths[i+1] < length_)
+        while (i + 1 < N && lengths[i + 1] < length_)
             ++i;
 
         return i;
@@ -93,5 +93,4 @@ namespace Movement
         SplineBase::clear();
         lengths.clear();
     }
-
 }

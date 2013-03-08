@@ -48,12 +48,34 @@ enum SpellCastFlags
     CAST_FLAG_UNKNOWN7          = 0x00000040,               // !0x41 mask used to call CGTradeSkillInfo::DoRecast
     CAST_FLAG_UNKNOWN8          = 0x00000080,
     CAST_FLAG_UNKNOWN9          = 0x00000100,
+    CAST_FLAG_UNKNOWN10         = 0x00000200,
+    CAST_FLAG_UNKNOWN11         = 0x00000400,
+    CAST_FLAG_PREDICTED_POWER   = 0x00000800,               // wotlk, trigger rune cooldown
+    CAST_FLAG_UNKNOWN13         = 0x00001000,
+    CAST_FLAG_UNKNOWN14         = 0x00002000,
+    CAST_FLAG_UNKNOWN15         = 0x00004000,
+    CAST_FLAG_UNKNOWN16         = 0x00008000,
+    CAST_FLAG_UNKNOWN17         = 0x00010000,
+    CAST_FLAG_ADJUST_MISSILE    = 0x00020000,               // wotlk
+    CAST_FLAG_UNKNOWN19         = 0x00040000,               // spell cooldown related (may be category cooldown)
+    CAST_FLAG_VISUAL_CHAIN      = 0x00080000,               // wotlk
+    CAST_FLAG_UNKNOWN21         = 0x00100000,
+    CAST_FLAG_PREDICTED_RUNES   = 0x00200000,               // wotlk, rune cooldown list
+    CAST_FLAG_IMMUNITY          = 0x04000000                // spell cast school imminity info
+};
+
+enum SpellFlags
+{
+    SPELL_FLAG_NORMAL       = 0x00,
+    SPELL_FLAG_REFLECTED    = 0x01,     // reflected spell
+    SPELL_FLAG_REDIRECTED   = 0x02      // redirected spell
 };
 
 enum SpellNotifyPushType
 {
     PUSH_IN_FRONT,
     PUSH_IN_FRONT_90,
+    PUSH_IN_FRONT_30,
     PUSH_IN_FRONT_15,
     PUSH_IN_BACK,
     PUSH_SELF_CENTER,
@@ -100,6 +122,8 @@ class SpellCastTargets
             m_GOTargetGUID      = target.m_GOTargetGUID;
             m_CorpseTargetGUID  = target.m_CorpseTargetGUID;
             m_itemTargetGUID    = target.m_itemTargetGUID;
+            m_srcTransportGUID  = target.m_srcTransportGUID;
+            m_destTransportGUID = target.m_destTransportGUID;
 
             m_itemTargetEntry  = target.m_itemTargetEntry;
 
@@ -171,6 +195,8 @@ class SpellCastTargets
         ObjectGuid m_GOTargetGUID;
         ObjectGuid m_CorpseTargetGUID;
         ObjectGuid m_itemTargetGUID;
+        ObjectGuid m_srcTransportGUID;
+        ObjectGuid m_destTransportGUID;
         uint32 m_itemTargetEntry;
 };
 
@@ -211,8 +237,8 @@ class Spell
         friend struct MaNGOS::SpellNotifierPlayer;
         friend struct MaNGOS::SpellNotifierCreatureAndPlayer;
         friend void Unit::SetCurrentCastedSpell(Spell* pSpell);
-    public:
 
+    public:
         void EffectEmpty(SpellEffectIndex eff_idx);
         void EffectNULL(SpellEffectIndex eff_idx);
         void EffectUnused(SpellEffectIndex eff_idx);
@@ -232,6 +258,8 @@ class Spell
         void EffectHealthLeech(SpellEffectIndex eff_idx);
         void EffectQuestComplete(SpellEffectIndex eff_idx);
         void EffectCreateItem(SpellEffectIndex eff_idx);
+        void EffectCreateItem2(SpellEffectIndex eff_idx);
+        void EffectCreateRandomItem(SpellEffectIndex eff_idx);
         void EffectPersistentAA(SpellEffectIndex eff_idx);
         void EffectEnergize(SpellEffectIndex eff_idx);
         void EffectOpenLock(SpellEffectIndex eff_idx);
@@ -245,6 +273,7 @@ class Spell
         void EffectPickPocket(SpellEffectIndex eff_idx);
         void EffectAddFarsight(SpellEffectIndex eff_idx);
         void EffectHealMechanical(SpellEffectIndex eff_idx);
+        void EffectJump(SpellEffectIndex eff_idx);
         void EffectTeleUnitsFaceCaster(SpellEffectIndex eff_idx);
         void EffectLearnSkill(SpellEffectIndex eff_idx);
         void EffectAddHonor(SpellEffectIndex eff_idx);
@@ -255,10 +284,12 @@ class Spell
         void EffectSummonPet(SpellEffectIndex eff_idx);
         void EffectLearnPetSpell(SpellEffectIndex eff_idx);
         void EffectWeaponDmg(SpellEffectIndex eff_idx);
+        void EffectClearQuest(SpellEffectIndex eff_idx);
         void EffectForceCast(SpellEffectIndex eff_idx);
         void EffectTriggerSpell(SpellEffectIndex eff_idx);
         void EffectTriggerMissileSpell(SpellEffectIndex eff_idx);
         void EffectThreat(SpellEffectIndex eff_idx);
+        void EffectRestoreItemCharges(SpellEffectIndex eff_idx);
         void EffectHealMaxHealth(SpellEffectIndex eff_idx);
         void EffectInterruptCast(SpellEffectIndex eff_idx);
         void EffectSummonObjectWild(SpellEffectIndex eff_idx);
@@ -269,6 +300,7 @@ class Spell
         void EffectStuck(SpellEffectIndex eff_idx);
         void EffectSummonPlayer(SpellEffectIndex eff_idx);
         void EffectActivateObject(SpellEffectIndex eff_idx);
+        void EffectApplyGlyph(SpellEffectIndex eff_idx);
         void EffectEnchantHeldItem(SpellEffectIndex eff_idx);
         void EffectSummonObject(SpellEffectIndex eff_idx);
         void EffectResurrect(SpellEffectIndex eff_idx);
@@ -288,11 +320,15 @@ class Spell
         void EffectCharge2(SpellEffectIndex eff_idx);
         void EffectProspecting(SpellEffectIndex eff_idx);
         void EffectRedirectThreat(SpellEffectIndex eff_idx);
+        void EffectMilling(SpellEffectIndex eff_idx);
+        void EffectRenamePet(SpellEffectIndex eff_idx);
         void EffectSendTaxi(SpellEffectIndex eff_idx);
         void EffectKnockBack(SpellEffectIndex eff_idx);
         void EffectPlayerPull(SpellEffectIndex eff_idx);
         void EffectDispelMechanic(SpellEffectIndex eff_idx);
         void EffectSummonDeadPet(SpellEffectIndex eff_idx);
+        void EffectSummonAllTotems(SpellEffectIndex eff_idx);
+        void EffectBreakPlayerTargeting(SpellEffectIndex eff_idx);
         void EffectDestroyAllTotems(SpellEffectIndex eff_idx);
         void EffectDurabilityDamage(SpellEffectIndex eff_idx);
         void EffectSkill(SpellEffectIndex eff_idx);
@@ -309,10 +345,22 @@ class Spell
         void EffectEnergisePct(SpellEffectIndex eff_idx);
         void EffectTriggerSpellWithValue(SpellEffectIndex eff_idx);
         void EffectTriggerRitualOfSummoning(SpellEffectIndex eff_idx);
+        void EffectKillCreditPersonal(SpellEffectIndex eff_idx);
         void EffectKillCreditGroup(SpellEffectIndex eff_idx);
         void EffectQuestFail(SpellEffectIndex eff_idx);
+        void EffectQuestOffer(SpellEffectIndex eff_idx);
+        void EffectActivateRune(SpellEffectIndex eff_idx);
+        void EffectTeachTaxiNode(SpellEffectIndex eff_idx);
+        void EffectWMODamage(SpellEffectIndex eff_idx);
+        void EffectWMORepair(SpellEffectIndex eff_idx);
+        void EffectWMOChange(SpellEffectIndex eff_idx);
+        void EffectTitanGrip(SpellEffectIndex eff_idx);
+        void EffectEnchantItemPrismatic(SpellEffectIndex eff_idx);
         void EffectPlaySound(SpellEffectIndex eff_idx);
         void EffectPlayMusic(SpellEffectIndex eff_idx);
+        void EffectSpecCount(SpellEffectIndex eff_idx);
+        void EffectActivateSpec(SpellEffectIndex eff_idx);
+        void EffectCancelAura(SpellEffectIndex eff_idx);
         void EffectKnockBackFromPosition(SpellEffectIndex eff_idx);
 
         Spell(Unit* caster, SpellEntry const* info, bool triggered, ObjectGuid originalCasterGUID = ObjectGuid(), SpellEntry const* triggeredBy = NULL);
@@ -342,6 +390,7 @@ class Spell
         SpellCastResult CheckItems();
         SpellCastResult CheckRange(bool strict);
         SpellCastResult CheckPower();
+        SpellCastResult CheckOrTakeRunePower(bool take);
         SpellCastResult CheckCasterAuras() const;
 
         int32 CalculateDamage(SpellEffectIndex i, Unit* target) { return m_caster->CalculateSpellDamage(target, m_spellInfo, i, &m_currentBasePoints[i]); }
@@ -354,25 +403,9 @@ class Spell
         void setState(uint32 state) { m_spellState = state; }
 
         void DoCreateItem(SpellEffectIndex eff_idx, uint32 itemtype);
-        void DoSummon(SpellEffectIndex eff_idx);
-        void DoSummonWild(SpellEffectIndex eff_idx, uint32 forceFaction = 0);
-        void DoSummonGuardian(SpellEffectIndex eff_idx, uint32 forceFaction = 0);
-        void DoSummonTotem(SpellEffectIndex eff_idx, uint8 slot_dbc = 0);
-        void DoSummonCritter(SpellEffectIndex eff_idx, uint32 forceFaction = 0);
-        bool DoSummonPossessed(SpellEffectIndex eff_idx, uint32 forceFaction = 0);
 
         void WriteSpellGoTargets(WorldPacket* data);
         void WriteAmmoToPacket(WorldPacket* data);
-
-        typedef std::list<Unit*> UnitList;
-        void FillTargetMap();
-        void SetTargetMap(SpellEffectIndex effIndex, uint32 targetMode, UnitList& targetUnitMap);
-
-        void FillAreaTargets(UnitList& targetUnitMap, float radius, SpellNotifyPushType pushType, SpellTargets spellTargets, WorldObject* originalCaster = NULL);
-        void FillRaidOrPartyTargets(UnitList& targetUnitMap, Unit* member, float radius, bool raid, bool withPets, bool withcaster);
-
-        // Returns a target that was filled by SPELL_SCRIPT_TARGET (or selected victim) Can return NULL
-        Unit* GetPrefilledUnitTargetOrUnitTarget(SpellEffectIndex effIndex) const;
 
         template<typename T> WorldObject* FindCorpseUsing();
 
@@ -399,6 +432,7 @@ class Spell
         int32 m_currentBasePoints[MAX_EFFECT_INDEX];        // cache SpellEntry::CalculateSimpleValue and use for set custom base points
         Item* m_CastItem;
         uint8 m_cast_count;
+        uint32 m_glyphIndex;
         SpellCastTargets m_targets;
 
         int32 GetCastTime() const { return m_casttime; }
@@ -458,6 +492,8 @@ class Spell
 
         static void SelectMountByAreaAndSkill(Unit* target, SpellEntry const* parentSpell, uint32 spellId75, uint32 spellId150, uint32 spellId225, uint32 spellId300, uint32 spellIdSpecial);
 
+        typedef std::list<Unit*> UnitList;
+
     protected:
         bool HasGlobalCooldown();
         void TriggerGlobalCooldown();
@@ -482,10 +518,19 @@ class Spell
         int32 m_casttime;                                   // Calculated spell cast time initialized only in Spell::prepare
         int32 m_duration;
         bool m_canReflect;                                  // can reflect this spell?
+        uint8 m_spellFlags;                                 // for spells whose target was changed in cast i.e. due to reflect
         bool m_autoRepeat;
+        uint8 m_runesState;
 
         uint8 m_delayAtDamageCount;
-        int32 GetNextDelayAtDamageMsTime() { return m_delayAtDamageCount < 5 ? 1000 - (m_delayAtDamageCount++) * 200 : 200; }
+        bool isDelayableNoMore()
+        {
+            if (m_delayAtDamageCount >= 2)
+                return true;
+
+            ++m_delayAtDamageCount;
+            return false;
+        }
 
         // Delayed spells system
         uint64 m_delayStart;                                // time of spell delay start, filled by event handler, zero = just started
@@ -526,6 +571,21 @@ class Spell
         uint32 m_procAttacker;                              // Attacker trigger flags
         uint32 m_procVictim;                                // Victim   trigger flags
         void   prepareDataForTriggerSystem();
+
+        //*****************************************
+        // Spell target filling
+        //*****************************************
+        void FillTargetMap();
+        void SetTargetMap(SpellEffectIndex effIndex, uint32 targetMode, UnitList& targetUnitMap);
+
+        void FillAreaTargets(UnitList& targetUnitMap, float radius, SpellNotifyPushType pushType, SpellTargets spellTargets, WorldObject* originalCaster = NULL);
+        void FillRaidOrPartyTargets(UnitList& targetUnitMap, Unit* member, Unit* center, float radius, bool raid, bool withPets, bool withcaster);
+        void FillRaidOrPartyManaPriorityTargets(UnitList& targetUnitMap, Unit* member, Unit* center, float radius, uint32 count, bool raid, bool withPets, bool withcaster);
+        void FillRaidOrPartyHealthPriorityTargets(UnitList& targetUnitMap, Unit* member, Unit* center, float radius, uint32 count, bool raid, bool withPets, bool withcaster);
+
+        // Returns a target that was filled by SPELL_SCRIPT_TARGET (or selected victim) Can return NULL
+        Unit* GetPrefilledUnitTargetOrUnitTarget(SpellEffectIndex effIndex) const;
+        void GetSpellRangeAndRadius(SpellEffectIndex effIndex, float& radius, uint32& EffectChainTarget, uint32& unMaxTargets) const;
 
         //*****************************************
         // Spell target subsystem
@@ -575,7 +635,7 @@ class Spell
         void HandleDelayedSpellLaunch(TargetInfo* target);
         void InitializeDamageMultipliers();
         void ResetEffectDamageAndHeal();
-        void DoSpellHitOnUnit(Unit* unit, uint32 effectMask, bool isReflected = false);
+        void DoSpellHitOnUnit(Unit* unit, uint32 effectMask);
         void DoAllEffectOnTarget(GOTargetInfo* target);
         void DoAllEffectOnTarget(ItemTargetInfo* target);
         bool IsAliveUnitPresentInTargetList();
@@ -600,6 +660,29 @@ class Spell
         // we can't store original aura link to prevent access to deleted auras
         // and in same time need aura data and after aura deleting.
         SpellEntry const* m_triggeredByAuraSpell;
+
+    private:
+        // NPC Summonings
+        struct CreaturePosition
+        {
+            CreaturePosition() :
+                x(0.0f), y(0.0f), z(0.0f),
+                creature(NULL)
+            {}
+
+            float x, y, z;
+            Creature* creature;
+        };
+        typedef std::vector<CreaturePosition> CreatureSummonPositions;
+
+        // return true IFF further processing required
+        bool DoSummonPet(SpellEffectIndex eff_idx);
+        bool DoSummonTotem(SpellEffectIndex eff_idx, uint8 slot_dbc = 0);
+        bool DoSummonWild(CreatureSummonPositions& list, SummonPropertiesEntry const* prop, SpellEffectIndex effIdx, uint32 level);
+        bool DoSummonCritter(CreatureSummonPositions& list, SummonPropertiesEntry const* prop, SpellEffectIndex effIdx, uint32 level);
+        bool DoSummonGuardian(CreatureSummonPositions& list, SummonPropertiesEntry const* prop, SpellEffectIndex effIdx, uint32 level);
+        bool DoSummonPossessed(CreatureSummonPositions& list, SummonPropertiesEntry const* prop, SpellEffectIndex effIdx, uint32 level);
+        bool DoSummonVehicle(CreatureSummonPositions& list, SummonPropertiesEntry const* prop, SpellEffectIndex effIdx, uint32 level);
 };
 
 enum ReplenishType
@@ -644,7 +727,7 @@ namespace MaNGOS
                     i_data.push_back(pPlayer);
             }
         }
-        template<class SKIP> void Visit(GridRefManager<SKIP> &) {}
+        template<class SKIP> void Visit(GridRefManager<SKIP>&) {}
     };
 
     struct MANGOS_DLL_DECL SpellNotifierCreatureAndPlayer
@@ -677,6 +760,7 @@ namespace MaNGOS
             {
                 case PUSH_IN_FRONT:
                 case PUSH_IN_FRONT_90:
+                case PUSH_IN_FRONT_30:
                 case PUSH_IN_FRONT_15:
                 case PUSH_IN_BACK:
                 case PUSH_SELF_CENTER:
@@ -704,7 +788,7 @@ namespace MaNGOS
             }
         }
 
-        template<class T> inline void Visit(GridRefManager<T>  &m)
+        template<class T> inline void Visit(GridRefManager<T>&  m)
         {
             MANGOS_ASSERT(i_data);
 
@@ -769,6 +853,10 @@ namespace MaNGOS
                         break;
                     case PUSH_IN_FRONT_90:
                         if (i_castingObject->isInFront((Unit*)(itr->getSource()), i_radius, M_PI_F / 2))
+                            i_data->push_back(itr->getSource());
+                        break;
+                    case PUSH_IN_FRONT_30:
+                        if (i_castingObject->isInFront((Unit*)(itr->getSource()), i_radius, M_PI_F / 6))
                             i_data->push_back(itr->getSource());
                         break;
                     case PUSH_IN_FRONT_15:

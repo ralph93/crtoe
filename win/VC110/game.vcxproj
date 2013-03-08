@@ -338,7 +338,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="..\..\src\game\AccountMgr.cpp" />
-    <ClCompile Include="..\..\src\game\AddonHandler.cpp" />
+    <ClCompile Include="..\..\src\game\AchievementMgr.cpp" />
     <ClCompile Include="..\..\src\game\AggressorAI.cpp" />
     <ClCompile Include="..\..\src\game\ArenaTeam.cpp" />
     <ClCompile Include="..\..\src\game\ArenaTeamHandler.cpp" />
@@ -349,14 +349,21 @@
     <ClCompile Include="..\..\src\game\BattleGround\BattleGround.cpp" />
     <ClCompile Include="..\..\src\game\BattleGround\BattleGroundAA.cpp" />
     <ClCompile Include="..\..\src\game\BattleGround\BattleGroundAB.cpp" />
+    <ClCompile Include="..\..\src\game\BattleGround\BattleGroundRB.cpp" />
     <ClCompile Include="..\..\src\game\BattleGround\BattleGroundAV.cpp" />
     <ClCompile Include="..\..\src\game\BattleGround\BattleGroundBE.cpp" />
+    <ClCompile Include="..\..\src\game\BattleGround\BattleGroundDS.cpp" />
     <ClCompile Include="..\..\src\game\BattleGround\BattleGroundEY.cpp" />
     <ClCompile Include="..\..\src\game\BattleGround\BattleGroundHandler.cpp" />
+    <ClCompile Include="..\..\src\game\BattleGround\BattleGroundIC.cpp" />
     <ClCompile Include="..\..\src\game\BattleGround\BattleGroundMgr.cpp" />
     <ClCompile Include="..\..\src\game\BattleGround\BattleGroundNA.cpp" />
     <ClCompile Include="..\..\src\game\BattleGround\BattleGroundRL.cpp" />
+    <ClCompile Include="..\..\src\game\BattleGround\BattleGroundRV.cpp" />
+    <ClCompile Include="..\..\src\game\BattleGround\BattleGroundSA.cpp" />
     <ClCompile Include="..\..\src\game\BattleGround\BattleGroundWS.cpp" />
+    <ClCompile Include="..\..\src\game\Calendar.cpp" />
+    <ClCompile Include="..\..\src\game\CalendarHandler.cpp" />
     <ClCompile Include="..\..\src\game\Camera.cpp" />
     <ClCompile Include="..\..\src\game\Channel.cpp" />
     <ClCompile Include="..\..\src\game\ChannelHandler.cpp" />
@@ -480,6 +487,8 @@
     <ClCompile Include="..\..\src\game\Transports.cpp" />
     <ClCompile Include="..\..\src\game\Unit.cpp" />
     <ClCompile Include="..\..\src\game\UpdateData.cpp" />
+    <ClCompile Include="..\..\src\game\Vehicle.cpp" />
+    <ClCompile Include="..\..\src\game\VehicleHandler.cpp" />
     <ClCompile Include="..\..\src\game\VoiceChatHandler.cpp" />
     <ClCompile Include="..\..\src\game\WaypointManager.cpp" />
     <ClCompile Include="..\..\src\game\WaypointMovementGenerator.cpp" />
@@ -487,6 +496,7 @@
     <ClCompile Include="..\..\src\game\World.cpp" />
     <ClCompile Include="..\..\src\game\OutdoorPvP\OutdoorPvP.cpp" />
     <ClCompile Include="..\..\src\game\OutdoorPvP\OutdoorPvPEP.cpp" />
+    <ClCompile Include="..\..\src\game\OutdoorPvP\OutdoorPvPGH.cpp" />
     <ClCompile Include="..\..\src\game\OutdoorPvP\OutdoorPvPHP.cpp" />
     <ClCompile Include="..\..\src\game\OutdoorPvP\OutdoorPvPMgr.cpp" />
     <ClCompile Include="..\..\src\game\OutdoorPvP\OutdoorPvPNA.cpp" />
@@ -508,7 +518,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\src\game\AccountMgr.h" />
-    <ClInclude Include="..\..\src\game\AddonHandler.h" />
+    <ClInclude Include="..\..\src\game\AchievementMgr.h" />
     <ClInclude Include="..\..\src\game\AggressorAI.h" />
     <ClInclude Include="..\..\src\game\ArenaTeam.h" />
     <ClInclude Include="..\..\src\game\AuctionHouseBot\AuctionHouseBot.h" />
@@ -517,13 +527,19 @@
     <ClInclude Include="..\..\src\game\BattleGround\BattleGround.h" />
     <ClInclude Include="..\..\src\game\BattleGround\BattleGroundAA.h" />
     <ClInclude Include="..\..\src\game\BattleGround\BattleGroundAB.h" />
+    <ClInclude Include="..\..\src\game\BattleGround\BattleGroundRB.h" />
     <ClInclude Include="..\..\src\game\BattleGround\BattleGroundAV.h" />
     <ClInclude Include="..\..\src\game\BattleGround\BattleGroundBE.h" />
+    <ClInclude Include="..\..\src\game\BattleGround\BattleGroundDS.h" />
     <ClInclude Include="..\..\src\game\BattleGround\BattleGroundEY.h" />
+    <ClInclude Include="..\..\src\game\BattleGround\BattleGroundIC.h" />
     <ClInclude Include="..\..\src\game\BattleGround\BattleGroundMgr.h" />
     <ClInclude Include="..\..\src\game\BattleGround\BattleGroundNA.h" />
     <ClInclude Include="..\..\src\game\BattleGround\BattleGroundRL.h" />
+    <ClInclude Include="..\..\src\game\BattleGround\BattleGroundRV.h" />
+    <ClInclude Include="..\..\src\game\BattleGround\BattleGroundSA.h" />
     <ClInclude Include="..\..\src\game\BattleGround\BattleGroundWS.h" />
+    <ClInclude Include="..\..\src\game\Calendar.h" />
     <ClInclude Include="..\..\src\game\Camera.h" />
     <ClInclude Include="..\..\src\game\Cell.h" />
     <ClInclude Include="..\..\src\game\CellImpl.h" />
@@ -637,12 +653,14 @@
     <ClInclude Include="..\..\src\game\UpdateData.h" />
     <ClInclude Include="..\..\src\game\UpdateFields.h" />
     <ClInclude Include="..\..\src\game\UpdateMask.h" />
+    <ClInclude Include="..\..\src\game\Vehicle.h" />
     <ClInclude Include="..\..\src\game\WaypointManager.h" />
     <ClInclude Include="..\..\src\game\WaypointMovementGenerator.h" />
     <ClInclude Include="..\..\src\game\Weather.h" />
     <ClInclude Include="..\..\src\game\World.h" />
     <ClInclude Include="..\..\src\game\OutdoorPvP\OutdoorPvP.h" />
     <ClInclude Include="..\..\src\game\OutdoorPvP\OutdoorPvPEP.h" />
+    <ClInclude Include="..\..\src\game\OutdoorPvP\OutdoorPvPGH.h" />
     <ClInclude Include="..\..\src\game\OutdoorPvP\OutdoorPvPHP.h" />
     <ClInclude Include="..\..\src\game\OutdoorPvP\OutdoorPvPMgr.h" />
     <ClInclude Include="..\..\src\game\OutdoorPvP\OutdoorPvPNA.h" />

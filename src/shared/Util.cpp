@@ -245,6 +245,21 @@ std::string TimeToTimestampStr(time_t t)
     return std::string(buf);
 }
 
+time_t timeBitFieldsToSecs(uint32 packedDate)
+{
+    tm lt;
+    memset(&lt, 0, sizeof(lt));
+
+    lt.tm_min = packedDate & 0x3F;
+    lt.tm_hour = (packedDate >> 6) & 0x1F;
+    lt.tm_wday = (packedDate >> 11) & 7;
+    lt.tm_mday = ((packedDate >> 14) & 0x3F) + 1;
+    lt.tm_mon = (packedDate >> 20) & 0xF;
+    lt.tm_year = ((packedDate >> 24) & 0x1F) + 100;
+
+    return time_t(mktime(&lt));
+}
+
 /// Check if the string is a valid ip address representation
 bool IsIPAddress(char const* ipaddress)
 {
@@ -433,7 +448,7 @@ std::wstring GetMainPartOfName(std::wstring wname, uint32 declension)
         { &ie_End[1], &i_End[1],    NULL,         NULL,        NULL,         NULL,         NULL,       NULL }
     };
 
-    for (wchar_t const* const* itr = &dropEnds[declension][0]; *itr; ++itr)
+    for (wchar_t const * const* itr = &dropEnds[declension][0]; *itr; ++itr)
     {
         size_t len = size_t((*itr)[-1]);                    // get length from string size field
 
@@ -503,8 +518,8 @@ void utf8printf(FILE* out, const char* str, ...)
 void vutf8printf(FILE* out, const char* str, va_list* ap)
 {
 #if PLATFORM == PLATFORM_WINDOWS
-    char temp_buf[32*1024];
-    wchar_t wtemp_buf[32*1024];
+    char temp_buf[32 * 1024];
+    wchar_t wtemp_buf[32 * 1024];
 
     size_t temp_len = vsnprintf(temp_buf, 32 * 1024, str, *ap);
 

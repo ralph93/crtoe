@@ -139,14 +139,11 @@ class MANGOS_DLL_DECL MapManager : public MaNGOS::Singleton<MapManager, MaNGOS::
         typedef std::map<uint32, TransportSet> TransportMap;
         TransportMap m_TransportsByMap;
 
-        uint32 GenerateInstanceId() { return ++i_MaxInstanceId; }
-        void InitMaxInstanceId();
         void InitializeVisibilityDistanceInfo();
 
         /* statistics */
         uint32 GetNumInstances();
         uint32 GetNumPlayersInInstances();
-
 
         // get list of all maps
         const MapMapType& Maps() const { return i_maps; }
@@ -178,8 +175,6 @@ class MANGOS_DLL_DECL MapManager : public MaNGOS::Singleton<MapManager, MaNGOS::
         uint32 i_gridCleanUpDelay;
         MapMapType i_maps;
         IntervalTimer i_timer;
-
-        uint32 i_MaxInstanceId;
 };
 
 template<typename Do>

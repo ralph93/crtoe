@@ -42,6 +42,7 @@ enum StableResultCode
     STABLE_SUCCESS_STABLE   = 0x08,                         // stable success
     STABLE_SUCCESS_UNSTABLE = 0x09,                         // unstable/swap success
     STABLE_SUCCESS_BUY_SLOT = 0x0A,                         // buy slot success
+    STABLE_ERR_EXOTIC       = 0x0C,                         // "you are unable to control exotic creatures"
 };
 
 void WorldSession::HandleTabardVendorActivateOpcode(WorldPacket& recv_data)
@@ -95,6 +96,13 @@ void WorldSession::SendShowBank(ObjectGuid guid)
     SendPacket(&data);
 }
 
+void WorldSession::SendShowMailBox(ObjectGuid guid)
+{
+    WorldPacket data(SMSG_SHOW_MAILBOX, 8);
+    data << ObjectGuid(guid);
+    SendPacket(&data);
+}
+
 void WorldSession::HandleTrainerListOpcode(WorldPacket& recv_data)
 {
     ObjectGuid guid;
@@ -110,14 +118,13 @@ void WorldSession::SendTrainerList(ObjectGuid guid)
     SendTrainerList(guid, str);
 }
 
-
 static void SendTrainerSpellHelper(WorldPacket& data, TrainerSpell const* tSpell, TrainerSpellState state, float fDiscountMod, bool can_learn_primary_prof, uint32 reqLevel)
 {
-    bool primary_prof_first_rank = sSpellMgr.IsPrimaryProfessionFirstRankSpell(tSpell->spell);
+    bool primary_prof_first_rank = sSpellMgr.IsPrimaryProfessionFirstRankSpell(tSpell->learnedSpell);
 
-    SpellChainNode const* chain_node = sSpellMgr.GetSpellChainNode(tSpell->spell);
+    SpellChainNode const* chain_node = sSpellMgr.GetSpellChainNode(tSpell->learnedSpell);
 
-    data << uint32(tSpell->spell);
+    data << uint32(tSpell->spell);                      // learned spell (or cast-spell in profession case)
     data << uint8(state == TRAINER_SPELL_GREEN_DISABLED ? TRAINER_SPELL_GREEN : state);
     data << uint32(floor(tSpell->spellCost * fDiscountMod));
 
@@ -127,8 +134,8 @@ static void SendTrainerSpellHelper(WorldPacket& data, TrainerSpell const* tSpell
     data << uint8(reqLevel);
     data << uint32(tSpell->reqSkill);
     data << uint32(tSpell->reqSkillValue);
-    data << uint32(chain_node ? (chain_node->prev ? chain_node->prev : chain_node->req) : 0);
-    data << uint32(chain_node && chain_node->prev ? chain_node->req : 0);
+    data << uint32(!tSpell->IsCastable() && chain_node ? (chain_node->prev ? chain_node->prev : chain_node->req) : 0);
+    data << uint32(!tSpell->IsCastable() && chain_node && chain_node->prev ? chain_node->req : 0);
     data << uint32(0);
 }
 
@@ -187,7 +194,7 @@ void WorldSession::SendTrainerList(ObjectGuid guid, const std::string& strTitle)
             TrainerSpell const* tSpell = &itr->second;
 
             uint32 reqLevel = 0;
-            if (!_player->IsSpellFitByClassAndRace(tSpell->spell, &reqLevel))
+            if (!_player->IsSpellFitByClassAndRace(tSpell->learnedSpell, &reqLevel))
                 continue;
 
             reqLevel = tSpell->isProvidedReqLevel ? tSpell->reqLevel : std::max(reqLevel, tSpell->reqLevel);
@@ -207,7 +214,7 @@ void WorldSession::SendTrainerList(ObjectGuid guid, const std::string& strTitle)
             TrainerSpell const* tSpell = &itr->second;
 
             uint32 reqLevel = 0;
-            if (!_player->IsSpellFitByClassAndRace(tSpell->spell, &reqLevel))
+            if (!_player->IsSpellFitByClassAndRace(tSpell->learnedSpell, &reqLevel))
                 continue;
 
             reqLevel = tSpell->isProvidedReqLevel ? tSpell->reqLevel : std::max(reqLevel, tSpell->reqLevel);
@@ -268,7 +275,7 @@ void WorldSession::HandleTrainerBuySpellOpcode(WorldPacket& recv_data)
 
     // can't be learn, cheat? Or double learn with lags...
     uint32 reqLevel = 0;
-    if (!_player->IsSpellFitByClassAndRace(trainer_spell->spell, &reqLevel))
+    if (!_player->IsSpellFitByClassAndRace(trainer_spell->learnedSpell, &reqLevel))
         return;
 
     reqLevel = trainer_spell->isProvidedReqLevel ? trainer_spell->reqLevel : std::max(reqLevel, trainer_spell->reqLevel);
@@ -291,8 +298,11 @@ void WorldSession::HandleTrainerBuySpellOpcode(WorldPacket& recv_data)
     data << uint32(0x016A);                                 // index from SpellVisualKit.dbc
     SendPacket(&data);
 
-    // learn explicitly
-    _player->learnSpell(trainer_spell->spell, false);
+    // learn explicitly or cast explicitly
+    if (trainer_spell->IsCastable())
+        _player->CastSpell(_player, trainer_spell->spell, true);
+    else
+        _player->learnSpell(spellId, false);
 
     data.Initialize(SMSG_TRAINER_BUY_SUCCEEDED, 12);
     data << ObjectGuid(guid);
@@ -490,10 +500,9 @@ void WorldSession::HandleListStabledPetsOpcode(WorldPacket& recv_data)
 
     recv_data >> npcGUID;
 
-    Creature* unit = GetPlayer()->GetNPCIfCanInteractWith(npcGUID, UNIT_NPC_FLAG_STABLEMASTER);
-    if (!unit)
+    if (!CheckStableMaster(npcGUID))
     {
-        DEBUG_LOG("WORLD: HandleListStabledPetsOpcode - %s not found or you can't interact with him.", npcGUID.GetString().c_str());
+        SendStableResult(STABLE_ERR_STABLE);
         return;
     }
 
@@ -527,13 +536,12 @@ void WorldSession::SendStablePet(ObjectGuid guid)
         data << uint32(pet->GetEntry());
         data << uint32(pet->getLevel());
         data << pet->GetName();                             // petname
-        data << uint32(pet->GetLoyaltyLevel());             // loyalty
-        data << uint8(0x01);                                // client slot 1 == current pet (0)
+        data << uint8(1);                                   // 1 = current, 2/3 = in stable (any from 4,5,... create problems with proper show)
         ++num;
     }
 
-    //                                                     0      1     2   3      4      5        6
-    QueryResult* result = CharacterDatabase.PQuery("SELECT owner, slot, id, entry, level, loyalty, name FROM character_pet WHERE owner = '%u' AND slot >= '%u' AND slot <= '%u' ORDER BY slot",
+    //                                                     0      1   2      3      4
+    QueryResult* result = CharacterDatabase.PQuery("SELECT owner, id, entry, level, name FROM character_pet WHERE owner = '%u' AND slot >= '%u' AND slot <= '%u' ORDER BY slot",
                           _player->GetGUIDLow(), PET_SAVE_FIRST_STABLE_SLOT, PET_SAVE_LAST_STABLE_SLOT);
 
     if (result)
@@ -542,12 +550,11 @@ void WorldSession::SendStablePet(ObjectGuid guid)
         {
             Field* fields = result->Fetch();
 
-            data << uint32(fields[2].GetUInt32());          // petnumber
-            data << uint32(fields[3].GetUInt32());          // creature entry
-            data << uint32(fields[4].GetUInt32());          // level
-            data << fields[6].GetString();                  // name
-            data << uint32(fields[5].GetUInt32());          // loyalty
-            data << uint8(fields[1].GetUInt32() + 1);       // slot
+            data << uint32(fields[1].GetUInt32());          // petnumber
+            data << uint32(fields[2].GetUInt32());          // creature entry
+            data << uint32(fields[3].GetUInt32());          // level
+            data << fields[4].GetString();                  // name
+            data << uint8(2);                               // 1 = current, 2/3 = in stable (any from 4,5,... create problems with proper show)
 
             ++num;
         }
@@ -573,7 +580,7 @@ bool WorldSession::CheckStableMaster(ObjectGuid guid)
     if (guid == GetPlayer()->GetObjectGuid())
     {
         // command case will return only if player have real access to command
-        if (!ChatHandler(GetPlayer()).FindCommand("stable"))
+        if (!GetPlayer()->HasAuraType(SPELL_AURA_OPEN_STABLE) && !ChatHandler(GetPlayer()).FindCommand("stable"))
         {
             DEBUG_LOG("%s attempt open stable in cheating way.", guid.GetString().c_str());
             return false;
@@ -695,9 +702,13 @@ void WorldSession::HandleUnstablePet(WorldPacket& recv_data)
     }
 
     CreatureInfo const* creatureInfo = ObjectMgr::GetCreatureTemplate(creature_id);
-    if (!creatureInfo || !creatureInfo->isTameable())
+    if (!creatureInfo || !creatureInfo->isTameable(_player->CanTameExoticPets()))
     {
-        SendStableResult(STABLE_ERR_STABLE);
+        // if problem in exotic pet
+        if (creatureInfo && creatureInfo->isTameable(true))
+            SendStableResult(STABLE_ERR_EXOTIC);
+        else
+            SendStableResult(STABLE_ERR_STABLE);
         return;
     }
 
@@ -757,7 +768,7 @@ void WorldSession::HandleBuyStableSlot(WorldPacket& recv_data)
         SendStableResult(STABLE_ERR_STABLE);
 }
 
-void WorldSession::HandleStableRevivePet(WorldPacket &/* recv_data */)
+void WorldSession::HandleStableRevivePet(WorldPacket& /* recv_data */)
 {
     DEBUG_LOG("HandleStableRevivePet: Not implemented");
 }
@@ -779,7 +790,6 @@ void WorldSession::HandleStableSwapPet(WorldPacket& recv_data)
     // remove fake death
     if (GetPlayer()->hasUnitState(UNIT_STAT_DIED))
         GetPlayer()->RemoveSpellsCausingAura(SPELL_AURA_FEIGN_DEATH);
-
 
     Pet* pet = _player->GetPet();
 
@@ -811,9 +821,13 @@ void WorldSession::HandleStableSwapPet(WorldPacket& recv_data)
     }
 
     CreatureInfo const* creatureInfo = ObjectMgr::GetCreatureTemplate(creature_id);
-    if (!creatureInfo || !creatureInfo->isTameable())
+    if (!creatureInfo || !creatureInfo->isTameable(_player->CanTameExoticPets()))
     {
-        SendStableResult(STABLE_ERR_STABLE);
+        // if problem in exotic pet
+        if (creatureInfo && creatureInfo->isTameable(true))
+            SendStableResult(STABLE_ERR_EXOTIC);
+        else
+            SendStableResult(STABLE_ERR_STABLE);
         return;
     }
 

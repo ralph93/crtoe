@@ -180,7 +180,6 @@ bool WMOGroup::open()
             f.read(&fogIdx, 4);
             f.read(&liquidType, 4);
             f.read(&groupWMOID, 4);
-
         }
         else if (!strcmp(fourcc, "MOPY"))
         {
@@ -275,7 +274,7 @@ int WMOGroup::ConvertToVMAPGroupWmo(FILE* output, WMORoot* rootWMO, bool pPrecis
         if (fwrite(&wsize, sizeof(int), 1, output) != 1)
         {
             printf("Error while writing file wsize");
-            exit(0);
+            // no need to exit?
         }
         if (fwrite(&nIdexes, sizeof(uint32), 1, output) != 1)
         {
@@ -300,7 +299,7 @@ int WMOGroup::ConvertToVMAPGroupWmo(FILE* output, WMORoot* rootWMO, bool pPrecis
         if (fwrite(&wsize, sizeof(int), 1, output) != 1)
         {
             printf("Error while writing file wsize");
-            exit(0);
+            // no need to exit?
         }
         if (fwrite(&nVertices, sizeof(int), 1, output) != 1)
         {
@@ -434,29 +433,16 @@ int WMOGroup::ConvertToVMAPGroupWmo(FILE* output, WMORoot* rootWMO, bool pPrecis
             switch (((uint8)liquidEntry - 1) & 3)
             {
                 case 0:
-                    liquidEntry = ((mogpFlags & 0x80000) != 0) + 1;
-                    if (liquidEntry == 1)   // water type
-                    {
-                        if (filename.find("Coilfang_Raid") != string::npos)
-                        {
-                            // set water type to special coilfang raid water
-                            liquidEntry = 41;
-                        }
-                    }
+                    liquidEntry = ((mogpFlags & 0x80000) != 0) + 13;
                     break;
                 case 1:
-                    liquidEntry = 2;        // ocean
+                    liquidEntry = 14;
                     break;
                 case 2:
-                    liquidEntry = 3;        // magma
+                    liquidEntry = 19;
                     break;
                 case 3:
-                    if (filename.find("Stratholme_raid") != string::npos)
-                    {
-                        liquidEntry = 21;   // Naxxramas slime
-                    }
-                    else
-                        liquidEntry = 4;    // Normal slime
+                    liquidEntry = 20;
                     break;
                 default:
                     break;
@@ -467,7 +453,7 @@ int WMOGroup::ConvertToVMAPGroupWmo(FILE* output, WMORoot* rootWMO, bool pPrecis
 
         /* std::ofstream llog("Buildings/liquid.log", ios_base::out | ios_base::app);
         llog << filename;
-        llog << ":\ntype: " << hlq->type << " (root:" << rootWMO->liquidType << " group:" << liquidType << ")\n";
+        llog << ":\nliquidEntry: " << liquidEntry << " type: " << hlq->type << " (root:" << rootWMO->liquidType << " group:" << liquidType << ")\n";
         llog.close(); */
 
         fwrite(hlq, sizeof(WMOLiquidHeader), 1, output);

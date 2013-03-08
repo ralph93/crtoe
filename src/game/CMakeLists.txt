@@ -21,8 +21,8 @@ set(LIBRARY_NAME game)
 set(LIBRARY_SRCS
     AccountMgr.cpp
     AccountMgr.h
-    AddonHandler.cpp
-    AddonHandler.h
+    AchievementMgr.cpp
+    AchievementMgr.h
     AggressorAI.cpp
     AggressorAI.h
     ArenaTeam.cpp
@@ -45,17 +45,30 @@ set(LIBRARY_SRCS
     BattleGround/BattleGroundAV.h
     BattleGround/BattleGroundBE.cpp
     BattleGround/BattleGroundBE.h
+    BattleGround/BattleGroundDS.cpp
+    BattleGround/BattleGroundDS.h
     BattleGround/BattleGroundEY.cpp
     BattleGround/BattleGroundEY.h
     BattleGround/BattleGroundHandler.cpp
+    BattleGround/BattleGroundIC.cpp
+    BattleGround/BattleGroundIC.h
     BattleGround/BattleGroundMgr.cpp
     BattleGround/BattleGroundMgr.h
     BattleGround/BattleGroundNA.cpp
     BattleGround/BattleGroundNA.h
+    BattleGround/BattleGroundRB.cpp
+    BattleGround/BattleGroundRB.h
     BattleGround/BattleGroundRL.cpp
     BattleGround/BattleGroundRL.h
+    BattleGround/BattleGroundRV.cpp
+    BattleGround/BattleGroundRV.h
+    BattleGround/BattleGroundSA.cpp
+    BattleGround/BattleGroundSA.h
     BattleGround/BattleGroundWS.cpp
     BattleGround/BattleGroundWS.h
+    Calendar.cpp
+    Calendar.h
+    CalendarHandler.cpp
     Camera.cpp
     Camera.h
     Cell.h
@@ -217,6 +230,8 @@ set(LIBRARY_SRCS
     OutdoorPvP/OutdoorPvP.h
     OutdoorPvP/OutdoorPvPEP.cpp
     OutdoorPvP/OutdoorPvPEP.h
+    OutdoorPvP/OutdoorPvPGH.cpp
+    OutdoorPvP/OutdoorPvPGH.h
     OutdoorPvP/OutdoorPvPHP.cpp
     OutdoorPvP/OutdoorPvPHP.h
     OutdoorPvP/OutdoorPvPMgr.cpp
@@ -304,6 +319,9 @@ set(LIBRARY_SRCS
     UpdateData.h
     UpdateFields.h
     UpdateMask.h
+    Vehicle.cpp
+    Vehicle.h
+    VehicleHandler.cpp
     vmap/BIH.cpp
     vmap/BIH.h
     vmap/BIHWrap.h
