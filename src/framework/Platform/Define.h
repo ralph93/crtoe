@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2005-2013 MaNGOS <http://getmangos.com/>
+ * Copyright (C) 2005-2012 MaNGOS <http://getmangos.com/>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -135,5 +135,20 @@ typedef uint32      DWORD;
 #endif
 
 typedef uint64 OBJECT_HANDLE;
+
+enum FieldFormat
+{
+    FT_NA = 'x',                                            // ignore/ default, 4 byte size, in Source String means field is ignored, in Dest String means field is filled with default value
+    FT_NA_BYTE = 'X',                                       // ignore/ default, 1 byte size, see above
+    FT_NA_FLOAT = 'F',                                      // ignore/ default,  float size, see above
+    FT_NA_POINTER = 'p',                                    // fill default value into dest, pointer size, Use this only with static data (otherwise mem-leak)
+    FT_STRING = 's',                                        // char*
+    FT_FLOAT = 'f',                                         // float
+    FT_INT = 'i',                                           // uint32
+    FT_BYTE = 'b',                                          // uint8
+    FT_SORT = 'd',                                          // sorted by this field, field is not included
+    FT_IND = 'n',                                           // the same,but parsed to data
+    FT_LOGIC = 'l'                                          // Logical (boolean)
+};
 
 #endif // MANGOS_DEFINE_H

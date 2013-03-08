@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2005-2013 MaNGOS <http://getmangos.com/>
+ * Copyright (C) 2005-2012 MaNGOS <http://getmangos.com/>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -773,6 +773,7 @@ namespace MMAP
                 case 0:
                 case 1:
                 case 530:
+                case 571:
                     return true;
                 default:
                     break;
@@ -787,6 +788,11 @@ namespace MMAP
                 case 42:    // Colin.wdt
                 case 169:   // EmeraldDream.wdt (unused, and very large)
                 case 451:   // development.wdt
+                case 573:   // ExteriorTest.wdt
+                case 597:   // CraigTest.wdt
+                case 605:   // development_nonweighted.wdt
+                case 606:   // QA_DVD.wdt
+                case 627:   // unused.wdt
                     return true;
                 default:
                     if (isTransportMap(mapID))
@@ -802,6 +808,12 @@ namespace MMAP
                 case 489:   // WSG
                 case 529:   // AB
                 case 566:   // EotS
+                case 607:   // SotA
+                case 628:   // IoC
+                case 727:   // TP
+                case 728:   // BfG
+                case 761:   // BfG2
+                case 968:   // EotS2
                     return true;
                 default:
                     break;
@@ -824,7 +836,43 @@ namespace MMAP
             case 589:
             case 590:
             case 591:
+            case 592:
             case 593:
+            case 594:
+            case 596:
+            case 610:
+            case 612:
+            case 613:
+            case 614:
+            case 620:
+            case 621:
+            case 622:
+            case 623:
+            case 641:
+            case 642:
+            case 647:
+            case 672:
+            case 673:
+            case 674:
+            case 712:
+            case 713:
+            case 718:
+            case 738:
+            case 739:
+            case 740:
+            case 741:
+            case 742:
+            case 743:
+            case 746:
+            case 747:
+            case 748:
+            case 749:
+            case 750:
+            case 762:
+            case 763:
+            case 765:
+            case 766:
+            case 767:
                 return true;
             default:
                 return false;

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2005-2013 MaNGOS <http://getmangos.com/>
+ * Copyright (C) 2005-2012 MaNGOS <http://getmangos.com/>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -44,7 +44,9 @@ class Bag : public Item
 
         Item* GetItemByPos(uint8 slot) const;
         Item* GetItemByEntry(uint32 item) const;
+        Item* GetItemByLimitedCategory(uint32 limitedCategory) const;
         uint32 GetItemCount(uint32 item, Item* eItem = NULL) const;
+        uint32 GetItemCountWithLimitCategory(uint32 limitCategory, Item* eItem = NULL) const;
 
         uint8 GetSlotByItemGUID(ObjectGuid guid) const;
         bool IsEmpty() const;

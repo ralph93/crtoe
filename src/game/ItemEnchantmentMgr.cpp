@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2005-2013 MaNGOS <http://getmangos.com/>
+ * Copyright (C) 2005-2012 MaNGOS <http://getmangos.com/>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -48,7 +48,11 @@ void LoadRandomEnchantmentsTable()
 {
     RandomItemEnch.clear();                                 // for reload case
 
+    EnchantmentStore::const_iterator tab;
+    uint32 entry, ench;
+    float chance;
     uint32 count = 0;
+
     QueryResult* result = WorldDatabase.Query("SELECT entry, ench, chance FROM item_enchantment_template");
 
     if (result)
@@ -60,9 +64,9 @@ void LoadRandomEnchantmentsTable()
             Field* fields = result->Fetch();
             bar.step();
 
-            uint32 entry = fields[0].GetUInt32();
-            uint32 ench = fields[1].GetUInt32();
-            float chance = fields[2].GetFloat();
+            entry = fields[0].GetUInt32();
+            ench = fields[1].GetUInt32();
+            chance = fields[2].GetFloat();
 
             if (chance > 0.000001f && chance <= 100.0f)
                 RandomItemEnch[entry].push_back(EnchStoreItem(ench, chance));

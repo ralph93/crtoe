@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2005-2013 MaNGOS <http://getmangos.com/>
+ * Copyright (C) 2005-2012 MaNGOS <http://getmangos.com/>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -26,7 +26,7 @@
 #include "ObjectGuid.h"
 #include <zlib/zlib.h>
 
-UpdateData::UpdateData() : m_blockCount(0)
+UpdateData::UpdateData(uint16 map) : m_blockCount(0), m_map(map)
 {
 }
 
@@ -102,19 +102,19 @@ void UpdateData::Compress(void* dst, uint32* dst_size, void* src, int src_size)
     *dst_size = c_stream.total_out;
 }
 
-bool UpdateData::BuildPacket(WorldPacket* packet, bool hasTransport)
+bool UpdateData::BuildPacket(WorldPacket* packet)
 {
     MANGOS_ASSERT(packet->empty());                         // shouldn't happen
 
-    ByteBuffer buf(4 + 1 + (m_outOfRangeGUIDs.empty() ? 0 : 1 + 4 + 9 * m_outOfRangeGUIDs.size()) + m_data.wpos());
+    ByteBuffer buf(4 + (m_outOfRangeGUIDs.empty() ? 0 : 1 + 4 + 9 * m_outOfRangeGUIDs.size()) + m_data.wpos());
 
-    buf << (uint32)(!m_outOfRangeGUIDs.empty() ? m_blockCount + 1 : m_blockCount);
-    buf << (uint8)(hasTransport ? 1 : 0);
+    buf << uint16(m_map);
+    buf << uint32(!m_outOfRangeGUIDs.empty() ? m_blockCount + 1 : m_blockCount);
 
     if (!m_outOfRangeGUIDs.empty())
     {
-        buf << (uint8) UPDATETYPE_OUT_OF_RANGE_OBJECTS;
-        buf << (uint32) m_outOfRangeGUIDs.size();
+        buf << uint8(UPDATETYPE_OUT_OF_RANGE_OBJECTS);
+        buf << uint32(m_outOfRangeGUIDs.size());
 
         for (GuidSet::const_iterator i = m_outOfRangeGUIDs.begin(); i != m_outOfRangeGUIDs.end(); ++i)
             buf << i->WriteAsPacked();
@@ -124,20 +124,20 @@ bool UpdateData::BuildPacket(WorldPacket* packet, bool hasTransport)
 
     size_t pSize = buf.wpos();                              // use real used data size
 
-    if (pSize > 100)                                        // compress large packets
-    {
-        uint32 destsize = compressBound(pSize);
-        packet->resize(destsize + sizeof(uint32));
+    //if (pSize > 100)                                        // compress large packets
+    //{
+    //    uint32 destsize = compressBound(pSize);
+    //    packet->resize(destsize + sizeof(uint32));
 
-        packet->put<uint32>(0, pSize);
-        Compress(const_cast<uint8*>(packet->contents()) + sizeof(uint32), &destsize, (void*)buf.contents(), pSize);
-        if (destsize == 0)
-            return false;
+    //    packet->put<uint32>(0, pSize);
+    //    Compress(const_cast<uint8*>(packet->contents()) + sizeof(uint32), &destsize, (void*)buf.contents(), pSize);
+    //    if (destsize == 0)
+    //        return false;
 
-        packet->resize(destsize + sizeof(uint32));
-        packet->SetOpcode(SMSG_COMPRESSED_UPDATE_OBJECT);
-    }
-    else                                                    // send small packets without compression
+    //    packet->resize(destsize + sizeof(uint32));
+    //    packet->SetOpcode(SMSG_COMPRESSED_UPDATE_OBJECT);
+    //}
+    //else                                                    // send small packets without compression
     {
         packet->append(buf);
         packet->SetOpcode(SMSG_UPDATE_OBJECT);
@@ -151,4 +151,5 @@ void UpdateData::Clear()
     m_data.clear();
     m_outOfRangeGUIDs.clear();
     m_blockCount = 0;
+    m_map = 0;
 }

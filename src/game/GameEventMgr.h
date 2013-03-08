@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2005-2013 MaNGOS <http://getmangos.com/>
+ * Copyright (C) 2005-2012 MaNGOS <http://getmangos.com/>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -97,6 +97,7 @@ class GameEventMgr
         void GameEventUnspawn(int16 event_id);
         void UpdateCreatureData(int16 event_id, bool activate);
         void UpdateEventQuests(uint16 event_id, bool activate);
+        void UpdateWorldStates(uint16 event_id, bool activate);
         void SendEventMails(int16 event_id);
     protected:
         typedef std::list<uint32> GuidList;

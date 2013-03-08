@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2005-2013 MaNGOS <http://getmangos.com/>
+ * Copyright (C) 2005-2012 MaNGOS <http://getmangos.com/>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -34,7 +34,7 @@ class DBCStorage
         char const* GetFormat() const { return fmt; }
         uint32 GetFieldCount() const { return fieldCount; }
 
-        bool Load(char const* fn)
+        bool Load(char const* fn, LocaleConstant loc)
         {
             DBCFileLoader dbc;
             // Check if load was sucessful, only then continue
@@ -44,16 +44,19 @@ class DBCStorage
             fieldCount = dbc.GetCols();
 
             // load raw non-string data
-            m_dataTable = (T*)dbc.AutoProduceData(fmt,nCount,(char**&)indexTable);
+            m_dataTable = (T*)dbc.AutoProduceData(fmt, nCount, (char**&)indexTable);
+
+            // create string holders for loaded string fields
+            m_stringPoolList.push_back(dbc.AutoProduceStringsArrayHolders(fmt,(char*)m_dataTable));
 
             // load strings from dbc data
-            m_stringPoolList.push_back(dbc.AutoProduceStrings(fmt,(char*)m_dataTable));
+            m_stringPoolList.push_back(dbc.AutoProduceStrings(fmt,(char*)m_dataTable,loc));
 
             // error in dbc file at loading if NULL
-            return indexTable!=NULL;
+            return indexTable != NULL;
         }
 
-        bool LoadStringsFrom(char const* fn)
+        bool LoadStringsFrom(char const* fn, LocaleConstant loc)
         {
             // DBC must be already loaded using Load
             if (!indexTable)
@@ -65,7 +68,7 @@ class DBCStorage
                 return false;
 
             // load strings from another locale dbc data
-            m_stringPoolList.push_back(dbc.AutoProduceStrings(fmt,(char*)m_dataTable));
+            m_stringPoolList.push_back(dbc.AutoProduceStrings(fmt,(char*)m_dataTable,loc));
 
             return true;
         }

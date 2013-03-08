@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2005-2013 MaNGOS <http://getmangos.com/>
+ * Copyright (C) 2005-2012 MaNGOS <http://getmangos.com/>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -31,7 +31,8 @@ namespace Movement
         public:
 
             static void WriteMonsterMove(const MoveSpline& mov, WorldPacket& data);
-            static void WriteCreate(const MoveSpline& mov, ByteBuffer& data);
+            static void WriteCreateBits(const MoveSpline& mov, ByteBuffer& data);
+            static void WriteCreateBytes(const MoveSpline& mov, ByteBuffer& data);
     };
 }
 #endif // MANGOSSERVER_PACKET_BUILDER_H

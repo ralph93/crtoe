@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2005-2013 MaNGOS <http://getmangos.com/>
+ * Copyright (C) 2005-2012 MaNGOS <http://getmangos.com/>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -34,6 +34,8 @@
 #include "SkillExtraItems.h"
 #include "SkillDiscovery.h"
 #include "AccountMgr.h"
+#include "AchievementMgr.h"
+#include "ArenaTeam.h"
 #include "AuctionHouseMgr.h"
 #include "ObjectMgr.h"
 #include "CreatureEventAIMgr.h"
@@ -41,13 +43,14 @@
 #include "SpellMgr.h"
 #include "Chat.h"
 #include "DBCStores.h"
+#include "DB2Stores.h"
 #include "MassMailMgr.h"
 #include "LootMgr.h"
 #include "ItemEnchantmentMgr.h"
 #include "MapManager.h"
 #include "ScriptMgr.h"
 #include "CreatureAIRegistry.h"
-#include "Policies/Singleton.h"
+#include "Policies/SingletonImp.h"
 #include "BattleGround/BattleGroundMgr.h"
 #include "OutdoorPvP/OutdoorPvP.h"
 #include "TemporarySummon.h"
@@ -96,7 +99,9 @@ World::World()
     m_startTime = m_gameTime;
     m_maxActiveSessionCount = 0;
     m_maxQueuedSessionCount = 0;
+    m_NextCurrencyReset = 0;
     m_NextDailyQuestReset = 0;
+    m_NextWeeklyQuestReset = 0;
 
     m_defaultDbcLocale = LOCALE_enUS;
     m_availableDbcLocaleMask = 0;
@@ -255,13 +260,28 @@ World::AddSession_(WorldSession* s)
         return;
     }
 
-    WorldPacket packet(SMSG_AUTH_RESPONSE, 1 + 4 + 1 + 4 + 1);
-    packet << uint8(AUTH_OK);
+    WorldPacket packet(SMSG_AUTH_RESPONSE, 17);
+
+    packet.WriteBit(false);                                 // has queue
+    packet.WriteBit(true);                                  // has account info
+
+    packet << uint32(0);                                    // Unknown - 4.3.2
+    packet << uint8(s->Expansion());                        // 0 - normal, 1 - TBC, 2 - WotLK, 3 - Cata, 4 - MOP. must be set in database manually for each account
     packet << uint32(0);                                    // BillingTimeRemaining
-    packet << uint8(0);                                     // BillingPlanFlags
+    packet << uint8(s->Expansion());                        // 0 - normal, 1 - TBC, 2 - WotLK, 3 - Cata, 4 - MOP. Must be set in database manually for each account.
     packet << uint32(0);                                    // BillingTimeRested
-    packet << uint8(s->Expansion());                        // 0 - normal, 1 - TBC. Must be set in database manually for each account.
+    packet << uint8(0);                                     // BillingPlanFlags
+    packet << uint8(AUTH_OK);
+
     s->SendPacket(&packet);
+
+    s->SendAddonsInfo();
+
+    WorldPacket pkt(SMSG_CLIENTCACHE_VERSION, 4);
+    pkt << uint32(getConfig(CONFIG_UINT32_CLIENTCACHE_VERSION));
+    s->SendPacket(&pkt);
+
+    s->SendTutorialsData();
 
     UpdateMaxSessionCounters();
 
@@ -295,16 +315,24 @@ int32 World::GetQueuedSessionPos(WorldSession* sess)
 void World::AddQueuedSession(WorldSession* sess)
 {
     sess->SetInQueue(true);
-    m_QueuedSessions.push_back(sess);
+    m_QueuedSessions.push_back (sess);
 
     // The 1st SMSG_AUTH_RESPONSE needs to contain other info too.
-    WorldPacket packet(SMSG_AUTH_RESPONSE, 1 + 4 + 1 + 4 + 1 + 4);
-    packet << uint8(AUTH_WAIT_QUEUE);
+    WorldPacket packet (SMSG_AUTH_RESPONSE, 21);
+
+    packet.WriteBit(true);                                  // has queue
+    packet.WriteBit(false);                                 // unk queue-related
+    packet.WriteBit(true);                                  // has account data
+
+    packet << uint32(0);                                    // Unknown - 4.3.2
+    packet << uint8(sess->Expansion());                     // 0 - normal, 1 - TBC, 2 - WotLK, 3 - CT. must be set in database manually for each account
     packet << uint32(0);                                    // BillingTimeRemaining
-    packet << uint8(0);                                     // BillingPlanFlags
+    packet << uint8(sess->Expansion());                     // 0 - normal, 1 - TBC, 2 - WotLK, 3 - CT. Must be set in database manually for each account.
     packet << uint32(0);                                    // BillingTimeRested
-    packet << uint8(sess->Expansion());                     // 0 - normal, 1 - TBC, must be set in database manually for each account
+    packet << uint8(0);                                     // BillingPlanFlags
+    packet << uint8(AUTH_WAIT_QUEUE);
     packet << uint32(GetQueuedSessionPos(sess));            // position in queue
+
     sess->SendPacket(&packet);
 }
 
@@ -343,6 +371,15 @@ bool World::RemoveQueuedSession(WorldSession* sess)
         WorldSession* pop_sess = m_QueuedSessions.front();
         pop_sess->SetInQueue(false);
         pop_sess->SendAuthWaitQue(0);
+        pop_sess->SendAddonsInfo();
+
+        WorldPacket pkt(SMSG_CLIENTCACHE_VERSION, 4);
+        pkt << uint32(getConfig(CONFIG_UINT32_CLIENTCACHE_VERSION));
+        pop_sess->SendPacket(&pkt);
+
+        pop_sess->SendAccountDataTimes(GLOBAL_CACHE_MASK);
+        pop_sess->SendTutorialsData();
+
         m_QueuedSessions.pop_front();
 
         // update iter to point first queued socket or end() if queue is empty now
@@ -442,8 +479,9 @@ void World::LoadConfigSettings(bool reload)
     setConfigPos(CONFIG_FLOAT_RATE_POWER_MANA, "Rate.Mana", 1.0f);
     setConfig(CONFIG_FLOAT_RATE_POWER_RAGE_INCOME, "Rate.Rage.Income", 1.0f);
     setConfigPos(CONFIG_FLOAT_RATE_POWER_RAGE_LOSS, "Rate.Rage.Loss", 1.0f);
+    setConfig(CONFIG_FLOAT_RATE_POWER_RUNICPOWER_INCOME, "Rate.RunicPower.Income", 1.0f);
+    setConfigPos(CONFIG_FLOAT_RATE_POWER_RUNICPOWER_LOSS, "Rate.RunicPower.Loss",   1.0f);
     setConfig(CONFIG_FLOAT_RATE_POWER_FOCUS,             "Rate.Focus", 1.0f);
-    setConfigPos(CONFIG_FLOAT_RATE_LOYALTY,              "Rate.Loyalty", 1.0f);
     setConfig(CONFIG_FLOAT_RATE_POWER_ENERGY,            "Rate.Energy", 1.0f);
     setConfigPos(CONFIG_FLOAT_RATE_SKILL_DISCOVERY,      "Rate.Skill.Discovery",      1.0f);
     setConfigPos(CONFIG_FLOAT_RATE_DROP_ITEM_POOR,       "Rate.Drop.Item.Poor",       1.0f);
@@ -455,6 +493,8 @@ void World::LoadConfigSettings(bool reload)
     setConfigPos(CONFIG_FLOAT_RATE_DROP_ITEM_ARTIFACT,   "Rate.Drop.Item.Artifact",   1.0f);
     setConfigPos(CONFIG_FLOAT_RATE_DROP_ITEM_REFERENCED, "Rate.Drop.Item.Referenced", 1.0f);
     setConfigPos(CONFIG_FLOAT_RATE_DROP_MONEY,           "Rate.Drop.Money", 1.0f);
+    setConfigPos(CONFIG_FLOAT_RATE_DROP_CURRENCY,        "Rate.Drop.Currency", 1.0f);
+    setConfigPos(CONFIG_FLOAT_RATE_DROP_CURRENCY_AMOUNT, "Rate.Drop.Currency.Amount", 1.0f);
     setConfig(CONFIG_FLOAT_RATE_XP_KILL,    "Rate.XP.Kill",    1.0f);
     setConfig(CONFIG_FLOAT_RATE_XP_QUEST,   "Rate.XP.Quest",   1.0f);
     setConfig(CONFIG_FLOAT_RATE_XP_EXPLORE, "Rate.XP.Explore", 1.0f);
@@ -484,7 +524,7 @@ void World::LoadConfigSettings(bool reload)
     setConfigPos(CONFIG_FLOAT_RATE_AUCTION_TIME, "Rate.Auction.Time", 1.0f);
     setConfig(CONFIG_FLOAT_RATE_AUCTION_DEPOSIT, "Rate.Auction.Deposit", 1.0f);
     setConfig(CONFIG_FLOAT_RATE_AUCTION_CUT,     "Rate.Auction.Cut", 1.0f);
-    setConfig(CONFIG_UINT32_AUCTION_DEPOSIT_MIN, "Auction.Deposit.Min", 0);
+    setConfig(CONFIG_UINT32_AUCTION_DEPOSIT_MIN, "Auction.Deposit.Min", SILVER);
     setConfig(CONFIG_FLOAT_RATE_HONOR, "Rate.Honor", 1.0f);
     setConfigPos(CONFIG_FLOAT_RATE_MINING_AMOUNT, "Rate.Mining.Amount", 1.0f);
     setConfigPos(CONFIG_FLOAT_RATE_MINING_NEXT,   "Rate.Mining.Next", 1.0f);
@@ -538,7 +578,7 @@ void World::LoadConfigSettings(bool reload)
     if (configNoReload(reload, CONFIG_UINT32_REALM_ZONE, "RealmZone", REALM_ZONE_DEVELOPMENT))
         setConfig(CONFIG_UINT32_REALM_ZONE, "RealmZone", REALM_ZONE_DEVELOPMENT);
 
-    setConfig(CONFIG_BOOL_ALLOW_TWO_SIDE_ACCOUNTS,            "AllowTwoSide.Accounts", false);
+    setConfig(CONFIG_BOOL_ALLOW_TWO_SIDE_ACCOUNTS,            "AllowTwoSide.Accounts", true);
     setConfig(CONFIG_BOOL_ALLOW_TWO_SIDE_INTERACTION_CHAT,    "AllowTwoSide.Interaction.Chat", false);
     setConfig(CONFIG_BOOL_ALLOW_TWO_SIDE_INTERACTION_CHANNEL, "AllowTwoSide.Interaction.Channel", false);
     setConfig(CONFIG_BOOL_ALLOW_TWO_SIDE_INTERACTION_GROUP,   "AllowTwoSide.Interaction.Group", false);
@@ -563,22 +603,27 @@ void World::LoadConfigSettings(bool reload)
     // must be after CONFIG_UINT32_CHARACTERS_PER_REALM
     setConfigMin(CONFIG_UINT32_CHARACTERS_PER_ACCOUNT, "CharactersPerAccount", 50, getConfig(CONFIG_UINT32_CHARACTERS_PER_REALM));
 
+    setConfigMinMax(CONFIG_UINT32_HEROIC_CHARACTERS_PER_REALM, "HeroicCharactersPerRealm", 1, 1, 10);
+
+    setConfig(CONFIG_UINT32_MIN_LEVEL_FOR_HEROIC_CHARACTER_CREATING, "MinLevelForHeroicCharacterCreating", 55);
+
     setConfigMinMax(CONFIG_UINT32_SKIP_CINEMATICS, "SkipCinematics", 0, 0, 2);
 
     if (configNoReload(reload, CONFIG_UINT32_MAX_PLAYER_LEVEL, "MaxPlayerLevel", DEFAULT_MAX_LEVEL))
         setConfigMinMax(CONFIG_UINT32_MAX_PLAYER_LEVEL, "MaxPlayerLevel", DEFAULT_MAX_LEVEL, 1, DEFAULT_MAX_LEVEL);
 
     setConfigMinMax(CONFIG_UINT32_START_PLAYER_LEVEL, "StartPlayerLevel", 1, 1, getConfig(CONFIG_UINT32_MAX_PLAYER_LEVEL));
+    setConfigMinMax(CONFIG_UINT32_START_HEROIC_PLAYER_LEVEL, "StartHeroicPlayerLevel", 55, 1, getConfig(CONFIG_UINT32_MAX_PLAYER_LEVEL));
 
     setConfigMinMax(CONFIG_UINT32_START_PLAYER_MONEY, "StartPlayerMoney", 0, 0, MAX_MONEY_AMOUNT);
 
-    setConfig(CONFIG_UINT32_MAX_HONOR_POINTS, "MaxHonorPoints", 75000);
-
-    setConfigMinMax(CONFIG_UINT32_START_HONOR_POINTS, "StartHonorPoints", 0, 0, getConfig(CONFIG_UINT32_MAX_HONOR_POINTS));
-
-    setConfig(CONFIG_UINT32_MAX_ARENA_POINTS, "MaxArenaPoints", 5000);
-
-    setConfigMinMax(CONFIG_UINT32_START_ARENA_POINTS, "StartArenaPoints", 0, 0, getConfig(CONFIG_UINT32_MAX_ARENA_POINTS));
+    setConfigMinMax(CONFIG_UINT32_CURRENCY_RESET_TIME_HOUR, "Currency.ResetHour", 6, 0, 23);
+    setConfigMinMax(CONFIG_UINT32_CURRENCY_RESET_TIME_WEEK_DAY, "Currency.ResetWeekDay", 3, 0, 6);
+    setConfigMin(CONFIG_UINT32_CURRENCY_RESET_INTERVAL, "Currency.ResetInterval", 7, 1);
+    setConfig(CONFIG_UINT32_CURRENCY_START_CONQUEST_POINTS, "Currency.StartConquestPoints", 0);
+    setConfig(CONFIG_UINT32_CURRENCY_START_HONOR_POINTS, "Currency.StartHonorPoints", 0);
+    setConfig(CONFIG_UINT32_CURRENCY_CONQUEST_POINTS_DEFAULT_WEEK_CAP, "Currency.ConquestPointsDefaultWeekCap", 1350 * 100);  // with precision
+    setConfig(CONFIG_UINT32_CURRENCY_ARENA_CONQUEST_POINTS_REWARD, "Currency.ConquestPointsArenaReward", 120 * 100);          // with precision
 
     setConfig(CONFIG_BOOL_ALL_TAXI_PATHS, "AllFlightPaths", false);
 
@@ -587,6 +632,8 @@ void World::LoadConfigSettings(bool reload)
 
     setConfig(CONFIG_BOOL_CAST_UNSTUCK, "CastUnstuck", true);
     setConfig(CONFIG_UINT32_MAX_SPELL_CASTS_IN_CHAIN, "MaxSpellCastsInChain", 10);
+    setConfig(CONFIG_UINT32_BIRTHDAY_TIME, "BirthdayTime", 1125180000);
+
     setConfig(CONFIG_UINT32_INSTANCE_RESET_TIME_HOUR, "Instance.ResetTimeHour", 4);
     setConfig(CONFIG_UINT32_INSTANCE_UNLOAD_DELAY,    "Instance.UnloadDelay", 30 * MINUTE * IN_MILLISECONDS);
 
@@ -596,7 +643,7 @@ void World::LoadConfigSettings(bool reload)
     setConfigMinMax(CONFIG_UINT32_TRADE_SKILL_GMIGNORE_LEVEL, "TradeSkill.GMIgnore.Level", SEC_CONSOLE, SEC_PLAYER, SEC_CONSOLE);
     setConfigMinMax(CONFIG_UINT32_TRADE_SKILL_GMIGNORE_SKILL, "TradeSkill.GMIgnore.Skill", SEC_CONSOLE, SEC_PLAYER, SEC_CONSOLE);
 
-    setConfigMinMax(CONFIG_UINT32_MIN_PETITION_SIGNS, "MinPetitionSigns", 9, 0, 9);
+    setConfigMinMax(CONFIG_UINT32_MIN_PETITION_SIGNS, "MinPetitionSigns", 4, 0, 4);
 
     setConfig(CONFIG_UINT32_GM_LOGIN_STATE,    "GM.LoginState",    2);
     setConfig(CONFIG_UINT32_GM_VISIBLE_STATE,  "GM.Visible",       2);
@@ -610,6 +657,7 @@ void World::LoadConfigSettings(bool reload)
 
     setConfigMinMax(CONFIG_UINT32_START_GM_LEVEL, "GM.StartLevel", 1, getConfig(CONFIG_UINT32_START_PLAYER_LEVEL), MAX_LEVEL);
     setConfig(CONFIG_BOOL_GM_LOWER_SECURITY, "GM.LowerSecurity", false);
+    setConfig(CONFIG_BOOL_GM_ALLOW_ACHIEVEMENT_GAINS, "GM.AllowAchievementGain", true);
     setConfig(CONFIG_UINT32_GM_INVISIBLE_AURA, "GM.InvisibleAura", 37800);
 
     setConfig(CONFIG_UINT32_GROUP_VISIBILITY, "Visibility.GroupMode", 0);
@@ -634,15 +682,14 @@ void World::LoadConfigSettings(bool reload)
     setConfig(CONFIG_UINT32_SKILL_CHANCE_SKINNING_STEPS, "SkillChance.SkinningSteps", 75);
 
     setConfig(CONFIG_BOOL_SKILL_PROSPECTING, "SkillChance.Prospecting", false);
+    setConfig(CONFIG_BOOL_SKILL_MILLING,     "SkillChance.Milling",     false);
 
     setConfig(CONFIG_UINT32_SKILL_GAIN_CRAFTING,  "SkillGain.Crafting",  1);
-    setConfig(CONFIG_UINT32_SKILL_GAIN_DEFENSE,   "SkillGain.Defense",   1);
     setConfig(CONFIG_UINT32_SKILL_GAIN_GATHERING, "SkillGain.Gathering", 1);
-    setConfig(CONFIG_UINT32_SKILL_GAIN_WEAPON,       "SkillGain.Weapon",    1);
 
-    setConfig(CONFIG_BOOL_SKILL_FAIL_LOOT_FISHING,         "SkillFail.Loot.Fishing", false);
-    setConfig(CONFIG_BOOL_SKILL_FAIL_GAIN_FISHING,         "SkillFail.Gain.Fishing", false);
-    setConfig(CONFIG_BOOL_SKILL_FAIL_POSSIBLE_FISHINGPOOL, "SkillFail.Possible.FishingPool", true);
+    setConfig(CONFIG_BOOL_SKILL_FAIL_LOOT_FISHING,         "SkillFail.Loot.Fishing", true);
+    setConfig(CONFIG_BOOL_SKILL_FAIL_GAIN_FISHING,         "SkillFail.Gain.Fishing", true);
+    setConfig(CONFIG_BOOL_SKILL_FAIL_POSSIBLE_FISHINGPOOL, "SkillFail.Possible.FishingPool", false);
 
     setConfig(CONFIG_UINT32_MAX_OVERSPEED_PINGS, "MaxOverspeedPings", 2);
     if (getConfig(CONFIG_UINT32_MAX_OVERSPEED_PINGS) != 0 && getConfig(CONFIG_UINT32_MAX_OVERSPEED_PINGS) < 2)
@@ -653,8 +700,6 @@ void World::LoadConfigSettings(bool reload)
 
     setConfig(CONFIG_BOOL_SAVE_RESPAWN_TIME_IMMEDIATELY, "SaveRespawnTimeImmediately", true);
     setConfig(CONFIG_BOOL_WEATHER, "ActivateWeather", true);
-
-    setConfig(CONFIG_BOOL_ALWAYS_MAX_SKILL_FOR_LEVEL, "AlwaysMaxSkillForLevel", false);
 
     if (configNoReload(reload, CONFIG_UINT32_EXPANSION, "Expansion", MAX_EXPANSION))
         setConfigMinMax(CONFIG_UINT32_EXPANSION, "Expansion", MAX_EXPANSION, 0, MAX_EXPANSION);
@@ -675,6 +720,8 @@ void World::LoadConfigSettings(bool reload)
     setConfigMinMax(CONFIG_INT32_QUEST_HIGH_LEVEL_HIDE_DIFF, "Quests.HighLevelHideDiff", 7, -1, MAX_LEVEL);
 
     setConfigMinMax(CONFIG_UINT32_QUEST_DAILY_RESET_HOUR, "Quests.Daily.ResetHour", 6, 0, 23);
+    setConfigMinMax(CONFIG_UINT32_QUEST_WEEKLY_RESET_WEEK_DAY, "Quests.Weekly.ResetWeekDay", 3, 0, 6);
+    setConfigMinMax(CONFIG_UINT32_QUEST_WEEKLY_RESET_HOUR, "Quests.Weekly.ResetHour", 6, 0 , 23);
 
     setConfig(CONFIG_BOOL_QUEST_IGNORE_RAID, "Quests.IgnoreRaid", false);
 
@@ -721,11 +768,10 @@ void World::LoadConfigSettings(bool reload)
     setConfig(CONFIG_UINT32_BATTLEGROUND_PREMADE_GROUP_WAIT_FOR_MATCH, "BattleGround.PremadeGroupWaitForMatch", 30 * MINUTE * IN_MILLISECONDS);
     setConfig(CONFIG_UINT32_ARENA_MAX_RATING_DIFFERENCE,               "Arena.MaxRatingDifference", 150);
     setConfig(CONFIG_UINT32_ARENA_RATING_DISCARD_TIMER,                "Arena.RatingDiscardTimer", 10 * MINUTE * IN_MILLISECONDS);
-    setConfig(CONFIG_BOOL_ARENA_AUTO_DISTRIBUTE_POINTS,                "Arena.AutoDistributePoints", false);
-    setConfig(CONFIG_UINT32_ARENA_AUTO_DISTRIBUTE_INTERVAL_DAYS,       "Arena.AutoDistributeInterval", 7);
     setConfig(CONFIG_BOOL_ARENA_QUEUE_ANNOUNCER_JOIN,                  "Arena.QueueAnnouncer.Join", false);
     setConfig(CONFIG_BOOL_ARENA_QUEUE_ANNOUNCER_EXIT,                  "Arena.QueueAnnouncer.Exit", false);
     setConfig(CONFIG_UINT32_ARENA_SEASON_ID,                           "Arena.ArenaSeason.ID", 1);
+    setConfig(CONFIG_UINT32_ARENA_SEASON_PREVIOUS_ID,                  "Arena.ArenaSeasonPrevious.ID", 0);
     setConfigMin(CONFIG_INT32_ARENA_STARTRATING,                       "Arena.StartRating", -1, -1);
     setConfigMin(CONFIG_INT32_ARENA_STARTPERSONALRATING,               "Arena.StartPersonalRating", -1, -1);
     setConfig(CONFIG_BOOL_OUTDOORPVP_SI_ENABLED,                       "OutdoorPvp.SIEnabled", true);
@@ -734,15 +780,30 @@ void World::LoadConfigSettings(bool reload)
     setConfig(CONFIG_BOOL_OUTDOORPVP_ZM_ENABLED,                       "OutdoorPvp.ZMEnabled", true);
     setConfig(CONFIG_BOOL_OUTDOORPVP_TF_ENABLED,                       "OutdoorPvp.TFEnabled", true);
     setConfig(CONFIG_BOOL_OUTDOORPVP_NA_ENABLED,                       "OutdoorPvp.NAEnabled", true);
+    setConfig(CONFIG_BOOL_OUTDOORPVP_GH_ENABLED,                       "OutdoorPvp.GHEnabled", true);
 
     setConfig(CONFIG_BOOL_OFFHAND_CHECK_AT_TALENTS_RESET, "OffhandCheckAtTalentsReset", false);
 
     setConfig(CONFIG_BOOL_KICK_PLAYER_ON_BAD_PACKET, "Network.KickOnBadPacket", false);
 
+    if (int clientCacheId = sConfig.GetIntDefault("ClientCacheVersion", 0))
+    {
+        // overwrite DB/old value
+        if (clientCacheId > 0)
+        {
+            setConfig(CONFIG_UINT32_CLIENTCACHE_VERSION, clientCacheId);
+            sLog.outString("Client cache version set to: %u", clientCacheId);
+        }
+        else
+            sLog.outError("ClientCacheVersion can't be negative %d, ignored.", clientCacheId);
+    }
+
     setConfig(CONFIG_UINT32_INSTANT_LOGOUT, "InstantLogout", SEC_MODERATOR);
 
     setConfigMin(CONFIG_UINT32_GUILD_EVENT_LOG_COUNT, "Guild.EventLogRecordsCount", GUILD_EVENTLOG_MAX_RECORDS, GUILD_EVENTLOG_MAX_RECORDS);
     setConfigMin(CONFIG_UINT32_GUILD_BANK_EVENT_LOG_COUNT, "Guild.BankEventLogRecordsCount", GUILD_BANK_MAX_LOGS, GUILD_BANK_MAX_LOGS);
+    setConfig(CONGIG_UINT32_GUILD_UNDELETABLE_LEVEL, "Guild.UndeletableLevel", 4);
+    setConfig(CONFIG_BOOL_GUILD_LEVELING_ENABLED, "Guild.LevelingEnabled", true);
 
     setConfig(CONFIG_UINT32_TIMERBAR_FATIGUE_GMLEVEL, "TimerBar.Fatigue.GMLevel", SEC_CONSOLE);
     setConfig(CONFIG_UINT32_TIMERBAR_FATIGUE_MAX,     "TimerBar.Fatigue.Max", 60);
@@ -825,6 +886,8 @@ void World::LoadConfigSettings(bool reload)
     if (configNoReload(reload, CONFIG_UINT32_GUID_RESERVE_SIZE_GAMEOBJECT, "GuidReserveSize.GameObject", 100))
         setConfig(CONFIG_UINT32_GUID_RESERVE_SIZE_GAMEOBJECT, "GuidReserveSize.GameObject", 100);
 
+    setConfig(CONFIG_UINT32_MIN_LEVEL_FOR_RAID, "Raid.MinLevel", 10);
+
     ///- Read the "Data" directory from the config file
     std::string dataPath = sConfig.GetStringDefault("DataDir", "./");
 
@@ -883,15 +946,15 @@ void World::SetInitialWorldSettings()
     LoadConfigSettings();
 
     ///- Check the existence of the map files for all races start areas.
-    if (!MapManager::ExistMapAndVMap(0, -6240.32f, 331.033f) ||                     // Dwarf/ Gnome
-            !MapManager::ExistMapAndVMap(0, -8949.95f, -132.493f) ||                // Human
-            !MapManager::ExistMapAndVMap(1, -618.518f, -4251.67f) ||                // Orc
-            !MapManager::ExistMapAndVMap(0, 1676.35f, 1677.45f) ||                  // Scourge
-            !MapManager::ExistMapAndVMap(1, 10311.3f, 832.463f) ||                  // NightElf
-            !MapManager::ExistMapAndVMap(1, -2917.58f, -257.98f) ||                 // Tauren
-            (m_configUint32Values[CONFIG_UINT32_EXPANSION] >= EXPANSION_TBC &&
-              (!MapManager::ExistMapAndVMap(530, 10349.6f, -6357.29f) ||            // BloodElf
-              !MapManager::ExistMapAndVMap(530, -3961.64f, -13931.2f))))            // Draenei
+    if (!MapManager::ExistMapAndVMap(0, -6240.32f, 331.033f) ||
+            !MapManager::ExistMapAndVMap(0, -8949.95f, -132.493f) ||
+            !MapManager::ExistMapAndVMap(0, -8949.95f, -132.493f) ||
+            !MapManager::ExistMapAndVMap(1, -618.518f, -4251.67f) ||
+            !MapManager::ExistMapAndVMap(0, 1676.35f, 1677.45f) ||
+            !MapManager::ExistMapAndVMap(1, 10311.3f, 832.463f) ||
+            !MapManager::ExistMapAndVMap(1, -2917.58f, -257.98f) ||
+            (m_configUint32Values[CONFIG_UINT32_EXPANSION] &&
+             (!MapManager::ExistMapAndVMap(530, 10349.6f, -6357.29f) || !MapManager::ExistMapAndVMap(530, -3961.64f, -13931.2f))))
     {
         sLog.outError("Correct *.map files not found in path '%smaps' or *.vmtree/*.vmtile files in '%svmaps'. Please place *.map and vmap files in appropriate directories or correct the DataDir value in the mangosd.conf file.", m_dataPath.c_str(), m_dataPath.c_str());
         Log::WaitBeforeContinueIfNeed();
@@ -921,6 +984,7 @@ void World::SetInitialWorldSettings()
     ///- Load the DBC files
     sLog.outString("Initialize data stores...");
     LoadDBCStores(m_dataPath);
+    LoadDB2Stores(m_dataPath);
     DetectDBCLang();
     sObjectMgr.SetDBCLocaleIndex(GetDefaultDbcLocale());    // Get once for all the locale index of DBC language (console/broadcasts)
 
@@ -981,7 +1045,7 @@ void World::SetInitialWorldSettings()
     sSpellMgr.LoadSpellProcEvents();
 
     sLog.outString("Loading Spell Bonus Data...");
-    sSpellMgr.LoadSpellBonuses();
+    sSpellMgr.LoadSpellBonuses();                           // must be after LoadSpellChains
 
     sLog.outString("Loading Spell Proc Item Enchant...");
     sSpellMgr.LoadSpellProcItemEnchant();                   // must be after LoadSpellChains
@@ -998,8 +1062,11 @@ void World::SetInitialWorldSettings()
     sLog.outString("Loading Items...");                     // must be after LoadRandomEnchantmentsTable and LoadPageTexts
     sObjectMgr.LoadItemPrototypes();
 
-    sLog.outString("Loading Item Texts...");
-    sObjectMgr.LoadItemTexts();
+    sLog.outString("Loading Item converts...");             // must be after LoadItemPrototypes
+    sObjectMgr.LoadItemConverts();
+
+    sLog.outString("Loading Item expire converts...");      // must be after LoadItemPrototypes
+    sObjectMgr.LoadItemExpireConverts();
 
     sLog.outString("Loading Creature Model Based Info Data...");
     sObjectMgr.LoadCreatureModelInfo();
@@ -1019,6 +1086,9 @@ void World::SetInitialWorldSettings()
     sLog.outString("Loading SpellsScriptTarget...");
     sSpellMgr.LoadSpellScriptTarget();                      // must be after LoadCreatureTemplates and LoadGameobjectInfo
 
+    sLog.outString("Loading Vehicle Accessory...");         // must be after creature templates
+    sObjectMgr.LoadVehicleAccessory();
+
     sLog.outString("Loading ItemRequiredTarget...");
     sObjectMgr.LoadItemRequiredTarget();
 
@@ -1034,11 +1104,14 @@ void World::SetInitialWorldSettings()
     sLog.outString("Loading Points Of Interest Data...");
     sObjectMgr.LoadPointsOfInterest();
 
-    sLog.outString("Loading Pet Create Spells...");
-    sObjectMgr.LoadPetCreateSpells();
-
     sLog.outString("Loading Creature Data...");
     sObjectMgr.LoadCreatures();
+
+    sLog.outString("Loading pet levelup spells...");
+    sSpellMgr.LoadPetLevelupSpellMap();
+
+    sLog.outString("Loading pet default spell additional to levelup spells...");
+    sSpellMgr.LoadPetDefaultSpells();
 
     sLog.outString("Loading Creature Addon Data...");
     sLog.outString();
@@ -1048,6 +1121,9 @@ void World::SetInitialWorldSettings()
 
     sLog.outString("Loading Gameobject Data...");
     sObjectMgr.LoadGameObjects();
+
+    sLog.outString("Loading Gameobject Addon Data...");
+    sObjectMgr.LoadGameObjectAddon();
 
     sLog.outString("Loading CreatureLinking Data...");      // must be after Creatures
     sCreatureLinkingMgr.LoadFromDB();
@@ -1060,6 +1136,12 @@ void World::SetInitialWorldSettings()
 
     sLog.outString("Loading Quests...");
     sObjectMgr.LoadQuests();                                // must be loaded after DBCs, creature_template, item_template, gameobject tables
+
+    sLog.outString("Loading Quest POI");
+    sObjectMgr.LoadQuestPOI();
+
+    sLog.outString("Loading Quest Phase Maps...");
+    sObjectMgr.LoadQuestPhaseMaps();
 
     sLog.outString("Loading Quests Relations...");
     sLog.outString();
@@ -1086,6 +1168,9 @@ void World::SetInitialWorldSettings()
     sLog.outString("Loading Gameobject Respawn Data...");   // must be after LoadGameObjects(), and sMapPersistentStateMgr.InitWorldMaps()
     sMapPersistentStateMgr.LoadGameobjectRespawnTimes();
 
+    sLog.outString("Loading UNIT_NPC_FLAG_SPELLCLICK Data...");
+    sObjectMgr.LoadNPCSpellClickSpells();
+
     sLog.outString("Loading SpellArea Data...");            // must be after quest load
     sSpellMgr.LoadSpellAreas();
 
@@ -1109,9 +1194,6 @@ void World::SetInitialWorldSettings()
 
     sLog.outString("Loading spell target destination coordinates...");
     sSpellMgr.LoadSpellTargetPositions();
-
-    sLog.outString("Loading SpellAffect definitions...");
-    sSpellMgr.LoadSpellAffects();
 
     sLog.outString("Loading spell pet auras...");
     sSpellMgr.LoadSpellPetAuras();
@@ -1156,6 +1238,20 @@ void World::SetInitialWorldSettings()
 
     sLog.outString("Loading Skill Fishing base level requirements...");
     sObjectMgr.LoadFishingBaseSkillLevel();
+
+    sLog.outString();
+    sLog.outString("Loading Achievements...");
+    sAchievementMgr.LoadAchievementReferenceList();
+    sAchievementMgr.LoadAchievementCriteriaList();
+    sAchievementMgr.LoadAchievementCriteriaRequirements();
+    sAchievementMgr.LoadRewards();
+    sAchievementMgr.LoadRewardLocales();
+    sAchievementMgr.LoadCompletedAchievements();
+    sLog.outString(">>> Achievements loaded");
+    sLog.outString();
+
+    sLog.outString("Loading Instance encounters data...");  // must be after Creature loading
+    sObjectMgr.LoadInstanceEncounters();
 
     sLog.outString("Loading Npc Text Id...");
     sObjectMgr.LoadNpcGossips();                            // must be after load Creature and LoadGossipText
@@ -1241,7 +1337,6 @@ void World::SetInitialWorldSettings()
     sScriptMgr.LoadGameObjectScripts();                     // must be after load Creature/Gameobject(Template/Data)
     sScriptMgr.LoadGameObjectTemplateScripts();             // must be after load Creature/Gameobject(Template/Data)
     sScriptMgr.LoadEventScripts();                          // must be after load Creature/Gameobject(Template/Data)
-    sScriptMgr.LoadCreatureDeathScripts();                  // must be after load Creature/Gameobject(Template/Data)
     sLog.outString(">>> Scripts loaded");
     sLog.outString();
 
@@ -1319,7 +1414,6 @@ void World::SetInitialWorldSettings()
     ///- Initialize Battlegrounds
     sLog.outString("Starting BattleGround System");
     sBattleGroundMgr.CreateInitialBattleGrounds();
-    sBattleGroundMgr.InitAutomaticArenaPointDistribution();
 
     ///- Initialize Outdoor PvP
     sLog.outString("Starting Outdoor PvP System");
@@ -1332,8 +1426,17 @@ void World::SetInitialWorldSettings()
     sLog.outString("Deleting expired bans...");
     LoginDatabase.Execute("DELETE FROM ip_banned WHERE unbandate<=UNIX_TIMESTAMP() AND unbandate<>bandate");
 
+    sLog.outString("Calculate next currency reset time...");
+    InitCurrencyResetTime();
+
     sLog.outString("Calculate next daily quest reset time...");
     InitDailyQuestResetTime();
+
+    sLog.outString("Calculate next weekly quest reset time...");
+    InitWeeklyQuestResetTime();
+
+    sLog.outString("Calculate next monthly quest reset time...");
+    SetMonthlyQuestResetTime();
 
     sLog.outString("Starting Game Event system...");
     uint32 nextGameEvent = sGameEventMgr.Initialize();
@@ -1418,6 +1521,18 @@ void World::Update(uint32 diff)
     /// Handle daily quests reset time
     if (m_gameTime > m_NextDailyQuestReset)
         ResetDailyQuests();
+
+    /// Handle weekly quests reset time
+    if (m_gameTime > m_NextWeeklyQuestReset)
+        ResetWeeklyQuests();
+
+    /// Handle monthly quests reset time
+    if (m_gameTime > m_NextMonthlyQuestReset)
+        ResetMonthlyQuests();
+
+    /// Handle monthly quests reset time
+    if (m_gameTime > m_NextCurrencyReset)
+        ResetCurrencyWeekCounts();
 
     /// <ul><li> Handle auctions when the timer has passed
     if (m_timers[WUPDATE_AUCTIONS].Passed())
@@ -1946,6 +2061,40 @@ void World::_UpdateRealmCharCount(QueryResult* resultCharCount, uint32 accountId
     }
 }
 
+void World::InitWeeklyQuestResetTime()
+{
+    QueryResult* result = CharacterDatabase.Query("SELECT NextWeeklyQuestResetTime FROM saved_variables");
+    if (!result)
+        m_NextWeeklyQuestReset = time_t(time(NULL));        // game time not yet init
+    else
+        m_NextWeeklyQuestReset = time_t((*result)[0].GetUInt64());
+
+    // generate time by config
+    time_t curTime = time(NULL);
+    tm localTm = *localtime(&curTime);
+
+    int week_day_offset = localTm.tm_wday - int(getConfig(CONFIG_UINT32_QUEST_WEEKLY_RESET_WEEK_DAY));
+
+    // current week reset time
+    localTm.tm_hour = getConfig(CONFIG_UINT32_QUEST_WEEKLY_RESET_HOUR);
+    localTm.tm_min  = 0;
+    localTm.tm_sec  = 0;
+    time_t nextWeekResetTime = mktime(&localTm);
+    nextWeekResetTime -= week_day_offset * DAY;             // move time to proper day
+
+    // next reset time before current moment
+    if (curTime >= nextWeekResetTime)
+        nextWeekResetTime += WEEK;
+
+    // normalize reset time
+    m_NextWeeklyQuestReset = m_NextWeeklyQuestReset < curTime ? nextWeekResetTime - WEEK : nextWeekResetTime;
+
+    if (!result)
+        CharacterDatabase.PExecute("INSERT INTO saved_variables (NextWeeklyQuestResetTime) VALUES ('" UI64FMTD "')", uint64(m_NextWeeklyQuestReset));
+    else
+        delete result;
+}
+
 void World::InitDailyQuestResetTime()
 {
     QueryResult* result = CharacterDatabase.Query("SELECT NextDailyQuestResetTime FROM saved_variables");
@@ -1977,6 +2126,90 @@ void World::InitDailyQuestResetTime()
         delete result;
 }
 
+void World::SetMonthlyQuestResetTime(bool initialize)
+{
+    if (initialize)
+    {
+        QueryResult* result = CharacterDatabase.Query("SELECT NextMonthlyQuestResetTime FROM saved_variables");
+
+        if (!result)
+            m_NextMonthlyQuestReset = time_t(time(NULL));
+        else
+            m_NextMonthlyQuestReset = time_t((*result)[0].GetUInt64());
+
+        delete result;
+    }
+
+    // generate time
+    time_t currentTime = time(NULL);
+    tm localTm = *localtime(&currentTime);
+
+    int month = localTm.tm_mon;
+    int year = localTm.tm_year;
+
+    ++month;
+
+    // month 11 is december, next is january (0)
+    if (month > 11)
+    {
+        month = 0;
+        year += 1;
+    }
+
+    // reset time for next month
+    localTm.tm_year = year;
+    localTm.tm_mon = month;
+    localTm.tm_mday = 1;                                    // don't know if we really need config option for day/hour
+    localTm.tm_hour = 0;
+    localTm.tm_min  = 0;
+    localTm.tm_sec  = 0;
+
+    time_t nextMonthResetTime = mktime(&localTm);
+
+    m_NextMonthlyQuestReset = (initialize && m_NextMonthlyQuestReset < nextMonthResetTime) ? m_NextMonthlyQuestReset : nextMonthResetTime;
+
+    // Row must exist for this to work. Currently row is added by InitDailyQuestResetTime(), called before this function
+    CharacterDatabase.PExecute("UPDATE saved_variables SET NextMonthlyQuestResetTime = '" UI64FMTD "'", uint64(m_NextMonthlyQuestReset));
+}
+
+void World::InitCurrencyResetTime()
+{
+    QueryResult* result = CharacterDatabase.Query("SELECT `NextCurrenciesResetTime` FROM `saved_variables`");
+    if (!result)
+        m_NextCurrencyReset = time_t(time(NULL));        // game time not yet init
+    else
+        m_NextCurrencyReset = time_t((*result)[0].GetUInt64());
+
+    // re-init case or not exists
+    if (!m_NextCurrencyReset)
+    {
+        // generate time by config
+        time_t curTime = time(NULL);
+        tm localTm = *localtime(&curTime);
+
+        int week_day_offset = localTm.tm_wday - int(getConfig(CONFIG_UINT32_CURRENCY_RESET_TIME_WEEK_DAY));
+
+        // current week reset time
+        localTm.tm_hour = getConfig(CONFIG_UINT32_CURRENCY_RESET_TIME_HOUR);
+        localTm.tm_min  = 0;
+        localTm.tm_sec  = 0;
+        time_t nextWeekResetTime = mktime(&localTm);
+        nextWeekResetTime -= week_day_offset * DAY;
+
+        // next reset time before current moment
+        if (curTime >= nextWeekResetTime)
+            nextWeekResetTime += getConfig(CONFIG_UINT32_CURRENCY_RESET_INTERVAL) * DAY;
+
+        // normalize reset time
+        m_NextCurrencyReset = m_NextCurrencyReset < curTime ? nextWeekResetTime - getConfig(CONFIG_UINT32_CURRENCY_RESET_INTERVAL) * DAY : nextWeekResetTime;
+    }
+
+    if (!result)
+        CharacterDatabase.PExecute("INSERT INTO `saved_variables` (`NextCurrenciesResetTime`) VALUES ('" UI64FMTD "')", uint64(m_NextCurrencyReset));
+    else
+        delete result;
+}
+
 void World::ResetDailyQuests()
 {
     DETAIL_LOG("Daily quests reset for all characters.");
@@ -1987,6 +2220,53 @@ void World::ResetDailyQuests()
 
     m_NextDailyQuestReset = time_t(m_NextDailyQuestReset + DAY);
     CharacterDatabase.PExecute("UPDATE saved_variables SET NextDailyQuestResetTime = '" UI64FMTD "'", uint64(m_NextDailyQuestReset));
+}
+
+void World::ResetWeeklyQuests()
+{
+    DETAIL_LOG("Weekly quests reset for all characters.");
+    CharacterDatabase.Execute("DELETE FROM character_queststatus_weekly");
+    for (SessionMap::const_iterator itr = m_sessions.begin(); itr != m_sessions.end(); ++itr)
+        if (itr->second->GetPlayer())
+            itr->second->GetPlayer()->ResetWeeklyQuestStatus();
+
+    m_NextWeeklyQuestReset = time_t(m_NextWeeklyQuestReset + WEEK);
+    CharacterDatabase.PExecute("UPDATE saved_variables SET NextWeeklyQuestResetTime = '" UI64FMTD "'", uint64(m_NextWeeklyQuestReset));
+}
+
+void World::ResetMonthlyQuests()
+{
+    DETAIL_LOG("Monthly quests reset for all characters.");
+    CharacterDatabase.Execute("TRUNCATE character_queststatus_monthly");
+
+    for (SessionMap::const_iterator itr = m_sessions.begin(); itr != m_sessions.end(); ++itr)
+        if (itr->second->GetPlayer())
+            itr->second->GetPlayer()->ResetMonthlyQuestStatus();
+
+    SetMonthlyQuestResetTime(false);
+}
+
+void World::ResetCurrencyWeekCounts()
+{
+    CharacterDatabase.Execute("UPDATE `character_currencies` SET `weekCount` = 0");
+
+    for (SessionMap::const_iterator itr = m_sessions.begin(); itr != m_sessions.end(); ++itr)
+        if (itr->second->GetPlayer())
+            itr->second->GetPlayer()->ResetCurrencyWeekCounts();
+
+    for(ObjectMgr::ArenaTeamMap::iterator titr = sObjectMgr.GetArenaTeamMapBegin(); titr != sObjectMgr.GetArenaTeamMapEnd(); ++titr)
+    {
+        if (ArenaTeam * at = titr->second)
+        {
+            at->FinishWeek();                              // set played this week etc values to 0 in memory, too
+            at->SaveToDB();                                // save changes
+            at->NotifyStatsChanged();                      // notify the players of the changes
+        }
+    }
+
+    m_NextCurrencyReset = time_t(m_NextCurrencyReset + DAY * sWorld.getConfig(CONFIG_UINT32_CURRENCY_RESET_INTERVAL));
+
+    CharacterDatabase.PExecute("UPDATE saved_variables SET `NextCurrenciesResetTime` = '" UI64FMTD "'", uint64(m_NextCurrencyReset));
 }
 
 void World::SetPlayerLimit(int32 limit, bool needUpdate)
@@ -2012,7 +2292,7 @@ void World::UpdateMaxSessionCounters()
 
 void World::LoadDBVersion()
 {
-    QueryResult* result = WorldDatabase.Query("SELECT version, creature_ai_version FROM db_version LIMIT 1");
+    QueryResult* result = WorldDatabase.Query("SELECT version, creature_ai_version, cache_id FROM db_version LIMIT 1");
     if (result)
     {
         Field* fields = result->Fetch();
@@ -2020,6 +2300,8 @@ void World::LoadDBVersion()
         m_DBVersion              = fields[0].GetCppString();
         m_CreatureEventAIVersion = fields[1].GetCppString();
 
+        // will be overwrite by config values if different and non-0
+        setConfig(CONFIG_UINT32_CLIENTCACHE_VERSION, fields[2].GetUInt32());
         delete result;
     }
 

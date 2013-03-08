@@ -158,5 +158,5 @@ fi
 ## Extract mmaps
 if [ "$USE_MMAPS" = "1" ]
 then
-  sh MoveMapGen.sh $NUM_CPU $LOG_FILE $DETAIL_LOG_FILE
+  MoveMapGen.sh $NUM_CPU $LOG_FILE $DETAIL_LOG_FILE
 fi

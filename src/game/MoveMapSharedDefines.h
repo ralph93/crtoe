@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2005-2013 MaNGOS <http://getmangos.com/>
+ * Copyright (C) 2005-2012 MaNGOS <http://getmangos.com/>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -48,7 +48,7 @@ enum NavTerrain
     NAV_UNUSED2 = 0x20,
     NAV_UNUSED3 = 0x40,
     NAV_UNUSED4 = 0x80
-    // we only have 8 bits
+                  // we only have 8 bits
 };
 
 #endif  // _MOVE_MAP_SHARED_DEFINES_H

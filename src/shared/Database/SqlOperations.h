@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2005-2013 MaNGOS <http://getmangos.com/>
+ * Copyright (C) 2005-2012 MaNGOS <http://getmangos.com/>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -118,7 +118,7 @@ class SqlQueryHolder
         SqlQueryHolder() {}
         ~SqlQueryHolder();
         bool SetQuery(size_t index, const char* sql);
-        bool SetPQuery(size_t index, const char* format, ...) ATTR_PRINTF(3,4);
+        bool SetPQuery(size_t index, const char* format, ...) ATTR_PRINTF(3, 4);
         void SetSize(size_t size);
         QueryResult* GetResult(size_t index);
         void SetResult(size_t index, QueryResult* result);

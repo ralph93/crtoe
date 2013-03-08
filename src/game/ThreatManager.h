@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2005-2013 MaNGOS <http://getmangos.com/>
+ * Copyright (C) 2005-2012 MaNGOS <http://getmangos.com/>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -23,6 +23,7 @@
 #include "SharedDefines.h"
 #include "Utilities/LinkedReference/Reference.h"
 #include "UnitEvents.h"
+#include "Timer.h"
 #include "ObjectGuid.h"
 #include <list>
 
@@ -32,6 +33,8 @@ class Unit;
 class Creature;
 class ThreatManager;
 struct SpellEntry;
+
+#define THREAT_UPDATE_INTERVAL 1 * IN_MILLISECONDS    // Server should send threat update to client periodically each second
 
 //==============================================================
 // Class to calculate the real threat based
@@ -197,6 +200,8 @@ class MANGOS_DLL_SPEC ThreatManager
 
         void processThreatEvent(ThreatRefStatusChangeEvent* threatRefStatusChangeEvent);
 
+        void UpdateForClient(uint32 time);
+
         HostileReference* getCurrentVictim() { return iCurrentVictim; }
 
         Unit*  getOwner() const { return iOwner; }
@@ -215,6 +220,8 @@ class MANGOS_DLL_SPEC ThreatManager
     private:
         HostileReference* iCurrentVictim;
         Unit* iOwner;
+        ShortTimeTracker iUpdateTimer;
+        bool iUpdateNeed;
         ThreatContainer iThreatContainer;
         ThreatContainer iThreatOfflineContainer;
 };

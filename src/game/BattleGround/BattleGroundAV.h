@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2005-2013 MaNGOS <http://getmangos.com/>
+ * Copyright (C) 2005-2012 MaNGOS <http://getmangos.com/>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -67,6 +67,8 @@
 
 #define BG_AV_REP_OWNED_MINE                24
 #define BG_AV_REP_OWNED_MINE_HOLIDAY        36
+
+#define BG_AV_EVENT_START_BATTLE            9166
 
 enum BG_AV_Sounds
 {
@@ -318,15 +320,18 @@ class BattleGroundAV : public BattleGround
 
     public:
         BattleGroundAV();
+        ~BattleGroundAV();
         void Update(uint32 diff) override;
 
         /* inherited from BattlegroundClass */
         virtual void AddPlayer(Player* plr) override;
 
+        virtual void StartingEventCloseDoors() override;
         virtual void StartingEventOpenDoors() override;
         // world states
         virtual void FillInitialWorldStates(WorldPacket& data, uint32& count) override;
 
+        void RemovePlayer(Player* plr, ObjectGuid guid) override;
         void HandleAreaTrigger(Player* source, uint32 trigger) override;
         virtual void Reset() override;
 

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2005-2013 MaNGOS <http://getmangos.com/>
+ * Copyright (C) 2005-2012 MaNGOS <http://getmangos.com/>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -22,11 +22,11 @@
 #include "Platform/Define.h"
 #include "Utilities/TypeList.h"
 #include "ObjectRegistry.h"
-#include "Policies/Singleton.h"
+#include "Policies/SingletonImp.h"
 
 /** FactoryHolder holds a factory object of a specific type
  */
-template < class T, class Key = std::string >
+template<class T, class Key = std::string>
 class MANGOS_DLL_DECL FactoryHolder
 {
     public:

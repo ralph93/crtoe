@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2005-2013 MaNGOS <http://getmangos.com/>
+ * Copyright (C) 2005-2012 MaNGOS <http://getmangos.com/>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -19,7 +19,7 @@
 #include "WaypointManager.h"
 #include "Database/DatabaseEnv.h"
 #include "GridDefines.h"
-#include "Policies/Singleton.h"
+#include "Policies/SingletonImp.h"
 #include "ProgressBar.h"
 #include "MapManager.h"
 #include "ObjectMgr.h"
@@ -128,7 +128,7 @@ void WaypointManager::Load()
             // the cleanup queries make sure the following is true
             MANGOS_ASSERT(point >= 1 && point <= path.size());
 
-            WaypointNode& node  = path[point-1];
+            WaypointNode& node  = path[point - 1];
 
             node.x              = fields[2].GetFloat();
             node.y              = fields[3].GetFloat();
@@ -164,7 +164,7 @@ void WaypointManager::Load()
             {
                 if (sCreatureMovementScripts.second.find(node.script_id) == sCreatureMovementScripts.second.end())
                 {
-                    sLog.outErrorDb("Table creature_movement for id %u, point %u have script_id %u that does not exist in `dbscripts_on_creature_movement`, ignoring", id, point, node.script_id);
+                    sLog.outErrorDb("Table creature_movement for id %u, point %u have script_id %u that does not exist in `creature_movement_scripts`, ignoring", id, point, node.script_id);
                     continue;
                 }
 
@@ -301,7 +301,7 @@ void WaypointManager::Load()
             // the cleanup queries make sure the following is true
             MANGOS_ASSERT(point >= 1 && point <= path.size());
 
-            WaypointNode& node  = path[point-1];
+            WaypointNode& node  = path[point - 1];
 
             node.x              = fields[2].GetFloat();
             node.y              = fields[3].GetFloat();
@@ -329,7 +329,7 @@ void WaypointManager::Load()
             {
                 if (sCreatureMovementScripts.second.find(node.script_id) == sCreatureMovementScripts.second.end())
                 {
-                    sLog.outErrorDb("Table creature_movement_template for entry %u, point %u have script_id %u that does not exist in `dbscripts_on_creature_movement`, ignoring", entry, point, node.script_id);
+                    sLog.outErrorDb("Table creature_movement_template for entry %u, point %u have script_id %u that does not exist in `creature_movement_scripts`, ignoring", entry, point, node.script_id);
                     continue;
                 }
 
@@ -344,7 +344,7 @@ void WaypointManager::Load()
 
             for (int i = 0; i < MAX_WAYPOINT_TEXT; ++i)
             {
-                be.textid[i]    = fields[7+i].GetUInt32();
+                be.textid[i]    = fields[7 + i].GetUInt32();
 
                 if (be.textid[i])
                 {
@@ -390,7 +390,7 @@ void WaypointManager::Load()
     if (!movementScriptSet.empty())
     {
         for (std::set<uint32>::const_iterator itr = movementScriptSet.begin(); itr != movementScriptSet.end(); ++itr)
-            sLog.outErrorDb("Table `dbscripts_on_creature_movement` contain unused script, id %u.", *itr);
+            sLog.outErrorDb("Table `creature_movement_scripts` contain unused script, id %u.", *itr);
     }
 }
 
@@ -518,9 +518,9 @@ void WaypointManager::SetNodePosition(uint32 id, uint32 point, float x, float y,
     WaypointPathMap::iterator itr = m_pathMap.find(id);
     if (itr != m_pathMap.end() && point <= itr->second.size())
     {
-        itr->second[point-1].x = x;
-        itr->second[point-1].y = y;
-        itr->second[point-1].z = z;
+        itr->second[point - 1].x = x;
+        itr->second[point - 1].y = y;
+        itr->second[point - 1].z = z;
     }
 }
 
@@ -545,7 +545,7 @@ void WaypointManager::SetNodeText(uint32 id, uint32 point, const char* text_fiel
     WaypointPathMap::iterator itr = m_pathMap.find(id);
     if (itr != m_pathMap.end() && point <= itr->second.size())
     {
-        WaypointNode& node = itr->second[point-1];
+        WaypointNode& node = itr->second[point - 1];
         if (!node.behavior) node.behavior = new WaypointBehavior();
 
 //        if(field == "text1") node.behavior->text[0] = text ? text : "";

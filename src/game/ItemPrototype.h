@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2005-2013 MaNGOS <http://getmangos.com/>
+ * Copyright (C) 2005-2012 MaNGOS <http://getmangos.com/>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -23,42 +23,61 @@
 
 enum ItemModType
 {
-    ITEM_MOD_MANA                     = 0,
-    ITEM_MOD_HEALTH                   = 1,
+    ITEM_MOD_NONE                     = 0,
+    ITEM_MOD_HEALTH                   = 1,                  // deprecated
     ITEM_MOD_AGILITY                  = 3,
     ITEM_MOD_STRENGTH                 = 4,
     ITEM_MOD_INTELLECT                = 5,
     ITEM_MOD_SPIRIT                   = 6,
     ITEM_MOD_STAMINA                  = 7,
-    ITEM_MOD_DEFENSE_SKILL_RATING     = 12,
+    ITEM_MOD_DEFENSE_SKILL_RATING     = 12,                 // deprecated
     ITEM_MOD_DODGE_RATING             = 13,
     ITEM_MOD_PARRY_RATING             = 14,
-    ITEM_MOD_BLOCK_RATING             = 15,
-    ITEM_MOD_HIT_MELEE_RATING         = 16,
-    ITEM_MOD_HIT_RANGED_RATING        = 17,
-    ITEM_MOD_HIT_SPELL_RATING         = 18,
-    ITEM_MOD_CRIT_MELEE_RATING        = 19,
+    ITEM_MOD_BLOCK_RATING             = 15,                 // deprecated
+    ITEM_MOD_HIT_MELEE_RATING         = 16,                 // deprecated
+    ITEM_MOD_HIT_RANGED_RATING        = 17,                 // deprecated
+    ITEM_MOD_HIT_SPELL_RATING         = 18,                 // deprecated
+    ITEM_MOD_CRIT_MELEE_RATING        = 19,                 // deprecated
     ITEM_MOD_CRIT_RANGED_RATING       = 20,
-    ITEM_MOD_CRIT_SPELL_RATING        = 21,
-    ITEM_MOD_HIT_TAKEN_MELEE_RATING   = 22,
-    ITEM_MOD_HIT_TAKEN_RANGED_RATING  = 23,
-    ITEM_MOD_HIT_TAKEN_SPELL_RATING   = 24,
-    ITEM_MOD_CRIT_TAKEN_MELEE_RATING  = 25,
-    ITEM_MOD_CRIT_TAKEN_RANGED_RATING = 26,
-    ITEM_MOD_CRIT_TAKEN_SPELL_RATING  = 27,
-    ITEM_MOD_HASTE_MELEE_RATING       = 28,
-    ITEM_MOD_HASTE_RANGED_RATING      = 29,
-    ITEM_MOD_HASTE_SPELL_RATING       = 30,
+    ITEM_MOD_CRIT_SPELL_RATING        = 21,                 // deprecated
+    ITEM_MOD_HIT_TAKEN_MELEE_RATING   = 22,                 // deprecated
+    ITEM_MOD_HIT_TAKEN_RANGED_RATING  = 23,                 // deprecated
+    ITEM_MOD_HIT_TAKEN_SPELL_RATING   = 24,                 // deprecated
+    ITEM_MOD_CRIT_TAKEN_MELEE_RATING  = 25,                 // deprecated
+    ITEM_MOD_CRIT_TAKEN_RANGED_RATING = 26,                 // deprecated
+    ITEM_MOD_CRIT_TAKEN_SPELL_RATING  = 27,                 // deprecated
+    ITEM_MOD_HASTE_MELEE_RATING       = 28,                 // deprecated
+    ITEM_MOD_HASTE_RANGED_RATING      = 29,                 // deprecated
+    ITEM_MOD_HASTE_SPELL_RATING       = 30,                 // deprecated
     ITEM_MOD_HIT_RATING               = 31,
     ITEM_MOD_CRIT_RATING              = 32,
-    ITEM_MOD_HIT_TAKEN_RATING         = 33,
-    ITEM_MOD_CRIT_TAKEN_RATING        = 34,
+    ITEM_MOD_HIT_TAKEN_RATING         = 33,                 // deprecated
+    ITEM_MOD_CRIT_TAKEN_RATING        = 34,                 // deprecated
     ITEM_MOD_RESILIENCE_RATING        = 35,
     ITEM_MOD_HASTE_RATING             = 36,
-    ITEM_MOD_EXPERTISE_RATING         = 37
+    ITEM_MOD_EXPERTISE_RATING         = 37,
+    ITEM_MOD_ATTACK_POWER             = 38,
+    ITEM_MOD_RANGED_ATTACK_POWER      = 39,
+    ITEM_MOD_FERAL_ATTACK_POWER       = 40,                 // deprecated
+    ITEM_MOD_SPELL_HEALING_DONE       = 41,                 // deprecated
+    ITEM_MOD_SPELL_DAMAGE_DONE        = 42,                 // deprecated
+    ITEM_MOD_MANA_REGENERATION        = 43,                 // deprecated
+    ITEM_MOD_ARMOR_PENETRATION_RATING = 44,                 // deprecated
+    ITEM_MOD_SPELL_POWER              = 45,
+    ITEM_MOD_HEALTH_REGEN             = 46,
+    ITEM_MOD_SPELL_PENETRATION        = 47,
+    ITEM_MOD_BLOCK_VALUE              = 48,                 // deprecated
+    ITEM_MOD_MASTERY_RATING           = 49,
+    ITEM_MOD_EXTRA_ARMOR              = 50,
+    ITEM_MOD_FIRE_RESISTANCE          = 51,
+    ITEM_MOD_FROST_RESISTANCE         = 52,
+    ITEM_MOD_HOLY_RESISTANCE          = 53,
+    ITEM_MOD_SHADOW_RESISTANCE        = 54,
+    ITEM_MOD_NATURE_RESISTANCE        = 55,
+    ITEM_MOD_ARCANE_RESISTANCE        = 56
 };
 
-#define MAX_ITEM_MOD                    38
+#define MAX_ITEM_MOD                    57
 
 enum ItemSpelltriggerType
 {
@@ -90,7 +109,7 @@ enum ItemPrototypeFlags
     ITEM_FLAG_UNK0                            = 0x00000001, // not used
     ITEM_FLAG_CONJURED                        = 0x00000002,
     ITEM_FLAG_LOOTABLE                        = 0x00000004, // affect only non container items that can be "open" for loot. It or lockid set enable for client show "Right click to open". See also ITEM_DYNFLAG_UNLOCKED
-    ITEM_FLAG_UNK3                            = 0x00000008, // not used in pre-3.x
+    ITEM_FLAG_HEROIC                          = 0x00000008, // heroic item version
     ITEM_FLAG_UNK4                            = 0x00000010, // can't repeat old note: appears red icon (like when item durability==0)
     ITEM_FLAG_INDESTRUCTIBLE                  = 0x00000020, // used for totem. Item can not be destroyed, except by using spell (item can be reagent for spell and then allowed)
     ITEM_FLAG_UNK6                            = 0x00000040, // ? old note: usable
@@ -99,7 +118,7 @@ enum ItemPrototypeFlags
     ITEM_FLAG_WRAPPER                         = 0x00000200, // used or not used wrapper
     ITEM_FLAG_IGNORE_BAG_SPACE                = 0x00000400, // ignore bag space at new item creation?
     ITEM_FLAG_PARTY_LOOT                      = 0x00000800, // determines if item is party loot or not
-    ITEM_FLAG_UNK12                           = 0x00001000, // not used in pre-3.x
+    ITEM_FLAG_REFUNDABLE                      = 0x00001000, // item cost can be refunded within 2 hours after purchase
     ITEM_FLAG_CHARTER                         = 0x00002000, // arena/guild charter
     ITEM_FLAG_UNK14                           = 0x00004000,
     ITEM_FLAG_UNK15                           = 0x00008000, // a lot of items have this
@@ -111,6 +130,28 @@ enum ItemPrototypeFlags
     ITEM_FLAG_USEABLE_IN_ARENA                = 0x00200000,
     ITEM_FLAG_THROWABLE                       = 0x00400000, // Only items of ITEM_SUBCLASS_WEAPON_THROWN have it but not all, so can't be used as in game check
     ITEM_FLAG_SPECIALUSE                      = 0x00800000, // last used flag in 2.3.0
+    ITEM_FLAG_UNK24                           = 0x01000000,
+    ITEM_FLAG_UNK25                           = 0x02000000,
+    ITEM_FLAG_UNK26                           = 0x04000000,
+    ITEM_FLAG_BOA                             = 0x08000000, // bind on account (set in template for items that can binded in like way)
+    ITEM_FLAG_ENCHANT_SCROLL                  = 0x10000000, // for enchant scrolls
+    ITEM_FLAG_MILLABLE                        = 0x20000000, // item can have milling loot
+    ITEM_FLAG_UNK30                           = 0x40000000,
+    ITEM_FLAG_BOP_TRADEABLE                   = 0x80000000, // bound item that can be traded
+};
+
+enum ItemPrototypeFlags2
+{
+    ITEM_FLAG2_HORDE_ONLY                     = 0x00000001, // drop in loot, sell by vendor and equipping only for horde
+    ITEM_FLAG2_ALLIANCE_ONLY                  = 0x00000002, // drop in loot, sell by vendor and equipping only for alliance
+    ITEM_FLAG2_EXT_COST_REQUIRES_GOLD         = 0x00000004, // item cost include gold part in case extended cost use also
+    ITEM_FLAG2_UNK4                           = 0x00000008,
+    ITEM_FLAG2_UNK5                           = 0x00000010,
+    ITEM_FLAG2_UNK6                           = 0x00000020,
+    ITEM_FLAG2_UNK7                           = 0x00000040,
+    ITEM_FLAG2_UNK8                           = 0x00000080,
+    ITEM_FLAG2_NEED_ROLL_DISABLED             = 0x00000100, // need roll during looting is not allowed for this item
+    ITEM_FLAG2_CASTER_WEAPON                  = 0x00000200, // uses caster specific dbc file for DPS calculations
 };
 
 enum BagFamilyMask
@@ -130,7 +171,8 @@ enum BagFamilyMask
     BAG_FAMILY_MASK_SOULBOUND_EQUIPMENT       = 0x00000800,
     BAG_FAMILY_MASK_VANITY_PETS               = 0x00001000,
     BAG_FAMILY_MASK_CURRENCY_TOKENS           = 0x00002000,
-    BAG_FAMILY_MASK_QUEST_ITEMS               = 0x00004000
+    BAG_FAMILY_MASK_QUEST_ITEMS               = 0x00004000,
+    BAG_FAMILY_MASK_FISHING_SUPP              = 0x00008000,
 };
 
 enum SocketColor
@@ -138,10 +180,12 @@ enum SocketColor
     SOCKET_COLOR_META                           = 1,
     SOCKET_COLOR_RED                            = 2,
     SOCKET_COLOR_YELLOW                         = 4,
-    SOCKET_COLOR_BLUE                           = 8
+    SOCKET_COLOR_BLUE                           = 8,
+    SOCKET_COLOR_HYDRAULIC                      = 16,   // unused
+    SOCKET_COLOR_COGWHEEL                       = 32,
 };
 
-#define SOCKET_COLOR_ALL (SOCKET_COLOR_META | SOCKET_COLOR_RED | SOCKET_COLOR_YELLOW | SOCKET_COLOR_BLUE)
+#define SOCKET_COLOR_ALL (SOCKET_COLOR_META | SOCKET_COLOR_RED | SOCKET_COLOR_YELLOW | SOCKET_COLOR_BLUE | SOCKET_COLOR_COGWHEEL)
 
 enum InventoryType
 {
@@ -195,10 +239,11 @@ enum ItemClass
     ITEM_CLASS_QUEST                            = 12,
     ITEM_CLASS_KEY                              = 13,
     ITEM_CLASS_PERMANENT                        = 14,
-    ITEM_CLASS_MISC                             = 15
+    ITEM_CLASS_MISC                             = 15,
+    ITEM_CLASS_GLYPH                            = 16
 };
 
-#define MAX_ITEM_CLASS                            16
+#define MAX_ITEM_CLASS                            17
 
 enum ItemSubclassConsumable
 {
@@ -224,10 +269,12 @@ enum ItemSubclassContainer
     ITEM_SUBCLASS_ENGINEERING_CONTAINER         = 4,
     ITEM_SUBCLASS_GEM_CONTAINER                 = 5,
     ITEM_SUBCLASS_MINING_CONTAINER              = 6,
-    ITEM_SUBCLASS_LEATHERWORKING_CONTAINER      = 7
+    ITEM_SUBCLASS_LEATHERWORKING_CONTAINER      = 7,
+    ITEM_SUBCLASS_INSCRIPTION_CONTAINER         = 8,
+    ITEM_SUBCLASS_FISHING_CONTAINER             = 9,
 };
 
-#define MAX_ITEM_SUBCLASS_CONTAINER               8
+#define MAX_ITEM_SUBCLASS_CONTAINER               10
 
 enum ItemSubclassWeapon
 {
@@ -266,10 +313,12 @@ enum ItemSubclassGem
     ITEM_SUBCLASS_GEM_ORANGE                    = 5,
     ITEM_SUBCLASS_GEM_META                      = 6,
     ITEM_SUBCLASS_GEM_SIMPLE                    = 7,
-    ITEM_SUBCLASS_GEM_PRISMATIC                 = 8
+    ITEM_SUBCLASS_GEM_PRISMATIC                 = 8,
+    ITEM_SUBCLASS_GEM_HYDRAULIC                 = 9,         // ABS
+    ITEM_SUBCLASS_GEM_COGWHEEL                  = 10,
 };
 
-#define MAX_ITEM_SUBCLASS_GEM                     9
+#define MAX_ITEM_SUBCLASS_GEM                     11
 
 enum ItemSubclassArmor
 {
@@ -282,10 +331,12 @@ enum ItemSubclassArmor
     ITEM_SUBCLASS_ARMOR_SHIELD                  = 6,
     ITEM_SUBCLASS_ARMOR_LIBRAM                  = 7,
     ITEM_SUBCLASS_ARMOR_IDOL                    = 8,
-    ITEM_SUBCLASS_ARMOR_TOTEM                   = 9
+    ITEM_SUBCLASS_ARMOR_TOTEM                   = 9,
+    ITEM_SUBCLASS_ARMOR_SIGIL                   = 10,
+    ITEM_SUBCLASS_ARMOR_RELIC                   = 11,
 };
 
-#define MAX_ITEM_SUBCLASS_ARMOR                   10
+#define MAX_ITEM_SUBCLASS_ARMOR                   12
 
 enum ItemSubclassReagent
 {
@@ -303,7 +354,7 @@ enum ItemSubclassProjectile
     ITEM_SUBCLASS_THROWN                        = 4         // ABS
 };
 
-#define MAX_ITEM_SUBCLASS_PROJECTILE              5
+#define MAX_ITEM_SUBCLASS_PROJECTILE              4
 
 enum ItemSubclassTradeGoods
 {
@@ -320,10 +371,11 @@ enum ItemSubclassTradeGoods
     ITEM_SUBCLASS_ELEMENTAL                     = 10,
     ITEM_SUBCLASS_TRADE_GOODS_OTHER             = 11,
     ITEM_SUBCLASS_ENCHANTING                    = 12,
-    ITEM_SUBCLASS_MATERIAL                      = 13        // Added in 2.4.2
+    ITEM_SUBCLASS_MATERIAL                      = 13,
+    ITEM_SUBCLASS_VELLUM                        = 14,
 };
 
-#define MAX_ITEM_SUBCLASS_TRADE_GOODS             14
+#define MAX_ITEM_SUBCLASS_TRADE_GOODS             15
 
 enum ItemSubclassGeneric
 {
@@ -344,17 +396,19 @@ enum ItemSubclassRecipe
     ITEM_SUBCLASS_FIRST_AID_MANUAL              = 7,
     ITEM_SUBCLASS_ENCHANTING_FORMULA            = 8,
     ITEM_SUBCLASS_FISHING_MANUAL                = 9,
-    ITEM_SUBCLASS_JEWELCRAFTING_RECIPE          = 10
+    ITEM_SUBCLASS_JEWELCRAFTING_RECIPE          = 10,
+    ITEM_SUBCLASS_INSCRIPTION_RECIPE            = 11,
 };
 
-#define MAX_ITEM_SUBCLASS_RECIPE                  11
+#define MAX_ITEM_SUBCLASS_RECIPE                  12
 
 enum ItemSubclassMoney
 {
     ITEM_SUBCLASS_MONEY                         = 0
+    //                                          = 7 one test item
 };
 
-#define MAX_ITEM_SUBCLASS_MONEY                   1
+#define MAX_ITEM_SUBCLASS_MONEY                   8
 
 enum ItemSubclassQuiver
 {
@@ -369,9 +423,11 @@ enum ItemSubclassQuiver
 enum ItemSubclassQuest
 {
     ITEM_SUBCLASS_QUEST                         = 0
+    //                                            3 one unavailable item
+    //                                            8 two quest items
 };
 
-#define MAX_ITEM_SUBCLASS_QUEST                   1
+#define MAX_ITEM_SUBCLASS_QUEST                   9
 
 enum ItemSubclassKey
 {
@@ -396,9 +452,10 @@ enum ItemSubclassJunk
     ITEM_SUBCLASS_JUNK_HOLIDAY                  = 3,
     ITEM_SUBCLASS_JUNK_OTHER                    = 4,
     ITEM_SUBCLASS_JUNK_MOUNT                    = 5
+    //                                            12 single item 37677
 };
 
-#define MAX_ITEM_SUBCLASS_JUNK                    6
+#define MAX_ITEM_SUBCLASS_JUNK                    13
 
 enum ItemSubclassGlyph
 {
@@ -433,7 +490,8 @@ const uint32 MaxItemSubclassValues[MAX_ITEM_CLASS] =
     MAX_ITEM_SUBCLASS_QUEST,
     MAX_ITEM_SUBCLASS_KEY,
     MAX_ITEM_SUBCLASS_PERMANENT,
-    MAX_ITEM_SUBCLASS_JUNK
+    MAX_ITEM_SUBCLASS_JUNK,
+    MAX_ITEM_SUBCLASS_GLYPH
 };
 
 inline uint8 ItemSubClassToDurabilityMultiplierId(uint32 ItemClass, uint32 ItemSubClass)
@@ -461,17 +519,12 @@ enum ItemExtraFlags
 #pragma pack(push,1)
 #endif
 
-struct _Damage
-{
-    float   DamageMin;
-    float   DamageMax;
-    uint32  DamageType;                                     // id from Resistances.dbc
-};
-
 struct _ItemStat
 {
     uint32  ItemStatType;
     int32   ItemStatValue;
+    uint32  ItemStatType2;
+    int32   ItemStatValue2;
 };
 struct _Spell
 {
@@ -490,7 +543,6 @@ struct _Socket
     uint32 Content;
 };
 
-#define MAX_ITEM_PROTO_DAMAGES 5
 #define MAX_ITEM_PROTO_SOCKETS 3
 #define MAX_ITEM_PROTO_SPELLS  5
 #define MAX_ITEM_PROTO_STATS  10
@@ -500,11 +552,15 @@ struct ItemPrototype
     uint32 ItemId;
     uint32 Class;                                           // id from ItemClass.dbc
     uint32 SubClass;                                        // id from ItemSubClass.dbc
-    uint32 Unk0;
+    int32  Unk0;
     char*  Name1;
     uint32 DisplayInfoID;                                   // id from ItemDisplayInfo.dbc
     uint32 Quality;
     uint32 Flags;
+    uint32 Flags2;
+    float Unknown;
+    float Unknown1;
+    uint32 Unknown2;
     uint32 BuyCount;
     uint32 BuyPrice;
     uint32 SellPrice;
@@ -520,20 +576,13 @@ struct ItemPrototype
     uint32 RequiredCityRank;
     uint32 RequiredReputationFaction;                       // id from Faction.dbc
     uint32 RequiredReputationRank;
-    uint32 MaxCount;
-    uint32 Stackable;
+    int32  MaxCount;                                        // <=0: no limit
+    int32  Stackable;                                       // 0: not allowed, -1: put in player coin info tab and don't limit stacking (so 1 slot)
     uint32 ContainerSlots;
     _ItemStat ItemStat[MAX_ITEM_PROTO_STATS];
-    _Damage Damage[MAX_ITEM_PROTO_DAMAGES];
-    uint32 Armor;
-    uint32 HolyRes;
-    uint32 FireRes;
-    uint32 NatureRes;
-    uint32 FrostRes;
-    uint32 ShadowRes;
-    uint32 ArcaneRes;
+    uint32 ScalingStatDistribution;                         // id from ScalingStatDistribution.dbc
+    uint32 DamageType;
     uint32 Delay;
-    uint32 AmmoType;
     float  RangedModRange;
     _Spell Spells[MAX_ITEM_PROTO_SPELLS];
     uint32 Bonding;
@@ -543,11 +592,10 @@ struct ItemPrototype
     uint32 PageMaterial;
     uint32 StartQuest;                                      // id from QuestCache.wdb
     uint32 LockID;
-    uint32 Material;                                        // id from Material.dbc
+    int32  Material;                                        // id from Material.dbc
     uint32 Sheath;
     uint32 RandomProperty;                                  // id from ItemRandomProperties.dbc
     uint32 RandomSuffix;                                    // id from ItemRandomSuffix.dbc
-    uint32 Block;
     uint32 ItemSet;                                         // id from ItemSet.dbc
     uint32 MaxDurability;
     uint32 Area;                                            // id from AreaTable.dbc
@@ -559,12 +607,17 @@ struct ItemPrototype
     uint32 GemProperties;                                   // id from GemProperties.dbc
     int32 RequiredDisenchantSkill;
     float  ArmorDamageModifier;
+    uint32 Duration;
+    uint32 ItemLimitCategory;                               // id from ItemLimitCategory.dbc
+    uint32 HolidayId;                                       // id from Holidays.dbc
     uint32 ScriptId;
     uint32 DisenchantID;
     uint32 FoodType;
+    float  StatScalingFactor;
+    uint32 Unknown400_1;
+    uint32 Unknown400_2;
     uint32 MinMoneyLoot;
     uint32 MaxMoneyLoot;
-    uint32 Duration;
     uint32 ExtraFlags;                                      // see ItemExtraFlags
 
     // helpers
@@ -588,10 +641,19 @@ struct ItemPrototype
         return false;
     }
 
-    uint32 GetMaxStackSize() const { return Stackable; }
+    uint32 GetMaxStackSize() const { return Stackable > 0 ? uint32(Stackable) : uint32(0x7FFFFFFF - 1); }
+    float getDPS() const;
 
-    bool IsPotion() const { return Class == ITEM_CLASS_CONSUMABLE && SubClass == ITEM_SUBCLASS_POTION; }
+    uint32 GetArmor() const;
+    float GetMinDamage() const { return floor(getDPS() * float(Delay) / 1000.0f * 0.7f + 0.5f); }
+    float GetMaxDamage() const { return floor(getDPS() * float(Delay) / 1000.0f * 1.3f + 0.5f); }
+
+    bool IsPotion() const { return Class==ITEM_CLASS_CONSUMABLE && SubClass==ITEM_SUBCLASS_POTION; }
     bool IsConjuredConsumable() const { return Class == ITEM_CLASS_CONSUMABLE && (Flags & ITEM_FLAG_CONJURED); }
+    bool IsVellum() const
+    {
+        return Class == ITEM_CLASS_TRADE_GOODS && (1 << SubClass) & (1 << ITEM_SUBCLASS_VELLUM);
+    }
 };
 
 // GCC have alternative #pragma pack() syntax and old gcc version not support pack(pop), also any gcc version not support it at some platform

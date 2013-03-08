@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2005-2013 MaNGOS <http://getmangos.com/>
+ * Copyright (C) 2005-2012 MaNGOS <http://getmangos.com/>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -81,7 +81,7 @@ void WorldRunnable::run()
 
     sWorldSocketMgr->StopNetwork();
 
-    sMapMgr.UnloadAll();                                    // unload all grids (including locked in memory)
+    MapManager::Instance().UnloadAll();                     // unload all grids (including locked in memory)
 
     ///- End the database thread
     WorldDatabase.ThreadEnd();                              // free mySQL thread resources

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2005-2013 MaNGOS <http://getmangos.com/>
+ * Copyright (C) 2005-2012 MaNGOS <http://getmangos.com/>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -50,6 +50,9 @@ class WorldSocketMgr
 
         /// Wait untill all network threads have "joined" .
         void Wait();
+
+        std::string& GetBindAddress() { return m_addr; }
+        ACE_UINT16 GetBindPort() { return m_port; }
 
         /// Make this class singleton .
         static WorldSocketMgr* Instance();

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2005-2013 MaNGOS <http://getmangos.com/>
+ * Copyright (C) 2005-2012 MaNGOS <http://getmangos.com/>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -36,6 +36,10 @@ BattleGroundEY::BattleGroundEY()
     m_StartMessageIds[BG_STARTING_EVENT_FOURTH] = LANG_BG_EY_HAS_BEGUN;
 }
 
+BattleGroundEY::~BattleGroundEY()
+{
+}
+
 void BattleGroundEY::Update(uint32 diff)
 {
     BattleGround::Update(diff);
@@ -68,10 +72,17 @@ void BattleGroundEY::Update(uint32 diff)
     }
 }
 
+void BattleGroundEY::StartingEventCloseDoors()
+{
+}
+
 void BattleGroundEY::StartingEventOpenDoors()
 {
     // eye-doors are despawned, not opened
     SpawnEvent(BG_EVENT_DOOR, 0, false);
+
+    // Players that join battleground after start are not eligible to get achievement.
+    StartTimedAchievement(ACHIEVEMENT_CRITERIA_TYPE_WIN_BG, EY_EVENT_START_BATTLE);
 }
 
 void BattleGroundEY::AddPoints(Team team, uint32 points)
@@ -546,8 +557,10 @@ WorldSafeLocsEntry const* BattleGroundEY::GetClosestGraveYard(Player* player)
 
     float distance, nearestDistance;
 
-    WorldSafeLocsEntry const* entry = sWorldSafeLocsStore.LookupEntry(g_id);
-    WorldSafeLocsEntry const* nearestEntry = entry;
+    WorldSafeLocsEntry const* entry = NULL;
+    WorldSafeLocsEntry const* nearestEntry = NULL;
+    entry = sWorldSafeLocsStore.LookupEntry(g_id);
+    nearestEntry = entry;
 
     if (!entry)
     {
@@ -583,4 +596,13 @@ WorldSafeLocsEntry const* BattleGroundEY::GetClosestGraveYard(Player* player)
     }
 
     return nearestEntry;
+}
+
+bool BattleGroundEY::IsAllNodesControlledByTeam(Team team) const
+{
+    for (uint8 i = 0; i < EY_NODES_MAX; ++i)
+        if (m_towerOwner[i] != team)
+            return false;
+
+    return true;
 }

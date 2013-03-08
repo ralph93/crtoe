@@ -35,11 +35,13 @@ bool ExtractSingleModel(std::string& fname, StringSet& failedPaths)
     return mdl.ConvertToVMAPModel(output.c_str());
 }
 
+extern HANDLE LocaleMpq;
+
 void ExtractGameobjectModels()
 {
     printf("\n");
     printf("Extracting GameObject models...\n");
-    DBCFile dbc("DBFilesClient\\GameObjectDisplayInfo.dbc");
+    DBCFile dbc(LocaleMpq, "DBFilesClient\\GameObjectDisplayInfo.dbc");
     if (!dbc.open())
     {
         printf("Fatal error: Invalid GameObjectDisplayInfo.dbc file format!\n");

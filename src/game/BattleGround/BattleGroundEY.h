@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2005-2013 MaNGOS <http://getmangos.com/>
+ * Copyright (C) 2005-2012 MaNGOS <http://getmangos.com/>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -162,13 +162,32 @@ enum EYNodes
 #define EY_EVENT2_FLAG_CENTER 4 // maximum node is 3 so 4 for center is ok
 // all other event2 are just nodeids, i won't define something here
 
-#define EY_NORMAL_HONOR_INTERVAL        330
-#define EY_WEEKEND_HONOR_INTERVAL       200
+enum EYBuffs
+{
+    // buffs
+    EY_OBJECT_SPEEDBUFF_FEL_REAVER_RUINS    = 1,
+    EY_OBJECT_REGENBUFF_FEL_REAVER_RUINS    = 2,
+    EY_OBJECT_BERSERKBUFF_FEL_REAVER_RUINS  = 3,
+    EY_OBJECT_SPEEDBUFF_BLOOD_ELF_TOWER     = 4,
+    EY_OBJECT_REGENBUFF_BLOOD_ELF_TOWER     = 5,
+    EY_OBJECT_BERSERKBUFF_BLOOD_ELF_TOWER   = 6,
+    EY_OBJECT_SPEEDBUFF_DRAENEI_RUINS       = 7,
+    EY_OBJECT_REGENBUFF_DRAENEI_RUINS       = 8,
+    EY_OBJECT_BERSERKBUFF_DRAENEI_RUINS     = 9,
+    EY_OBJECT_SPEEDBUFF_MAGE_TOWER          = 10,
+    EY_OBJECT_REGENBUFF_MAGE_TOWER          = 11,
+    EY_OBJECT_BERSERKBUFF_MAGE_TOWER        = 12,
+    EY_OBJECT_MAX                           = 13
+};
+
+#define EY_NORMAL_HONOR_INTERVAL        260
+#define EY_WEEKEND_HONOR_INTERVAL       160
+#define EY_EVENT_START_BATTLE           13180
 
 enum EYScore
 {
-    EY_WARNING_NEAR_VICTORY_SCORE       = 1800,
-    EY_MAX_TEAM_SCORE                   = 2000
+    EY_WARNING_NEAR_VICTORY_SCORE       = 1400,
+    EY_MAX_TEAM_SCORE                   = 1600
 };
 
 enum EYFlagState
@@ -238,10 +257,12 @@ class BattleGroundEY : public BattleGround
 
     public:
         BattleGroundEY();
+        ~BattleGroundEY();
         void Update(uint32 diff) override;
 
         /* inherited from BattlegroundClass */
         virtual void AddPlayer(Player* plr) override;
+        virtual void StartingEventCloseDoors() override;
         virtual void StartingEventOpenDoors() override;
 
         /* BG Flags */
@@ -272,6 +293,9 @@ class BattleGroundEY : public BattleGround
         /* Battleground Events */
         virtual void EventPlayerClickedOnFlag(Player* source, GameObject* target_obj) override;
         virtual void EventPlayerDroppedFlag(Player* source) override;
+
+        /* achievement req. */
+        bool IsAllNodesControlledByTeam(Team team) const override;
 
     private:
         // process capture events

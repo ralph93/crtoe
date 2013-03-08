@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2005-2013 MaNGOS <http://getmangos.com/>
+ * Copyright (C) 2005-2012 MaNGOS <http://getmangos.com/>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -62,7 +62,7 @@ namespace MMAP
     // see following files:
     // contrib/extractor/system.cpp
     // src/game/GridMap.cpp
-    static char const* MAP_VERSION_MAGIC = "s1.3";
+    static char const* MAP_VERSION_MAGIC = "c1.3";
 
     struct MeshData
     {

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2005-2013 MaNGOS <http://getmangos.com/>
+ * Copyright (C) 2005-2012 MaNGOS <http://getmangos.com/>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -53,8 +53,8 @@
 #include "BattleGround/BattleGroundMgr.h"
 #include "MapPersistentStateMgr.h"
 #include "InstanceData.h"
-#include "DBCStores.h"
 #include "CreatureEventAIMgr.h"
+#include "DBCEnums.h"
 #include "AuctionHouseBot/AuctionHouseBot.h"
 #include "SQLStorages.h"
 
@@ -229,6 +229,7 @@ bool ChatHandler::HandleReloadAllCommand(char* /*args*/)
 {
     HandleReloadSkillFishingBaseLevelCommand((char*)"");
 
+    HandleReloadAllAchievementCommand((char*)"");
     HandleReloadAllAreaCommand((char*)"");
     HandleReloadAllEventAICommand((char*)"");
     HandleReloadAllLootCommand((char*)"");
@@ -244,7 +245,13 @@ bool ChatHandler::HandleReloadAllCommand(char* /*args*/)
     HandleReloadReservedNameCommand((char*)"");
     HandleReloadMangosStringCommand((char*)"");
     HandleReloadGameTeleCommand((char*)"");
-    HandleReloadBattleEventCommand((char*)"");
+    return true;
+}
+
+bool ChatHandler::HandleReloadAllAchievementCommand(char* /*args*/)
+{
+    HandleReloadAchievementCriteriaRequirementCommand((char*)"");
+    HandleReloadAchievementRewardCommand((char*)"");
     return true;
 }
 
@@ -272,12 +279,14 @@ bool ChatHandler::HandleReloadAllNpcCommand(char* args)
     HandleReloadNpcTrainerCommand((char*)"a");
     HandleReloadNpcVendorCommand((char*)"a");
     HandleReloadPointsOfInterestCommand((char*)"a");
+    HandleReloadSpellClickSpellsCommand((char*)"a");
     return true;
 }
 
 bool ChatHandler::HandleReloadAllQuestCommand(char* /*args*/)
 {
     HandleReloadQuestAreaTriggersCommand((char*)"a");
+    HandleReloadQuestPOICommand((char*)"a");
     HandleReloadQuestTemplateCommand((char*)"a");
 
     sLog.outString("Re-Loading Quests Relations...");
@@ -296,13 +305,12 @@ bool ChatHandler::HandleReloadAllScriptsCommand(char* /*args*/)
     }
 
     sLog.outString("Re-Loading Scripts...");
-    HandleReloadDBScriptsOnCreatureDeathCommand((char*)"a");
-    HandleReloadDBScriptsOnGoUseCommand((char*)"a");
-    HandleReloadDBScriptsOnGossipCommand((char*)"a");
-    HandleReloadDBScriptsOnEventCommand((char*)"a");
-    HandleReloadDBScriptsOnQuestEndCommand((char*)"a");
-    HandleReloadDBScriptsOnQuestStartCommand((char*)"a");
-    HandleReloadDBScriptsOnSpellCommand((char*)"a");
+    HandleReloadGameObjectScriptsCommand((char*)"a");
+    HandleReloadGossipScriptsCommand((char*)"a");
+    HandleReloadEventScriptsCommand((char*)"a");
+    HandleReloadQuestEndScriptsCommand((char*)"a");
+    HandleReloadQuestStartScriptsCommand((char*)"a");
+    HandleReloadSpellScriptsCommand((char*)"a");
     SendGlobalSysMessage("DB tables `*_scripts` reloaded.");
     HandleReloadDbScriptStringCommand((char*)"a");
     return true;
@@ -320,7 +328,6 @@ bool ChatHandler::HandleReloadAllSpellCommand(char* /*args*/)
 {
     HandleReloadSkillDiscoveryTemplateCommand((char*)"a");
     HandleReloadSkillExtraItemTemplateCommand((char*)"a");
-    HandleReloadSpellAffectCommand((char*)"a");
     HandleReloadSpellAreaCommand((char*)"a");
     HandleReloadSpellChainCommand((char*)"a");
     HandleReloadSpellElixirCommand((char*)"a");
@@ -338,7 +345,7 @@ bool ChatHandler::HandleReloadAllSpellCommand(char* /*args*/)
 bool ChatHandler::HandleReloadAllGossipsCommand(char* args)
 {
     if (*args != 'a')                                       // already reload from all_scripts
-        HandleReloadDBScriptsOnGossipCommand((char*)"a");
+        HandleReloadGossipScriptsCommand((char*)"a");
     HandleReloadGossipMenuCommand((char*)"a");
     HandleReloadNpcGossipCommand((char*)"a");
     HandleReloadPointsOfInterestCommand((char*)"a");
@@ -348,6 +355,7 @@ bool ChatHandler::HandleReloadAllGossipsCommand(char* args)
 bool ChatHandler::HandleReloadAllItemCommand(char* /*args*/)
 {
     HandleReloadPageTextsCommand((char*)"a");
+    HandleReloadItemConvertCommand((char*)"a");
     HandleReloadItemEnchantementsCommand((char*)"a");
     HandleReloadItemRequiredTragetCommand((char*)"a");
     return true;
@@ -355,6 +363,7 @@ bool ChatHandler::HandleReloadAllItemCommand(char* /*args*/)
 
 bool ChatHandler::HandleReloadAllLocalesCommand(char* /*args*/)
 {
+    HandleReloadLocalesAchievementRewardCommand((char*)"a");
     HandleReloadLocalesCreatureCommand((char*)"a");
     HandleReloadLocalesGameobjectCommand((char*)"a");
     HandleReloadLocalesGossipMenuOptionCommand((char*)"a");
@@ -372,6 +381,22 @@ bool ChatHandler::HandleReloadConfigCommand(char* /*args*/)
     sWorld.LoadConfigSettings(true);
     sMapMgr.InitializeVisibilityDistanceInfo();
     SendGlobalSysMessage("World config settings reloaded.");
+    return true;
+}
+
+bool ChatHandler::HandleReloadAchievementCriteriaRequirementCommand(char* /*args*/)
+{
+    sLog.outString("Re-Loading Additional Achievement Criteria Requirements Data...");
+    sAchievementMgr.LoadAchievementCriteriaRequirements();
+    SendGlobalSysMessage("DB table `achievement_criteria_requirement` reloaded.");
+    return true;
+}
+
+bool ChatHandler::HandleReloadAchievementRewardCommand(char* /*args*/)
+{
+    sLog.outString("Re-Loading Achievement Reward Data...");
+    sAchievementMgr.LoadRewards();
+    SendGlobalSysMessage("DB table `achievement_reward` reloaded.");
     return true;
 }
 
@@ -426,6 +451,26 @@ bool ChatHandler::HandleReloadGossipMenuCommand(char* /*args*/)
 {
     sObjectMgr.LoadGossipMenus();
     SendGlobalSysMessage("DB tables `gossip_menu` and `gossip_menu_option` reloaded.");
+    return true;
+}
+
+bool ChatHandler::HandleReloadGossipScriptsCommand(char* args)
+{
+    if (sScriptMgr.IsScriptScheduled())
+    {
+        SendSysMessage("DB scripts used currently, please attempt reload later.");
+        SetSentErrorMessage(true);
+        return false;
+    }
+
+    if (*args != 'a')
+        sLog.outString("Re-Loading Scripts from `gossip_scripts`...");
+
+    sScriptMgr.LoadGossipScripts();
+
+    if (*args != 'a')
+        SendGlobalSysMessage("DB table `gossip_scripts` reloaded.");
+
     return true;
 }
 
@@ -511,6 +556,15 @@ bool ChatHandler::HandleReloadLootTemplatesItemCommand(char* /*args*/)
     return true;
 }
 
+bool ChatHandler::HandleReloadLootTemplatesMillingCommand(char* /*args*/)
+{
+    sLog.outString("Re-Loading Loot Tables... (`milling_loot_template`)");
+    LoadLootTemplates_Milling();
+    LootTemplates_Milling.CheckLootRefs();
+    SendGlobalSysMessage("DB table `milling_loot_template` reloaded.");
+    return true;
+}
+
 bool ChatHandler::HandleReloadLootTemplatesPickpocketingCommand(char* /*args*/)
 {
     sLog.outString("Re-Loading Loot Tables... (`pickpocketing_loot_template`)");
@@ -552,6 +606,15 @@ bool ChatHandler::HandleReloadLootTemplatesSkinningCommand(char* /*args*/)
     LoadLootTemplates_Skinning();
     LootTemplates_Skinning.CheckLootRefs();
     SendGlobalSysMessage("DB table `skinning_loot_template` reloaded.");
+    return true;
+}
+
+bool ChatHandler::HandleReloadLootTemplatesSpellCommand(char* /*args*/)
+{
+    sLog.outString("Re-Loading Loot Tables... (`spell_loot_template`)");
+    LoadLootTemplates_Spell();
+    LootTemplates_Spell.CheckLootRefs();
+    SendGlobalSysMessage("DB table `spell_loot_template` reloaded.");
     return true;
 }
 
@@ -612,6 +675,22 @@ bool ChatHandler::HandleReloadPointsOfInterestCommand(char* /*args*/)
     return true;
 }
 
+bool ChatHandler::HandleReloadQuestPOICommand(char* /*args*/)
+{
+    sLog.outString("Re-Loading `quest_poi` and `quest_poi_points` Tables!");
+    sObjectMgr.LoadQuestPOI();
+    SendGlobalSysMessage("DB Table `quest_poi` and `quest_poi_points` reloaded.");
+    return true;
+}
+
+bool ChatHandler::HandleReloadSpellClickSpellsCommand(char* /*args*/)
+{
+    sLog.outString("Re-Loading `npc_spellclick_spells` Table!");
+    sObjectMgr.LoadNPCSpellClickSpells();
+    SendGlobalSysMessage("DB table `npc_spellclick_spells` reloaded.");
+    return true;
+}
+
 bool ChatHandler::HandleReloadReservedNameCommand(char* /*args*/)
 {
     sLog.outString("Loading ReservedNames... (`reserved_name`)");
@@ -657,14 +736,6 @@ bool ChatHandler::HandleReloadSkillFishingBaseLevelCommand(char* /*args*/)
     sLog.outString("Re-Loading Skill Fishing base level requirements...");
     sObjectMgr.LoadFishingBaseSkillLevel();
     SendGlobalSysMessage("DB table `skill_fishing_base_level` (fishing base level for zone/subzone) reloaded.");
-    return true;
-}
-
-bool ChatHandler::HandleReloadSpellAffectCommand(char* /*args*/)
-{
-    sLog.outString("Re-Loading SpellAffect definitions...");
-    sSpellMgr.LoadSpellAffects();
-    SendGlobalSysMessage("DB table `spell_affect` (spell mods apply requirements) reloaded.");
     return true;
 }
 
@@ -772,6 +843,14 @@ bool ChatHandler::HandleReloadItemEnchantementsCommand(char* /*args*/)
     return true;
 }
 
+bool ChatHandler::HandleReloadItemConvertCommand(char* /*args*/)
+{
+    sLog.outString("Re-Loading Item Converts Table...");
+    sObjectMgr.LoadItemConverts();
+    SendGlobalSysMessage("DB table `item_convert` reloaded.");
+    return true;
+}
+
 bool ChatHandler::HandleReloadItemRequiredTragetCommand(char* /*args*/)
 {
     sLog.outString("Re-Loading Item Required Targets Table...");
@@ -785,6 +864,47 @@ bool ChatHandler::HandleReloadBattleEventCommand(char* /*args*/)
     sLog.outString("Re-Loading BattleGround Eventindexes...");
     sBattleGroundMgr.LoadBattleEventIndexes();
     SendGlobalSysMessage("DB table `gameobject_battleground` and `creature_battleground` reloaded.");
+    return true;
+}
+
+bool ChatHandler::HandleReloadGameObjectScriptsCommand(char* args)
+{
+    if (sScriptMgr.IsScriptScheduled())
+    {
+        SendSysMessage("DB scripts used currently, please attempt reload later.");
+        SetSentErrorMessage(true);
+        return false;
+    }
+
+    if (*args != 'a')
+        sLog.outString("Re-Loading Scripts from `gameobject_[template]_scripts`...");
+
+    sScriptMgr.LoadGameObjectScripts();
+    sScriptMgr.LoadGameObjectTemplateScripts();
+
+    if (*args != 'a')
+        SendGlobalSysMessage("DB table `gameobject_[template]_scripts` reloaded.");
+
+    return true;
+}
+
+bool ChatHandler::HandleReloadEventScriptsCommand(char* args)
+{
+    if (sScriptMgr.IsScriptScheduled())
+    {
+        SendSysMessage("DB scripts used currently, please attempt reload later.");
+        SetSentErrorMessage(true);
+        return false;
+    }
+
+    if (*args != 'a')
+        sLog.outString("Re-Loading Scripts from `event_scripts`...");
+
+    sScriptMgr.LoadEventScripts();
+
+    if (*args != 'a')
+        SendGlobalSysMessage("DB table `event_scripts` reloaded.");
+
     return true;
 }
 
@@ -813,152 +933,71 @@ bool ChatHandler::HandleReloadEventAIScriptsCommand(char* /*args*/)
     return true;
 }
 
+bool ChatHandler::HandleReloadQuestEndScriptsCommand(char* args)
+{
+    if (sScriptMgr.IsScriptScheduled())
+    {
+        SendSysMessage("DB scripts used currently, please attempt reload later.");
+        SetSentErrorMessage(true);
+        return false;
+    }
+
+    if (*args != 'a')
+        sLog.outString("Re-Loading Scripts from `quest_end_scripts`...");
+
+    sScriptMgr.LoadQuestEndScripts();
+
+    if (*args != 'a')
+        SendGlobalSysMessage("DB table `quest_end_scripts` reloaded.");
+
+    return true;
+}
+
+bool ChatHandler::HandleReloadQuestStartScriptsCommand(char* args)
+{
+    if (sScriptMgr.IsScriptScheduled())
+    {
+        SendSysMessage("DB scripts used currently, please attempt reload later.");
+        SetSentErrorMessage(true);
+        return false;
+    }
+
+    if (*args != 'a')
+        sLog.outString("Re-Loading Scripts from `quest_start_scripts`...");
+
+    sScriptMgr.LoadQuestStartScripts();
+
+    if (*args != 'a')
+        SendGlobalSysMessage("DB table `quest_start_scripts` reloaded.");
+
+    return true;
+}
+
+bool ChatHandler::HandleReloadSpellScriptsCommand(char* args)
+{
+    if (sScriptMgr.IsScriptScheduled())
+    {
+        SendSysMessage("DB scripts used currently, please attempt reload later.");
+        SetSentErrorMessage(true);
+        return false;
+    }
+
+    if (*args != 'a')
+        sLog.outString("Re-Loading Scripts from `spell_scripts`...");
+
+    sScriptMgr.LoadSpellScripts();
+
+    if (*args != 'a')
+        SendGlobalSysMessage("DB table `spell_scripts` reloaded.");
+
+    return true;
+}
+
 bool ChatHandler::HandleReloadDbScriptStringCommand(char* /*args*/)
 {
     sLog.outString("Re-Loading Script strings from `db_script_string`...");
     sScriptMgr.LoadDbScriptStrings();
     SendGlobalSysMessage("DB table `db_script_string` reloaded.");
-    return true;
-}
-
-bool ChatHandler::HandleReloadDBScriptsOnGossipCommand(char* args)
-{
-    if (sScriptMgr.IsScriptScheduled())
-    {
-        SendSysMessage("DB scripts used currently, please attempt reload later.");
-        SetSentErrorMessage(true);
-        return false;
-    }
-
-    if (*args != 'a')
-        sLog.outString("Re-Loading Scripts from `dbscripts_on_gossip`...");
-
-    sScriptMgr.LoadGossipScripts();
-
-    if (*args != 'a')
-        SendGlobalSysMessage("DB table `dbscripts_on_gossip` reloaded.");
-
-    return true;
-}
-
-bool ChatHandler::HandleReloadDBScriptsOnSpellCommand(char* args)
-{
-    if (sScriptMgr.IsScriptScheduled())
-    {
-        SendSysMessage("DB scripts used currently, please attempt reload later.");
-        SetSentErrorMessage(true);
-        return false;
-    }
-
-    if (*args != 'a')
-        sLog.outString("Re-Loading Scripts from `dbscripts_on_spell`...");
-
-    sScriptMgr.LoadSpellScripts();
-
-    if (*args != 'a')
-        SendGlobalSysMessage("DB table `dbscripts_on_spell` reloaded.");
-
-    return true;
-}
-
-bool ChatHandler::HandleReloadDBScriptsOnQuestStartCommand(char* args)
-{
-    if (sScriptMgr.IsScriptScheduled())
-    {
-        SendSysMessage("DB scripts used currently, please attempt reload later.");
-        SetSentErrorMessage(true);
-        return false;
-    }
-
-    if (*args != 'a')
-        sLog.outString("Re-Loading Scripts from `dbscripts_on_quest_start`...");
-
-    sScriptMgr.LoadQuestStartScripts();
-
-    if (*args != 'a')
-        SendGlobalSysMessage("DB table `dbscripts_on_quest_start` reloaded.");
-
-    return true;
-}
-
-bool ChatHandler::HandleReloadDBScriptsOnQuestEndCommand(char* args)
-{
-    if (sScriptMgr.IsScriptScheduled())
-    {
-        SendSysMessage("DB scripts used currently, please attempt reload later.");
-        SetSentErrorMessage(true);
-        return false;
-    }
-
-    if (*args != 'a')
-        sLog.outString("Re-Loading Scripts from `dbscripts_on_quest_end`...");
-
-    sScriptMgr.LoadQuestEndScripts();
-
-    if (*args != 'a')
-        SendGlobalSysMessage("DB table `dbscripts_on_quest_end` reloaded.");
-
-    return true;
-}
-
-bool ChatHandler::HandleReloadDBScriptsOnEventCommand(char* args)
-{
-    if (sScriptMgr.IsScriptScheduled())
-    {
-        SendSysMessage("DB scripts used currently, please attempt reload later.");
-        SetSentErrorMessage(true);
-        return false;
-    }
-
-    if (*args != 'a')
-        sLog.outString("Re-Loading Scripts from `dbscripts_on_event`...");
-
-    sScriptMgr.LoadEventScripts();
-
-    if (*args != 'a')
-        SendGlobalSysMessage("DB table `dbscripts_on_event` reloaded.");
-
-    return true;
-}
-
-bool ChatHandler::HandleReloadDBScriptsOnGoUseCommand(char* args)
-{
-    if (sScriptMgr.IsScriptScheduled())
-    {
-        SendSysMessage("DB scripts used currently, please attempt reload later.");
-        SetSentErrorMessage(true);
-        return false;
-    }
-
-    if (*args != 'a')
-        sLog.outString("Re-Loading Scripts from `dbscripts_on_go[_template]_use`...");
-
-    sScriptMgr.LoadGameObjectScripts();
-    sScriptMgr.LoadGameObjectTemplateScripts();
-
-    if (*args != 'a')
-        SendGlobalSysMessage("DB table `dbscripts_on_go[_template]_use` reloaded.");
-
-    return true;
-}
-
-bool ChatHandler::HandleReloadDBScriptsOnCreatureDeathCommand(char* args)
-{
-    if (sScriptMgr.IsScriptScheduled())
-    {
-        SendSysMessage("DB scripts used currently, please attempt reload later.");
-        SetSentErrorMessage(true);
-        return false;
-    }
-
-    if (*args != 'a')
-        sLog.outString("Re-Loading Scripts from `dbscripts_on_creature_death`...");
-
-    sScriptMgr.LoadCreatureDeathScripts();
-
-    if (*args != 'a')
-        SendGlobalSysMessage("DB table `dbscripts_on_creature_death` reloaded.");
-
     return true;
 }
 
@@ -981,6 +1020,14 @@ bool ChatHandler::HandleReloadGameTeleCommand(char* /*args*/)
 
     SendGlobalSysMessage("DB table `game_tele` reloaded.");
 
+    return true;
+}
+
+bool ChatHandler::HandleReloadLocalesAchievementRewardCommand(char* /*args*/)
+{
+    sLog.outString("Re-Loading Locales Achievement Reward Data...");
+    sAchievementMgr.LoadRewardLocales();
+    SendGlobalSysMessage("DB table `locales_achievement_reward` reloaded.");
     return true;
 }
 
@@ -1096,6 +1143,7 @@ bool ChatHandler::HandleAccountSetGmLevelCommand(char* args)
         return false;
 
     int32 gm;
+        uint32 gmRealmID = realmID;
     if (!ExtractInt32(&args, gm))
         return false;
 
@@ -1113,9 +1161,16 @@ bool ChatHandler::HandleAccountSetGmLevelCommand(char* args)
 
     /// account can't set security to same or grater level, need more power GM or console
     AccountTypes plSecurity = GetAccessLevel();
-    if (AccountTypes(gm) >= plSecurity)
+    if (AccountTypes(gm) >= plSecurity  || (gmRealmID != realmID && plSecurity < SEC_CONSOLE))
     {
         SendSysMessage(LANG_YOURS_SECURITY_IS_LOW);
+        SetSentErrorMessage(true);
+        return false;
+    }
+    /// check if provided realmID is not current realmID, or isn't -1
+    if (gmRealmID != realmID && gmRealmID != -1)
+    {
+        SendSysMessage(LANG_INVALID_REALMID);
         SetSentErrorMessage(true);
         return false;
     }
@@ -1127,7 +1182,19 @@ bool ChatHandler::HandleAccountSetGmLevelCommand(char* args)
     }
 
     PSendSysMessage(LANG_YOU_CHANGE_SECURITY, targetAccountName.c_str(), gm);
-    LoginDatabase.PExecute("UPDATE account SET gmlevel = '%i' WHERE id = '%u'", gm, targetAccountId);
+    //LoginDatabase.PExecute("UPDATE account_access SET gmlevel = '%i' WHERE id = '%u'", gm, targetAccountId);
+
+    /// If gmRealmID is -1, delete all values for the account id, else, insert values for the specific realmID
+    if (gmRealmID == -1)
+    {
+        LoginDatabase.PExecute("DELETE FROM account_access WHERE id = '%u'", targetAccountId);
+        LoginDatabase.PExecute("INSERT INTO account_access VALUES ('%u', '%d', -1)", targetAccountId, gm);
+    }
+    else
+    {
+        LoginDatabase.PExecute("DELETE FROM account_access WHERE id = '%u' AND RealmID = '%d'", targetAccountId, realmID);
+        LoginDatabase.PExecute("INSERT INTO account_access VALUES ('%u','%d','%d')", targetAccountId, gm, realmID);
+    }
 
     return true;
 }
@@ -1186,6 +1253,275 @@ bool ChatHandler::HandleAccountSetPasswordCommand(char* args)
     LogCommand(msg);
     SetSentErrorMessage(true);
     return false;
+}
+
+
+void ChatHandler::ShowAchievementCriteriaListHelper(AchievementCriteriaEntry const* criEntry, AchievementEntry const* achEntry, LocaleConstant loc, Player* target /*= NULL*/)
+{
+    std::ostringstream ss;
+    if (m_session)
+    {
+        ss << criEntry->ID << " - |cffffffff|Hachievement_criteria:" << criEntry->ID << "|h[" << criEntry->name[loc] << " " << localeNames[loc] << "]|h|r";
+    }
+    else
+        ss << criEntry->ID << " - " << criEntry->name[loc] << " " << localeNames[loc];
+
+    if (target)
+        ss << " = " << target->GetAchievementMgr().GetCriteriaProgressCounter(criEntry);
+
+    if (achEntry->flags & ACHIEVEMENT_FLAG_COUNTER)
+        ss << GetMangosString(LANG_COUNTER);
+    else
+    {
+        ss << " [" << AchievementMgr::GetCriteriaProgressMaxCounter(criEntry, achEntry) << "]";
+
+        if (target && target->GetAchievementMgr().IsCompletedCriteria(criEntry, achEntry))
+            ss << GetMangosString(LANG_COMPLETE);
+    }
+
+    SendSysMessage(ss.str().c_str());
+}
+
+bool ChatHandler::HandleAchievementCommand(char* args)
+{
+    char* nameStr = ExtractOptNotLastArg(&args);
+
+    Player* target = NULL;
+
+    if (nameStr)
+    {
+        if (!ExtractPlayerTarget(&nameStr, &target))
+            return false;
+    }
+    else
+        target = getSelectedPlayer();
+
+    uint32 achId;
+    if (!ExtractUint32KeyFromLink(&args, "Hachievement", achId))
+        return false;
+
+    AchievementEntry const* achEntry = sAchievementStore.LookupEntry(achId);
+    if (!achEntry)
+    {
+        PSendSysMessage(LANG_ACHIEVEMENT_NOT_EXIST, achId);
+        SetSentErrorMessage(true);
+        return false;
+    }
+
+    LocaleConstant loc = GetSessionDbcLocale();
+
+    CompletedAchievementData const* completed = target ? target->GetAchievementMgr().GetCompleteData(achId) : NULL;
+
+    ShowAchievementListHelper(achEntry, loc, completed ? &completed->date : NULL, target);
+
+    if (AchievementCriteriaEntryList const* criteriaList = sAchievementMgr.GetAchievementCriteriaByAchievement(achEntry->ID))
+    {
+        SendSysMessage(LANG_COMMAND_ACHIEVEMENT_CRITERIA);
+        for (AchievementCriteriaEntryList::const_iterator itr = criteriaList->begin(); itr != criteriaList->end(); ++itr)
+            ShowAchievementCriteriaListHelper(*itr, achEntry, loc, target);
+    }
+
+    return true;
+}
+
+bool ChatHandler::HandleAchievementAddCommand(char* args)
+{
+    char* nameStr = ExtractOptNotLastArg(&args);
+
+    Player* target;
+    if (!ExtractPlayerTarget(&nameStr, &target))
+        return false;
+
+    uint32 achId;
+    if (!ExtractUint32KeyFromLink(&args, "Hachievement", achId))
+        return false;
+
+    AchievementEntry const* achEntry = sAchievementStore.LookupEntry(achId);
+    if (!achEntry || achEntry->flags & ACHIEVEMENT_FLAG_COUNTER)
+    {
+        PSendSysMessage(LANG_ACHIEVEMENT_NOT_EXIST, achId);
+        SetSentErrorMessage(true);
+        return false;
+    }
+
+    AchievementMgr& mgr = target->GetAchievementMgr();
+
+    if (AchievementCriteriaEntryList const* criteriaList = sAchievementMgr.GetAchievementCriteriaByAchievement(achEntry->ID))
+    {
+        for (AchievementCriteriaEntryList::const_iterator itr = criteriaList->begin(); itr != criteriaList->end(); ++itr)
+        {
+            if (mgr.IsCompletedCriteria(*itr, achEntry))
+                continue;
+
+            uint32 maxValue = AchievementMgr::GetCriteriaProgressMaxCounter(*itr, achEntry);
+            if (maxValue == std::numeric_limits<uint32>::max())
+                maxValue = 1;                               // Exception for counter like achievements, set them only to 1
+            mgr.SetCriteriaProgress(*itr, achEntry, maxValue, AchievementMgr::PROGRESS_SET);
+        }
+    }
+
+    LocaleConstant loc = GetSessionDbcLocale();
+    CompletedAchievementData const* completed = target ? target->GetAchievementMgr().GetCompleteData(achId) : NULL;
+    ShowAchievementListHelper(achEntry, loc, completed ? &completed->date : NULL, target);
+    return true;
+}
+
+bool ChatHandler::HandleAchievementRemoveCommand(char* args)
+{
+    char* nameStr = ExtractOptNotLastArg(&args);
+
+    Player* target;
+    if (!ExtractPlayerTarget(&nameStr, &target))
+        return false;
+
+    uint32 achId;
+    if (!ExtractUint32KeyFromLink(&args, "Hachievement", achId))
+        return false;
+
+    AchievementEntry const* achEntry = sAchievementStore.LookupEntry(achId);
+    if (!achEntry)
+    {
+        PSendSysMessage(LANG_ACHIEVEMENT_NOT_EXIST, achId);
+        SetSentErrorMessage(true);
+        return false;
+    }
+
+    AchievementMgr& mgr = target->GetAchievementMgr();
+
+    if (AchievementCriteriaEntryList const* criteriaList = sAchievementMgr.GetAchievementCriteriaByAchievement(achEntry->ID))
+        for (AchievementCriteriaEntryList::const_iterator itr = criteriaList->begin(); itr != criteriaList->end(); ++itr)
+            mgr.SetCriteriaProgress(*itr, achEntry, 0, AchievementMgr::PROGRESS_SET);
+
+    LocaleConstant loc = GetSessionDbcLocale();
+    CompletedAchievementData const* completed = target ? target->GetAchievementMgr().GetCompleteData(achId) : NULL;
+    ShowAchievementListHelper(achEntry, loc, completed ? &completed->date : NULL, target);
+    return true;
+}
+
+bool ChatHandler::HandleAchievementCriteriaAddCommand(char* args)
+{
+    Player* target;
+    uint32 criId;
+
+    if (!ExtractUint32KeyFromLink(&args, "Hachievement_criteria", criId))
+    {
+        // maybe player first
+        char* nameStr = ExtractArg(&args);
+        if (!ExtractPlayerTarget(&nameStr, &target))
+            return false;
+
+        if (!ExtractUint32KeyFromLink(&args, "Hachievement_criteria", criId))
+            return false;
+    }
+    else
+        target = getSelectedPlayer();
+
+    AchievementCriteriaEntry const* criEntry = sAchievementCriteriaStore.LookupEntry(criId);
+    if (!criEntry)
+    {
+        PSendSysMessage(LANG_ACHIEVEMENT_CRITERIA_NOT_EXIST, criId);
+        SetSentErrorMessage(true);
+        return false;
+    }
+
+    AchievementEntry const* achEntry = sAchievementStore.LookupEntry(criEntry->referredAchievement);
+    if (!achEntry)
+        return false;
+
+    LocaleConstant loc = GetSessionDbcLocale();
+
+    uint32 maxValue = AchievementMgr::GetCriteriaProgressMaxCounter(criEntry, achEntry);
+    if (maxValue == std::numeric_limits<uint32>::max())
+        maxValue = 1;                                       // Exception for counter like achievements, set them only to 1
+
+    AchievementMgr& mgr = target->GetAchievementMgr();
+
+    // nothing do if completed
+    if (mgr.IsCompletedCriteria(criEntry, achEntry))
+    {
+        ShowAchievementCriteriaListHelper(criEntry, achEntry, loc, target);
+        return true;
+    }
+
+    uint32 progress = mgr.GetCriteriaProgressCounter(criEntry);
+
+    uint32 val;
+    if (!ExtractOptUInt32(&args, val, maxValue ? maxValue : 1))
+        return false;
+
+    uint32 new_val;
+
+    if (maxValue)
+        new_val = progress < maxValue && maxValue - progress > val ? progress + val : maxValue;
+    else
+    {
+        uint32 max_int = std::numeric_limits<uint32>::max();
+        new_val = progress < max_int && max_int - progress > val ? progress + val : max_int;
+    }
+
+    mgr.SetCriteriaProgress(criEntry, achEntry, new_val, AchievementMgr::PROGRESS_SET);
+
+    ShowAchievementCriteriaListHelper(criEntry, achEntry, loc, target);
+    return true;
+}
+
+bool ChatHandler::HandleAchievementCriteriaRemoveCommand(char* args)
+{
+    Player* target;
+    uint32 criId;
+
+    if (!ExtractUint32KeyFromLink(&args, "Hachievement_criteria", criId))
+    {
+        // maybe player first
+        char* nameStr = ExtractArg(&args);
+        if (!ExtractPlayerTarget(&nameStr, &target))
+            return false;
+
+        if (!ExtractUint32KeyFromLink(&args, "Hachievement_criteria", criId))
+            return false;
+    }
+    else
+        target = getSelectedPlayer();
+
+    AchievementCriteriaEntry const* criEntry = sAchievementCriteriaStore.LookupEntry(criId);
+    if (!criEntry)
+    {
+        PSendSysMessage(LANG_ACHIEVEMENT_CRITERIA_NOT_EXIST, criId);
+        SetSentErrorMessage(true);
+        return false;
+    }
+
+    AchievementEntry const* achEntry = sAchievementStore.LookupEntry(criEntry->referredAchievement);
+    if (!achEntry)
+        return false;
+
+    LocaleConstant loc = GetSessionDbcLocale();
+
+    uint32 maxValue = AchievementMgr::GetCriteriaProgressMaxCounter(criEntry, achEntry);
+    if (maxValue == std::numeric_limits<uint32>::max())
+        maxValue = 1;                                       // Exception for counter like achievements, set them only to 1
+
+    AchievementMgr& mgr = target->GetAchievementMgr();
+
+    uint32 progress = mgr.GetCriteriaProgressCounter(criEntry);
+
+    // nothing do if not started
+    if (progress == 0)
+    {
+        ShowAchievementCriteriaListHelper(criEntry, achEntry, loc, target);
+        return true;
+    }
+
+    uint32 change;
+    if (!ExtractOptUInt32(&args, change, maxValue ? maxValue : 1))
+        return false;
+
+    uint32 newval = change < progress ? progress - change : 0;
+
+    mgr.SetCriteriaProgress(criEntry, achEntry, newval, AchievementMgr::PROGRESS_SET);
+
+    ShowAchievementCriteriaListHelper(criEntry, achEntry, loc, target);
+    return true;
 }
 
 bool ChatHandler::HandleMaxSkillCommand(char* /*args*/)
@@ -1257,7 +1593,7 @@ bool ChatHandler::HandleSetSkillCommand(char* args)
     if (level <= 0 || level > maxskill || maxskill <= 0)
         return false;
 
-    target->SetSkill(skill, level, maxskill);
+    target->SetSkill(skill, level, maxskill, target->GetSkillStep(skill));
     PSendSysMessage(LANG_SET_SKILL, skill, sl->name[GetSessionDbcLocale()], tNameLink.c_str(), level, maxskill);
 
     return true;
@@ -1292,6 +1628,9 @@ bool ChatHandler::HandleUnLearnCommand(char* args)
         target->removeSpell(spell_id, false, !allRanks);
     else
         SendSysMessage(LANG_FORGET_SPELL);
+
+    if (GetTalentSpellCost(spell_id))
+        target->SendTalentsInfoData(false);
 
     return true;
 }
@@ -2026,7 +2365,7 @@ bool ChatHandler::HandleLearnAllMySpellsCommand(char* /*args*/)
             continue;
 
         // skip server-side/triggered spells
-        if (spellInfo->spellLevel == 0)
+        if(spellInfo->GetSpellLevel()==0)
             continue;
 
         // skip wrong class/race skills
@@ -2034,7 +2373,7 @@ bool ChatHandler::HandleLearnAllMySpellsCommand(char* /*args*/)
             continue;
 
         // skip other spell families
-        if (spellInfo->SpellFamilyName != family)
+        if( spellInfo->GetSpellFamilyName() != family)
             continue;
 
         // skip spells with first rank learned as talent (and all talents then also)
@@ -2094,7 +2433,87 @@ bool ChatHandler::HandleLearnAllMyTalentsCommand(char* /*args*/)
         player->learnSpellHighRank(spellid);
     }
 
+    player->SendTalentsInfoData(false);
+
     SendSysMessage(LANG_COMMAND_LEARN_CLASS_TALENTS);
+    return true;
+}
+
+bool ChatHandler::HandleLearnAllMyPetTalentsCommand(char* /*args*/)
+{
+    Player* player = m_session->GetPlayer();
+
+    Pet* pet = player->GetPet();
+    if (!pet)
+    {
+        SendSysMessage(LANG_NO_PET_FOUND);
+        SetSentErrorMessage(true);
+        return false;
+    }
+
+    CreatureInfo const* ci = pet->GetCreatureInfo();
+    if (!ci)
+    {
+        SendSysMessage(LANG_WRONG_PET_TYPE);
+        SetSentErrorMessage(true);
+        return false;
+    }
+
+    CreatureFamilyEntry const* pet_family = sCreatureFamilyStore.LookupEntry(ci->family);
+    if (!pet_family)
+    {
+        SendSysMessage(LANG_WRONG_PET_TYPE);
+        SetSentErrorMessage(true);
+        return false;
+    }
+
+    if (pet_family->petTalentType < 0)                      // not hunter pet
+    {
+        SendSysMessage(LANG_WRONG_PET_TYPE);
+        SetSentErrorMessage(true);
+        return false;
+    }
+
+    for (uint32 i = 0; i < sTalentStore.GetNumRows(); ++i)
+    {
+        TalentEntry const* talentInfo = sTalentStore.LookupEntry(i);
+        if (!talentInfo)
+            continue;
+
+        TalentTabEntry const* talentTabInfo = sTalentTabStore.LookupEntry(talentInfo->TalentTab);
+        if (!talentTabInfo)
+            continue;
+
+        // prevent learn talent for different family (cheating)
+        if (((1 << pet_family->petTalentType) & talentTabInfo->petTalentMask) == 0)
+            continue;
+
+        // search highest talent rank
+        uint32 spellid = 0;
+
+        for (int rank = MAX_TALENT_RANK - 1; rank >= 0; --rank)
+        {
+            if (talentInfo->RankID[rank] != 0)
+            {
+                spellid = talentInfo->RankID[rank];
+                break;
+            }
+        }
+
+        if (!spellid)                                       // ??? none spells in talent
+            continue;
+
+        SpellEntry const* spellInfo = sSpellStore.LookupEntry(spellid);
+        if (!spellInfo || !SpellMgr::IsSpellValid(spellInfo, m_session->GetPlayer(), false))
+            continue;
+
+        // learn highest rank of talent and learn all non-talent spell ranks (recursive by tree)
+        pet->learnSpellHighRank(spellid);
+    }
+
+    player->SendTalentsInfoData(true);
+
+    SendSysMessage(LANG_COMMAND_LEARN_PET_TALENTS);
     return true;
 }
 
@@ -2154,7 +2573,7 @@ bool ChatHandler::HandleLearnCommand(char* args)
         if (targetPlayer == m_session->GetPlayer())
             SendSysMessage(LANG_YOU_KNOWN_SPELL);
         else
-            PSendSysMessage(LANG_TARGET_KNOWN_SPELL, targetPlayer->GetName());
+            PSendSysMessage(LANG_TARGET_KNOWN_SPELL, GetNameLink(targetPlayer).c_str());
         SetSentErrorMessage(true);
         return false;
     }
@@ -2163,6 +2582,10 @@ bool ChatHandler::HandleLearnCommand(char* args)
         targetPlayer->learnSpellHighRank(spell);
     else
         targetPlayer->learnSpell(spell, false);
+
+    uint32 first_spell = sSpellMgr.GetFirstSpellInChain(spell);
+    if (GetTalentSpellCost(first_spell))
+        targetPlayer->SendTalentsInfoData(false);
 
     return true;
 }
@@ -2885,12 +3308,39 @@ bool ChatHandler::HandleLookupSkillCommand(char* args)
     return true;
 }
 
+void ChatHandler::ShowCurrencyListHelper(Player* target, CurrencyTypesEntry const* currency, LocaleConstant loc)
+{
+    uint32 id = currency->ID;
+
+    uint32 count = target ? target->GetCurrencyCount(id) : 0;
+
+    uint32 talentCost = GetTalentSpellCost(id);
+
+    // send spell in "id - [name] (Amount: x)" format
+    std::ostringstream ss;
+    if (m_session)
+        ss << id << " - |cff00aa00|Hcurrency:" << id << "|h[" << currency->name[loc];
+    else
+        ss << id << " - " << currency->name[loc];
+
+    if (m_session)
+        ss << " " << localeNames[loc] << "]|h|r";
+    else
+        ss << " " << localeNames[loc];
+
+    if (target)
+        ss << " (" << GetMangosString(LANG_CURRENCY_AMOUNT) << ": " << count << ")";
+
+    SendSysMessage(ss.str().c_str());
+}
+
 void ChatHandler::ShowSpellListHelper(Player* target, SpellEntry const* spellInfo, LocaleConstant loc)
 {
     uint32 id = spellInfo->Id;
 
     bool known = target && target->HasSpell(id);
-    bool learn = (spellInfo->Effect[EFFECT_INDEX_0] == SPELL_EFFECT_LEARN_SPELL);
+    SpellEffectEntry const* spellEffect = spellInfo->GetSpellEffect(EFFECT_INDEX_0);
+    bool learn = (spellEffect && spellEffect->Effect == SPELL_EFFECT_LEARN_SPELL);
 
     uint32 talentCost = GetTalentSpellCost(id);
 
@@ -2900,7 +3350,7 @@ void ChatHandler::ShowSpellListHelper(Player* target, SpellEntry const* spellInf
 
     // unit32 used to prevent interpreting uint8 as char at output
     // find rank of learned spell for learning spell, or talent rank
-    uint32 rank = talentCost ? talentCost : sSpellMgr.GetSpellRank(learn ? spellInfo->EffectTriggerSpell[EFFECT_INDEX_0] : id);
+    uint32 rank = talentCost ? talentCost : sSpellMgr.GetSpellRank(learn ? (spellEffect ? spellEffect->EffectTriggerSpell : 0) : id);
 
     // send spell in "id - [name, rank N] [talent] [passive] [learn] [known]" format
     std::ostringstream ss;
@@ -2932,6 +3382,65 @@ void ChatHandler::ShowSpellListHelper(Player* target, SpellEntry const* spellInf
     SendSysMessage(ss.str().c_str());
 }
 
+bool ChatHandler::HandleLookupCurrencyCommand(char* args)
+{
+    if (!*args)
+        return false;
+
+    // can be NULL at console call
+    Player* target = getSelectedPlayer();
+
+    std::string namepart = args;
+    std::wstring wnamepart;
+
+    if (!Utf8toWStr(namepart, wnamepart))
+        return false;
+
+    // converting string that we try to find to lower case
+    wstrToLower(wnamepart);
+
+    uint32 counter = 0;                                     // Counter for figure out that we found smth.
+
+    // Search in CurrencyTypes.dbc
+    for (uint32 id = 0; id < sCurrencyTypesStore.GetNumRows(); ++id)
+    {
+        CurrencyTypesEntry const* currency = sCurrencyTypesStore.LookupEntry(id);
+        if (currency)
+        {
+            int loc = GetSessionDbcLocale();
+            std::string name = currency->name[loc];
+            if (name.empty())
+                continue;
+
+            if (!Utf8FitTo(name, wnamepart))
+            {
+                loc = 0;
+                for (; loc < MAX_LOCALE; ++loc)
+                {
+                    if (loc == GetSessionDbcLocale())
+                        continue;
+
+                    name = currency->name[loc];
+                    if (name.empty())
+                        continue;
+
+                    if (Utf8FitTo(name, wnamepart))
+                        break;
+                }
+            }
+
+            if (loc < MAX_LOCALE)
+            {
+                ShowCurrencyListHelper(target, currency, LocaleConstant(loc));
+                ++counter;
+            }
+        }
+    }
+    if (counter == 0)                                       // if counter == 0 then we found nth
+        SendSysMessage(LANG_COMMAND_NOCURRENCYFOUND);
+    return true;
+}
+
 bool ChatHandler::HandleLookupSpellCommand(char* args)
 {
     if (!*args)
@@ -2958,6 +3467,7 @@ bool ChatHandler::HandleLookupSpellCommand(char* args)
         if (spellInfo)
         {
             int loc = GetSessionDbcLocale();
+            DEBUG_LOG("Spellid %u locale %u", id, loc);
             std::string name = spellInfo->SpellName[loc];
             if (name.empty())
                 continue;
@@ -3524,9 +4034,21 @@ bool ChatHandler::HandleDamageCommand(char* args)
     return true;
 }
 
-bool ChatHandler::HandleModifyArenaCommand(char* args)
+bool ChatHandler::HandleModifyCurrencyCommand(char* args)
 {
     if (!*args)
+        return false;
+
+    uint32 currencyId;
+    if (!ExtractUint32KeyFromLink(&args, "Hcurrency", currencyId))
+        return false;
+
+    CurrencyTypesEntry const * entry = sCurrencyTypesStore.LookupEntry(currencyId);
+    if (!entry)
+        return false;
+
+    int32 amount;
+    if (!ExtractInt32(&args, amount))
         return false;
 
     Player* target = getSelectedPlayer();
@@ -3537,11 +4059,9 @@ bool ChatHandler::HandleModifyArenaCommand(char* args)
         return false;
     }
 
-    int32 amount = (int32)atoi(args);
+    target->ModifyCurrencyCount(currencyId, amount, false, false);
 
-    target->ModifyArenaPoints(amount);
-
-    PSendSysMessage(LANG_COMMAND_MODIFY_ARENA, GetNameLink(target).c_str(), target->GetArenaPoints());
+    PSendSysMessage(LANG_COMMAND_MODIFY_CURRENCY, currencyId, GetNameLink(target).c_str(), target->GetCurrencyCount(currencyId));
 
     return true;
 }
@@ -3582,7 +4102,7 @@ bool ChatHandler::HandleAuraCommand(char* args)
     if (!spellInfo)
         return false;
 
-    if (!IsSpellAppliesAura(spellInfo, (1 << EFFECT_INDEX_0) | (1 << EFFECT_INDEX_1) | (1 << EFFECT_INDEX_2)) &&
+    if (!IsSpellAppliesAura(spellInfo) &&
             !IsSpellHaveEffect(spellInfo, SPELL_EFFECT_PERSISTENT_AREA_AURA))
     {
         PSendSysMessage(LANG_SPELL_NO_HAVE_AURAS, spellID);
@@ -3594,9 +4114,14 @@ bool ChatHandler::HandleAuraCommand(char* args)
 
     for (uint32 i = 0; i < MAX_EFFECT_INDEX; ++i)
     {
-        uint8 eff = spellInfo->Effect[i];
-        if (eff >= TOTAL_SPELL_EFFECTS)
+        SpellEffectEntry const* spellEffect = spellInfo->GetSpellEffect(SpellEffectIndex(i));
+        if(!spellEffect)
             continue;
+
+        uint8 eff = spellEffect->Effect;
+        if (eff>=TOTAL_SPELL_EFFECTS)
+            continue;
+
         if (IsAreaAuraEffect(eff)           ||
                 eff == SPELL_EFFECT_APPLY_AURA  ||
                 eff == SPELL_EFFECT_PERSISTENT_AREA_AURA)
@@ -3814,9 +4339,14 @@ bool ChatHandler::HandleNpcInfoCommand(char* /*args*/)
 
     // Send information dependend on difficulty mode
     CreatureInfo const* baseInfo = ObjectMgr::GetCreatureTemplate(Entry);
-    if (baseInfo->HeroicEntry == target->GetCreatureInfo()->Entry)
+    uint32 diff = 1;
+    for (; diff < MAX_DIFFICULTY; ++diff)
+        if (baseInfo->DifficultyEntry[diff - 1] == target->GetCreatureInfo()->Entry)
+            break;
+
+    if (diff < MAX_DIFFICULTY)
         PSendSysMessage(LANG_NPCINFO_CHAR_DIFFICULTY, target->GetGuidStr().c_str(), faction, npcflags,
-                        Entry, target->GetCreatureInfo()->Entry, 1,
+                        Entry, target->GetCreatureInfo()->Entry, diff,
                         displayid, nativeid);
     else
         PSendSysMessage(LANG_NPCINFO_CHAR, target->GetGuidStr().c_str(), faction, npcflags, Entry, displayid, nativeid);
@@ -4280,6 +4810,12 @@ bool ChatHandler::HandleBankCommand(char* /*args*/)
     return true;
 }
 
+bool ChatHandler::HandleMailBoxCommand(char* /*args*/)
+{
+    m_session->SendShowMailBox(m_session->GetPlayer()->GetObjectGuid());
+    return true;
+}
+
 bool ChatHandler::HandleStableCommand(char* /*args*/)
 {
     m_session->SendStablePet(m_session->GetPlayer()->GetObjectGuid());
@@ -4507,17 +5043,32 @@ bool ChatHandler::HandleListTalentsCommand(char* /*args*/)
     return true;
 }
 
+bool ChatHandler::HandleResetAchievementsCommand(char* args)
+{
+    Player* target;
+    ObjectGuid target_guid;
+    if (!ExtractPlayerTarget(&args, &target, &target_guid))
+        return false;
+
+    if (target)
+        target->GetAchievementMgr().Reset();
+    else
+        AchievementMgr::DeleteFromDB(target_guid);
+
+    return true;
+}
+
 bool ChatHandler::HandleResetHonorCommand(char* args)
 {
     Player* target;
     if (!ExtractPlayerTarget(&args, &target))
         return false;
 
-    target->SetHonorPoints(0);
+    target->SetCurrencyCount(CURRENCY_HONOR_POINTS, 0);
     target->SetUInt32Value(PLAYER_FIELD_KILLS, 0);
     target->SetUInt32Value(PLAYER_FIELD_LIFETIME_HONORBALE_KILLS, 0);
-    target->SetUInt32Value(PLAYER_FIELD_TODAY_CONTRIBUTION, 0);
-    target->SetUInt32Value(PLAYER_FIELD_YESTERDAY_CONTRIBUTION, 0);
+    target->UpdateAchievementCriteria(ACHIEVEMENT_CRITERIA_TYPE_EARN_HONORABLE_KILL);
+
     return true;
 }
 
@@ -4547,7 +5098,7 @@ static bool HandleResetStatsOrLevelHelper(Player* player)
     if (player->GetShapeshiftForm() == FORM_NONE)
         player->InitDisplayIds();
 
-    player->SetByteValue(UNIT_FIELD_BYTES_2, 1, UNIT_BYTE2_FLAG_UNK3 | UNIT_BYTE2_FLAG_UNK5);
+    player->SetByteValue(UNIT_FIELD_BYTES_2, 1, UNIT_BYTE2_FLAG_PVP);
 
     player->SetUInt32Value(UNIT_FIELD_FLAGS, UNIT_FLAG_PVP_ATTACKABLE);
 
@@ -4568,13 +5119,21 @@ bool ChatHandler::HandleResetLevelCommand(char* args)
         return false;
 
     // set starting level
-    uint32 start_level = sWorld.getConfig(CONFIG_UINT32_START_PLAYER_LEVEL);
+    uint32 start_level = target->getClass() != CLASS_DEATH_KNIGHT
+                         ? sWorld.getConfig(CONFIG_UINT32_START_PLAYER_LEVEL)
+                         : sWorld.getConfig(CONFIG_UINT32_START_HEROIC_PLAYER_LEVEL);
+
+    target->_ApplyAllLevelScaleItemMods(false);
 
     target->SetLevel(start_level);
+    target->InitRunes();
     target->InitStatsForLevel(true);
     target->InitTaxiNodesForLevel();
+    target->InitGlyphsForLevel();
     target->InitTalentForLevel();
     target->SetUInt32Value(PLAYER_XP, 0);
+
+    target->_ApplyAllLevelScaleItemMods(true);
 
     // reset level for pet
     if (Pet* pet = target->GetPet())
@@ -4592,8 +5151,10 @@ bool ChatHandler::HandleResetStatsCommand(char* args)
     if (!HandleResetStatsOrLevelHelper(target))
         return false;
 
+    target->InitRunes();
     target->InitStatsForLevel(true);
     target->InitTaxiNodesForLevel();
+    target->InitGlyphsForLevel();
     target->InitTalentForLevel();
 
     return true;
@@ -4624,7 +5185,7 @@ bool ChatHandler::HandleResetSpellsCommand(char* args)
     return true;
 }
 
-bool ChatHandler::HandleResetTalentsCommand(char* args)
+bool ChatHandler::HandleResetSpecsCommand(char* args)
 {
     Player* target;
     ObjectGuid target_guid;
@@ -4634,19 +5195,73 @@ bool ChatHandler::HandleResetTalentsCommand(char* args)
 
     if (target)
     {
-        target->resetTalents(true);
+        target->resetTalents(true, true);
+        target->SendTalentsInfoData(false);
 
         ChatHandler(target).SendSysMessage(LANG_RESET_TALENTS);
         if (!m_session || m_session->GetPlayer() != target)
             PSendSysMessage(LANG_RESET_TALENTS_ONLINE, GetNameLink(target).c_str());
+
+        Pet* pet = target->GetPet();
+        Pet::resetTalentsForAllPetsOf(target, pet);
+        if (pet)
+            target->SendTalentsInfoData(true);
         return true;
     }
     else if (target_guid)
     {
-        uint32 at_flags = AT_LOGIN_RESET_TALENTS;
+        uint32 at_flags = AT_LOGIN_RESET_TALENTS | AT_LOGIN_RESET_PET_TALENTS;
         CharacterDatabase.PExecute("UPDATE characters SET at_login = at_login | '%u' WHERE guid = '%u'", at_flags, target_guid.GetCounter());
         std::string nameLink = playerLink(target_name);
         PSendSysMessage(LANG_RESET_TALENTS_OFFLINE, nameLink.c_str());
+        return true;
+    }
+
+    SendSysMessage(LANG_NO_CHAR_SELECTED);
+    SetSentErrorMessage(true);
+    return false;
+}
+
+bool ChatHandler::HandleResetTalentsCommand(char* args)
+{
+    Player* target;
+    std::string target_name;
+    if (!ExtractPlayerTarget(&args, &target, NULL, &target_name))
+    {
+        // Try reset talents as Hunter Pet
+        Creature* creature = getSelectedCreature();
+        if (!*args && creature && creature->IsPet())
+        {
+            Unit* owner = creature->GetOwner();
+            if (owner && owner->GetTypeId() == TYPEID_PLAYER && ((Pet*)creature)->IsPermanentPetFor((Player*)owner))
+            {
+                ((Pet*)creature)->resetTalents(true);
+                ((Player*)owner)->SendTalentsInfoData(true);
+
+                ChatHandler((Player*)owner).SendSysMessage(LANG_RESET_PET_TALENTS);
+                if (!m_session || m_session->GetPlayer() != ((Player*)owner))
+                    PSendSysMessage(LANG_RESET_PET_TALENTS_ONLINE, GetNameLink((Player*)owner).c_str());
+            }
+            return true;
+        }
+
+        SendSysMessage(LANG_NO_CHAR_SELECTED);
+        SetSentErrorMessage(true);
+        return false;
+    }
+
+    if (target)
+    {
+        target->resetTalents(true);
+        target->SendTalentsInfoData(false);
+        ChatHandler(target).SendSysMessage(LANG_RESET_TALENTS);
+        if (!m_session || m_session->GetPlayer() != target)
+            PSendSysMessage(LANG_RESET_TALENTS_ONLINE, GetNameLink(target).c_str());
+
+        Pet* pet = target->GetPet();
+        Pet::resetTalentsForAllPetsOf(target, pet);
+        if (pet)
+            target->SendTalentsInfoData(true);
         return true;
     }
 
@@ -4674,7 +5289,7 @@ bool ChatHandler::HandleResetAllCommand(char* args)
     }
     else if (casename == "talents")
     {
-        atLogin = AT_LOGIN_RESET_TALENTS;
+        atLogin = AtLoginFlags(AT_LOGIN_RESET_TALENTS | AT_LOGIN_RESET_PET_TALENTS);
         sWorld.SendWorldText(LANG_RESETALL_TALENTS);
         if (!m_session)
             SendSysMessage(LANG_RESETALL_TALENTS);
@@ -4962,6 +5577,15 @@ bool ChatHandler::HandleQuestCompleteCommand(char* args)
     int32 ReqOrRewMoney = pQuest->GetRewOrReqMoney();
     if (ReqOrRewMoney < 0)
         player->ModifyMoney(-ReqOrRewMoney);
+
+    for (int i = 0; i < QUEST_REQUIRED_CURRENCY_COUNT; ++i)
+    {
+        if (pQuest->ReqCurrencyId[i])
+            player->ModifyCurrencyCount(pQuest->ReqCurrencyId[i], int32(pQuest->ReqCurrencyCount[i] * GetCurrencyPrecision(pQuest->ReqCurrencyId[i])));
+    }
+
+    if (uint32 spell = pQuest->GetReqSpellLearned())
+        player->learnSpell(spell, false);
 
     player->CompleteQuest(entry);
     return true;
@@ -5436,7 +6060,7 @@ bool ChatHandler::HandleRespawnCommand(char* /*args*/)
     }
 
     MaNGOS::RespawnDo u_do;
-    MaNGOS::WorldObjectWorker<MaNGOS::RespawnDo> worker(u_do);
+    MaNGOS::WorldObjectWorker<MaNGOS::RespawnDo> worker(pl, u_do);
     Cell::VisitGridObjects(pl, worker, pl->GetMap()->GetVisibilityDistance());
     return true;
 }
@@ -5456,9 +6080,7 @@ bool ChatHandler::HandleGMFlyCommand(char* args)
         target = m_session->GetPlayer();
 
     WorldPacket data;
-    data.SetOpcode(value ? SMSG_MOVE_SET_CAN_FLY : SMSG_MOVE_UNSET_CAN_FLY);
-    data << target->GetPackGUID();
-    data << uint32(0);                                      // unknown
+    target->BuildMoveSetCanFlyPacket(&data, value, 0);
     target->SendMessageToSet(&data, true);
     PSendSysMessage(LANG_COMMAND_FLYMODE_STATUS, GetNameLink(target).c_str(), args);
     return true;
@@ -5955,9 +6577,9 @@ bool ChatHandler::HandleInstanceListBindsCommand(char* /*args*/)
             std::string timeleft = secsToTimeString(state->GetResetTime() - time(NULL), true);
             if (const MapEntry* entry = sMapStore.LookupEntry(itr->first))
             {
-                PSendSysMessage("map: %d (%s) inst: %d perm: %s diff: %s canReset: %s TTR: %s",
+                PSendSysMessage("map: %d (%s) inst: %d perm: %s diff: %d canReset: %s TTR: %s",
                                 itr->first, entry->name[GetSessionDbcLocale()], state->GetInstanceId(), itr->second.perm ? "yes" : "no",
-                                state->GetDifficulty() == DUNGEON_DIFFICULTY_NORMAL ? "normal" : "heroic", state->CanReset() ? "yes" : "no", timeleft.c_str());
+                                state->GetDifficulty(), state->CanReset() ? "yes" : "no", timeleft.c_str());
             }
             else
                 PSendSysMessage("bound for a nonexistent map %u", itr->first);
@@ -5978,9 +6600,9 @@ bool ChatHandler::HandleInstanceListBindsCommand(char* /*args*/)
                 std::string timeleft = secsToTimeString(state->GetResetTime() - time(NULL), true);
                 if (const MapEntry* entry = sMapStore.LookupEntry(itr->first))
                 {
-                    PSendSysMessage("map: %d (%s) inst: %d perm: %s diff: %s canReset: %s TTR: %s",
+                    PSendSysMessage("map: %d (%s) inst: %d perm: %s diff: %d canReset: %s TTR: %s",
                                     itr->first, entry->name[GetSessionDbcLocale()], state->GetInstanceId(), itr->second.perm ? "yes" : "no",
-                                    state->GetDifficulty() == DUNGEON_DIFFICULTY_NORMAL ? "normal" : "heroic", state->CanReset() ? "yes" : "no", timeleft.c_str());
+                                    state->GetDifficulty(), state->CanReset() ? "yes" : "no", timeleft.c_str());
                 }
                 else
                     PSendSysMessage("bound for a nonexistent map %u", itr->first);
@@ -6031,9 +6653,9 @@ bool ChatHandler::HandleInstanceUnbindCommand(char* args)
 
                 if (const MapEntry* entry = sMapStore.LookupEntry(itr->first))
                 {
-                    PSendSysMessage("unbinding map: %d (%s) inst: %d perm: %s diff: %s canReset: %s TTR: %s",
+                    PSendSysMessage("unbinding map: %d (%s) inst: %d perm: %s diff: %d canReset: %s TTR: %s",
                                     itr->first, entry->name[GetSessionDbcLocale()], save->GetInstanceId(), itr->second.perm ? "yes" : "no",
-                                    save->GetDifficulty() == DUNGEON_DIFFICULTY_NORMAL ? "normal" : "heroic", save->CanReset() ? "yes" : "no", timeleft.c_str());
+                                    save->GetDifficulty(), save->CanReset() ? "yes" : "no", timeleft.c_str());
                 }
                 else
                     PSendSysMessage("bound for a nonexistent map %u", itr->first);
@@ -6084,7 +6706,7 @@ bool ChatHandler::HandleInstanceSaveDataCommand(char* /*args*/)
 bool ChatHandler::HandleGMListFullCommand(char* /*args*/)
 {
     ///- Get the accounts with GM Level >0
-    QueryResult* result = LoginDatabase.Query("SELECT username,gmlevel FROM account WHERE gmlevel > 0");
+    QueryResult* result = LoginDatabase.Query("SELECT a.username,aa.gmlevel FROM account a LEFT JOIN account_access aa ON (a.id = aa.id) WHERE aa.gmlevel > 0");
     if (result)
     {
         SendSysMessage(LANG_GMLIST);
@@ -6514,12 +7136,6 @@ bool ChatHandler::HandleSendMessageCommand(char* args)
     return true;
 }
 
-bool ChatHandler::HandleFlushArenaPointsCommand(char* /*args*/)
-{
-    sBattleGroundMgr.DistributeArenaPoints();
-    return true;
-}
-
 bool ChatHandler::HandleModifyGenderCommand(char* args)
 {
     if (!*args)
@@ -6573,10 +7189,38 @@ bool ChatHandler::HandleModifyGenderCommand(char* args)
 
     char const* gender_full = gender ? "female" : "male";
 
-    PSendSysMessage(LANG_YOU_CHANGE_GENDER, player->GetName(), gender_full);
+    PSendSysMessage(LANG_YOU_CHANGE_GENDER, GetNameLink(player).c_str(), gender_full);
 
     if (needReportToTarget(player))
         ChatHandler(player).PSendSysMessage(LANG_YOUR_GENDER_CHANGED, gender_full, GetNameLink().c_str());
+
+    return true;
+}
+
+bool ChatHandler::HandleShowGearScoreCommand(char* args)
+{
+    Player* player = getSelectedPlayer();
+
+    if (!player)
+    {
+        PSendSysMessage(LANG_PLAYER_NOT_FOUND);
+        SetSentErrorMessage(true);
+        return false;
+    }
+
+    uint32 withBags, withBank;
+    if (!ExtractOptUInt32(&args, withBags, 1))
+        return false;
+
+    if (!ExtractOptUInt32(&args, withBank, 0))
+        return false;
+
+    // always recalculate gear score for display
+    player->ResetCachedGearScore();
+
+    uint32 gearScore = player->GetEquipGearScore(withBags != 0, withBank != 0);
+
+    PSendSysMessage(LANG_GEARSCORE, GetNameLink(player).c_str(), gearScore);
 
     return true;
 }

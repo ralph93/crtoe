@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2005-2013 MaNGOS <http://getmangos.com/>
+ * Copyright (C) 2005-2012 MaNGOS <http://getmangos.com/>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -65,22 +65,26 @@ class HostileRefManager : public RefManager<Unit, ThreatManager>
         void deleteReference(Unit* pCreature);
 
         // redirection threat data
-        void SetThreatRedirection(ObjectGuid guid)
+        void SetThreatRedirection(ObjectGuid guid, uint32 pct)
         {
             m_redirectionTargetGuid = guid;
+            m_redirectionMod = pct / 100.0f;
         }
 
         void ResetThreatRedirection()
         {
             m_redirectionTargetGuid.Clear();
+            m_redirectionMod = 0.0f;
         }
 
+        float GetThreatRedirectionMod() const { return m_redirectionMod; }
         Unit*  GetThreatRedirectionTarget() const;
 
     private:
         Unit* iOwner;                                       // owner of manager variable, back ref. to it, always exist
 
-        ObjectGuid m_redirectionTargetGuid;                 // in 2.x redirected only full threat
+        float      m_redirectionMod;
+        ObjectGuid m_redirectionTargetGuid;
 };
 //=================================================
 #endif

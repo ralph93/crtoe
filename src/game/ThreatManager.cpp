@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2005-2013 MaNGOS <http://getmangos.com/>
+ * Copyright (C) 2005-2012 MaNGOS <http://getmangos.com/>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -387,7 +387,7 @@ HostileReference* ThreatContainer::selectNextVictim(Creature* pAttacker, Hostile
 //============================================================
 
 ThreatManager::ThreatManager(Unit* owner)
-    : iCurrentVictim(NULL), iOwner(owner)
+    : iCurrentVictim(NULL), iOwner(owner), iUpdateTimer(THREAT_UPDATE_INTERVAL), iUpdateNeed(false)
 {
 }
 
@@ -398,6 +398,8 @@ void ThreatManager::clearReferences()
     iThreatContainer.clearReferences();
     iThreatOfflineContainer.clearReferences();
     iCurrentVictim = NULL;
+    iUpdateTimer.Reset(THREAT_UPDATE_INTERVAL);
+    iUpdateNeed = false;
 }
 
 //============================================================
@@ -427,12 +429,16 @@ void ThreatManager::addThreat(Unit* pVictim, float pThreat, bool crit, SpellScho
 
     if (threat > 0.0f)
     {
-        if (Unit* redirectedTarget = pVictim->getHostileRefManager().GetThreatRedirectionTarget())
+        if (float redirectedMod = pVictim->getHostileRefManager().GetThreatRedirectionMod())
         {
-            if (redirectedTarget != getOwner() && redirectedTarget->isAlive())
+            if (Unit* redirectedTarget = pVictim->getHostileRefManager().GetThreatRedirectionTarget())
             {
-                addThreatDirectly(redirectedTarget, threat);
-                threat = 0;                                 // but still need add to threat list
+                if (redirectedTarget != getOwner() && redirectedTarget->isAlive())
+                {
+                    float redirectedThreat = threat * redirectedMod;
+                    threat -= redirectedThreat;
+                    addThreatDirectly(redirectedTarget, redirectedThreat);
+                }
             }
         }
     }
@@ -443,8 +449,11 @@ void ThreatManager::addThreat(Unit* pVictim, float pThreat, bool crit, SpellScho
 void ThreatManager::addThreatDirectly(Unit* pVictim, float threat)
 {
     HostileReference* ref = iThreatContainer.addThreat(pVictim, threat);
+    // Ref is online
+    if (ref)
+        iUpdateNeed = true;
     // Ref is not in the online refs, search the offline refs next
-    if (!ref)
+    else
         ref = iThreatOfflineContainer.addThreat(pVictim, threat);
 
     if (!ref)                                               // there was no ref => create a new one
@@ -453,6 +462,7 @@ void ThreatManager::addThreatDirectly(Unit* pVictim, float threat)
         HostileReference* hostileReference = new HostileReference(pVictim, this, 0);
         iThreatContainer.addReference(hostileReference);
         hostileReference->addThreat(threat);                // now we add the real threat
+        iUpdateNeed = true;
         if (pVictim->GetTypeId() == TYPEID_PLAYER && ((Player*)pVictim)->isGameMaster())
             hostileReference->setOnlineOfflineState(false); // GM is always offline
     }
@@ -463,6 +473,7 @@ void ThreatManager::addThreatDirectly(Unit* pVictim, float threat)
 void ThreatManager::modifyThreatPercent(Unit* pVictim, int32 pPercent)
 {
     iThreatContainer.modifyThreatPercent(pVictim, pPercent);
+    iUpdateNeed = true;
 }
 
 //============================================================
@@ -500,6 +511,7 @@ void ThreatManager::tauntApply(Unit* pTaunter)
             if (ref->getTempThreatModifyer() == 0.0f)
             {
                 ref->setTempThreat(getCurrentVictim()->getThreat());
+                iUpdateNeed = true;
             }
         }
     }
@@ -512,6 +524,7 @@ void ThreatManager::tauntFadeOut(Unit* pTaunter)
     if (HostileReference* ref = iThreatContainer.getReferenceByTarget(pTaunter))
     {
         ref->resetTempThreat();
+        iUpdateNeed = true;
     }
 }
 
@@ -519,7 +532,15 @@ void ThreatManager::tauntFadeOut(Unit* pTaunter)
 
 void ThreatManager::setCurrentVictim(HostileReference* pHostileReference)
 {
+    // including NULL==NULL case
+    if (pHostileReference == iCurrentVictim)
+        return;
+
+    if (pHostileReference)
+        iOwner->SendHighestThreatUpdate(pHostileReference);
+
     iCurrentVictim = pHostileReference;
+    iUpdateNeed = true;
 }
 
 //============================================================
@@ -547,7 +568,9 @@ void ThreatManager::processThreatEvent(ThreatRefStatusChangeEvent* threatRefStat
                     setCurrentVictim(NULL);
                     setDirty(true);
                 }
+                iOwner->SendThreatRemove(hostileReference);
                 iThreatContainer.remove(hostileReference);
+                iUpdateNeed = true;
                 iThreatOfflineContainer.addReference(hostileReference);
             }
             else
@@ -555,6 +578,7 @@ void ThreatManager::processThreatEvent(ThreatRefStatusChangeEvent* threatRefStat
                 if (getCurrentVictim() && hostileReference->getThreat() > (1.1f * getCurrentVictim()->getThreat()))
                     setDirty(true);
                 iThreatContainer.addReference(hostileReference);
+                iUpdateNeed = true;
                 iThreatOfflineContainer.remove(hostileReference);
             }
             break;
@@ -566,10 +590,26 @@ void ThreatManager::processThreatEvent(ThreatRefStatusChangeEvent* threatRefStat
             }
             if (hostileReference->isOnline())
             {
+                iOwner->SendThreatRemove(hostileReference);
                 iThreatContainer.remove(hostileReference);
+                iUpdateNeed = true;
             }
             else
                 iThreatOfflineContainer.remove(hostileReference);
             break;
+    }
+}
+
+void ThreatManager::UpdateForClient(uint32 diff)
+{
+    if (!iUpdateNeed || isThreatListEmpty())
+        return;
+
+    iUpdateTimer.Update(diff);
+    if (iUpdateTimer.Passed())
+    {
+        iOwner->SendThreatUpdate();
+        iUpdateTimer.Reset(THREAT_UPDATE_INTERVAL);
+        iUpdateNeed = false;
     }
 }

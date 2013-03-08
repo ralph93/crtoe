@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2005-2013 MaNGOS <http://getmangos.com/>
+ * Copyright (C) 2005-2012 MaNGOS <http://getmangos.com/>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -36,6 +36,7 @@ enum OutdoorPvPTypes
     OPVP_ID_ZM,
     OPVP_ID_TF,
     OPVP_ID_NA,
+    OPVP_ID_GH,
 
     MAX_OPVP_ID
 };
@@ -70,7 +71,9 @@ enum OutdoorPvPZones
     ZONE_ID_SETHEKK_HALLS           = 3791,
     ZONE_ID_MANA_TOMBS              = 3792,
 
-    ZONE_ID_NAGRAND                 = 3518
+    ZONE_ID_NAGRAND                 = 3518,
+
+    ZONE_ID_GRIZZLY_HILLS           = 394
 };
 
 class Player;

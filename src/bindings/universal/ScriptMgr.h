@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2005-2013 MaNGOS <http://getmangos.com/>
+ * Copyright (C) 2005-2012 MaNGOS <http://getmangos.com/>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -44,7 +44,7 @@ struct Script
         pQuestSelect(NULL), pQuestComplete(NULL), pNPCDialogStatus(NULL), pGODialogStatus(NULL), pChooseReward(NULL),
         pItemHello(NULL), pGOHello(NULL), pProcessEventId(NULL), pAreaTrigger(NULL), pItemQuestAccept(NULL), pGOQuestAccept(NULL),
         pGOChooseReward(NULL), pItemUse(NULL), pEffectDummyGameObj(NULL), pEffectDummyCreature(NULL),
-        pEffectDummyItem(NULL), pEffectAuraDummy(NULL), GetAI(NULL), GetInstanceData(NULL)
+        pEffectDummyItem(NULL), pEffectAuraDummy(NULL), GetAI(NULL)
     {}
 
     std::string Name;
@@ -75,8 +75,8 @@ struct Script
     bool (*pEffectDummyItem)(Unit*, uint32, SpellEffectIndex, Item*);
     bool (*pEffectAuraDummy)(const Aura*, bool);
 
-    CreatureAI*(*GetAI)(Creature* _Creature);
-    InstanceData*(*GetInstanceData)(Map*);
+    CreatureAI* (*GetAI)(Creature* _Creature);
+    InstanceData* (*GetInstanceData)(Map*);
     // -----------------------------------------
 
     void registerSelf();

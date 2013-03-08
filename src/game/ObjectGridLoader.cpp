@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2005-2013 MaNGOS <http://getmangos.com/>
+ * Copyright (C) 2005-2012 MaNGOS <http://getmangos.com/>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -26,7 +26,7 @@
 #include "Corpse.h"
 #include "World.h"
 #include "CellImpl.h"
-#include "BattleGround/BattleGround.h"
+#include "GridDefines.h"
 
 class MANGOS_DLL_DECL ObjectGridRespawnMover
 {
@@ -35,7 +35,7 @@ class MANGOS_DLL_DECL ObjectGridRespawnMover
 
         void Move(GridType& grid);
 
-        template<class T> void Visit(GridRefManager<T> &) {}
+        template<class T> void Visit(GridRefManager<T>&) {}
         void Visit(CreatureMapType& m);
 };
 
@@ -266,7 +266,7 @@ ObjectGridUnloader::Unload(GridType& grid)
 
 template<class T>
 void
-ObjectGridUnloader::Visit(GridRefManager<T> &m)
+ObjectGridUnloader::Visit(GridRefManager<T>& m)
 {
     // remove all cross-reference before deleting
     for (typename GridRefManager<T>::iterator iter = m.begin(); iter != m.end(); ++iter)

@@ -595,6 +595,18 @@
 				Name="DataStores"
 				>
 				<File
+					RelativePath="..\..\src\shared\Database\DB2FileLoader.cpp"
+					>
+				</File>
+				<File
+					RelativePath="..\..\src\shared\Database\DB2FileLoader.h"
+					>
+				</File>
+				<File
+					RelativePath="..\..\src\shared\Database\DB2Store.h"
+					>
+				</File>
+				<File
 					RelativePath="..\..\src\shared\Database\DBCFileLoader.cpp"
 					>
 				</File>
@@ -709,6 +721,14 @@
 			</File>
 			<File
 				RelativePath="..\..\src\shared\Auth\md5.h"
+				>
+			</File>
+			<File
+				RelativePath="..\..\src\shared\Auth\SARC4.cpp"
+				>
+			</File>
+			<File
+				RelativePath="..\..\src\shared\Auth\SARC4.h"
 				>
 			</File>
 			<File

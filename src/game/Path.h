@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2005-2013 MaNGOS <http://getmangos.com/>
+ * Copyright (C) 2005-2012 MaNGOS <http://getmangos.com/>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -29,7 +29,7 @@ struct PathNode
     float x, y, z;
 };
 
-template < typename PathElem, typename PathNode = PathElem >
+template<typename PathElem, typename PathNode = PathElem>
 class Path
 {
     public:
@@ -59,7 +59,7 @@ class Path
             for (unsigned int idx = start + 1; idx < end; ++idx)
             {
                 PathNode const& node = i_nodes[idx];
-                PathNode const& prev = i_nodes[idx-1];
+                PathNode const& prev = i_nodes[idx - 1];
                 float xd = node.x - prev.x;
                 float yd = node.y - prev.y;
                 float zd = node.z - prev.z;
@@ -76,7 +76,7 @@ class Path
 
             if (curnode > 0)
             {
-                PathNode const& node = i_nodes[curnode-1];
+                PathNode const& node = i_nodes[curnode - 1];
                 float xd = x - node.x;
                 float yd = y - node.y;
                 float zd = z - node.z;

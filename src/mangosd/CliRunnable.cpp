@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2005-2013 MaNGOS <http://getmangos.com/>
+ * Copyright (C) 2005-2012 MaNGOS <http://getmangos.com/>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -462,7 +462,7 @@ bool ChatHandler::HandleAccountOnlineListCommand(char* args)
 
     ///- Get the list of accounts ID logged to the realm
     //                                                 0   1         2        3        4
-    QueryResult* result = LoginDatabase.PQuery("SELECT id, username, last_ip, gmlevel, expansion FROM account WHERE active_realm_id = %u", realmID);
+    QueryResult* result = LoginDatabase.PQuery("SELECT a.id, a.username, a.last_ip, aa.gmlevel, a.expansion FROM account a LEFT JOIN account_access aa ON (a.id = aa.id) WHERE active_realm_id = %u", realmID);
 
     return ShowAccountListHelper(result, &limit);
 }

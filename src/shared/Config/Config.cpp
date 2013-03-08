@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2005-2013 MaNGOS <http://getmangos.com/>
+ * Copyright (C) 2005-2012 MaNGOS <http://getmangos.com/>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -19,7 +19,7 @@
 #include "Config.h"
 #include "ace/Configuration_Import_Export.h"
 
-#include "Policies/Singleton.h"
+#include "Policies/SingletonImp.h"
 
 INSTANTIATE_SINGLETON_1(Config);
 

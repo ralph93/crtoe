@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2005-2013 MaNGOS <http://getmangos.com/>
+ * Copyright (C) 2005-2012 MaNGOS <http://getmangos.com/>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -25,6 +25,7 @@
 #include "UpdateData.h"
 #include "ObjectGuid.h"
 #include "Camera.h"
+#include "Util.h"
 
 #include <set>
 #include <string>
@@ -44,20 +45,20 @@
 
 enum TempSummonType
 {
-    TEMPSUMMON_TIMED_DESPAWN               = 3,             // despawns after a specified time
-    TEMPSUMMON_CORPSE_DESPAWN              = 5,             // despawns instantly after death
-    TEMPSUMMON_CORPSE_TIMED_DESPAWN        = 6,             // despawns after a specified time after death (or when the creature disappears)
-    TEMPSUMMON_DEAD_DESPAWN                = 7,             // despawns when the creature disappears
-    TEMPSUMMON_MANUAL_DESPAWN              = 8,             // despawns when UnSummon() is called
-    // Renamed type
-    TEMPSUMMON_TIMED_DESPAWN_OUT_OF_COMBAT = 4,             // despawns after a specified time after the creature is out of combat
-    TEMPSUMMON_TIMED_OOC_DESPAWN           = TEMPSUMMON_TIMED_DESPAWN_OUT_OF_COMBAT,             // despawns after a specified time after the creature is out of combat
-    // Types that will get new meaning (as described)
     TEMPSUMMON_TIMED_OR_DEAD_DESPAWN       = 1,             // despawns after a specified time OR when the creature disappears
     TEMPSUMMON_TIMED_OR_CORPSE_DESPAWN     = 2,             // despawns after a specified time OR when the creature dies
-    // New types, currently same mechanics as old types
-    TEMPSUMMON_TIMED_OOC_OR_DEAD_DESPAWN   = TEMPSUMMON_TIMED_OR_DEAD_DESPAWN,             // despawns after a specified time (OOC) OR when the creature disappears
-    TEMPSUMMON_TIMED_OOC_OR_CORPSE_DESPAWN = TEMPSUMMON_TIMED_OR_CORPSE_DESPAWN,             // despawns after a specified time (OOC) OR when the creature dies
+    TEMPSUMMON_TIMED_DESPAWN               = 3,             // despawns after a specified time
+    TEMPSUMMON_TIMED_DESPAWN_OUT_OF_COMBAT = 4,             // despawns after a specified time after the creature is out of combat
+    TEMPSUMMON_CORPSE_DESPAWN              = 5,             // despawns instantly after death
+    TEMPSUMMON_CORPSE_TIMED_DESPAWN        = 6,             // despawns after a specified time after death
+    TEMPSUMMON_DEAD_DESPAWN                = 7,             // despawns when the creature disappears
+    TEMPSUMMON_MANUAL_DESPAWN              = 8              // despawns when UnSummon() is called
+};
+
+enum PhaseMasks
+{
+    PHASEMASK_NORMAL   = 0x00000001,
+    PHASEMASK_ANYWHERE = 0xFFFFFFFF
 };
 
 class WorldPacket;
@@ -90,9 +91,9 @@ struct WorldLocation
     float coord_z;
     float orientation;
     explicit WorldLocation(uint32 _mapid = 0, float _x = 0, float _y = 0, float _z = 0, float _o = 0)
-        : mapid(_mapid), coord_x(_x), coord_y(_y), coord_z(_z), orientation(_o) {}
+        : mapid(_mapid), coord_x(_x), coord_y(_y), coord_z(_z), orientation(NormalizeOrientation(_o)) {}
     WorldLocation(WorldLocation const& loc)
-        : mapid(loc.mapid), coord_x(loc.coord_x), coord_y(loc.coord_y), coord_z(loc.coord_z), orientation(loc.orientation) {}
+        : mapid(loc.mapid), coord_x(loc.coord_x), coord_y(loc.coord_y), coord_z(loc.coord_z), orientation(NormalizeOrientation(loc.orientation)) {}
 };
 
 
@@ -170,9 +171,8 @@ class MANGOS_DLL_SPEC Object
 
         void BuildValuesUpdateBlockForPlayer(UpdateData* data, Player* target) const;
         void BuildOutOfRangeUpdateBlock(UpdateData* data) const;
-        void BuildMovementUpdateBlock(UpdateData* data, uint8 flags = 0) const;
 
-        virtual void DestroyForPlayer(Player* target) const;
+        virtual void DestroyForPlayer(Player* target, bool anim = false) const;
 
         const int32& GetInt32Value(uint16 index) const
         {
@@ -234,7 +234,7 @@ class MANGOS_DLL_SPEC Object
         void ApplyPercentModFloatValue(uint16 index, float val, bool apply)
         {
             val = val != -100.0f ? val : -99.9f ;
-            SetFloatValue(index, GetFloatValue(index) *(apply ? (100.0f + val) / 100.0f : 100.0f / (100.0f + val)));
+            SetFloatValue(index, GetFloatValue(index) * (apply ? (100.0f + val) / 100.0f : 100.0f / (100.0f + val)));
         }
 
         void SetFlag(uint16 index, uint32 newFlag);
@@ -368,14 +368,14 @@ class MANGOS_DLL_SPEC Object
 
         virtual void _SetCreateBits(UpdateMask* updateMask, Player* target) const;
 
-        void BuildMovementUpdate(ByteBuffer* data, uint8 updateFlags) const;
+        void BuildMovementUpdate(ByteBuffer* data, uint16 updateFlags) const;
         void BuildValuesUpdate(uint8 updatetype, ByteBuffer* data, UpdateMask* updateMask, Player* target) const;
         void BuildUpdateDataForPlayer(Player* pl, UpdateDataMapType& update_players);
 
         uint16 m_objectType;
 
         uint8 m_objectTypeId;
-        uint8 m_updateFlag;
+        uint16 m_updateFlag;
 
         union
         {
@@ -384,7 +384,7 @@ class MANGOS_DLL_SPEC Object
             float*  m_floatValues;
         };
 
-        std::vector<bool> m_changedValues;
+        uint32* m_uint32Values_mirror;
 
         uint16 m_valuesCount;
 
@@ -437,7 +437,7 @@ class MANGOS_DLL_SPEC WorldObject : public Object
 
         virtual void Update(uint32 /*update_diff*/, uint32 /*time_diff*/) {}
 
-        void _Create(uint32 guidlow, HighGuid guidhigh);
+        void _Create(uint32 guidlow, HighGuid guidhigh, uint32 phaseMask);
 
         TransportInfo* GetTransportInfo() const { return m_transportInfo; }
         bool IsBoarded() const { return m_transportInfo != NULL; }
@@ -480,6 +480,11 @@ class MANGOS_DLL_SPEC WorldObject : public Object
         uint32 GetMapId() const { return m_mapId; }
         uint32 GetInstanceId() const { return m_InstanceId; }
 
+        virtual void SetPhaseMask(uint32 newPhaseMask, bool update);
+        uint32 GetPhaseMask() const { return m_phaseMask; }
+        bool InSamePhase(WorldObject const* obj) const { return InSamePhase(obj->GetPhaseMask()); }
+        bool InSamePhase(uint32 phasemask) const { return (GetPhaseMask() & phasemask); }
+
         uint32 GetZoneId() const;
         uint32 GetAreaId() const;
         void GetZoneAndAreaId(uint32& zoneid, uint32& areaid) const;
@@ -498,7 +503,7 @@ class MANGOS_DLL_SPEC WorldObject : public Object
         float GetDistanceZ(const WorldObject* obj) const;
         bool IsInMap(const WorldObject* obj) const
         {
-            return IsInWorld() && obj->IsInWorld() && (GetMap() == obj->GetMap());
+            return IsInWorld() && obj->IsInWorld() && (GetMap() == obj->GetMap()) && InSamePhase(obj);
         }
         bool IsWithinDist3d(float x, float y, float z, float dist2compare) const;
         bool IsWithinDist2d(float x, float y, float dist2compare) const;
@@ -596,7 +601,7 @@ class MANGOS_DLL_SPEC WorldObject : public Object
         explicit WorldObject();
 
         // these functions are used mostly for Relocate() and Corpse/Player specific stuff...
-        // use them ONLY in LoadFromDB()/Create() funcs and nowhere else!
+        // use them ONLY in LoadFromDB()/Create()  funcs and nowhere else!
         // mapId/instanceId should be set in SetMap() function!
         void SetLocationMapId(uint32 _mapId) { m_mapId = _mapId; }
         void SetLocationInstanceId(uint32 _instanceId) { m_InstanceId = _instanceId; }
@@ -612,6 +617,7 @@ class MANGOS_DLL_SPEC WorldObject : public Object
 
         uint32 m_mapId;                                     // object at map with map_id
         uint32 m_InstanceId;                                // in map copy with instance id
+        uint32 m_phaseMask;                                 // in area phase state
 
         Position m_position;
         ViewPoint m_viewPoint;

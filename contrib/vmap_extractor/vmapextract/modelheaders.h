@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2005-2013 MaNGOS <http://getmangos.com/>
+ * Copyright (C) 2005-2012 MaNGOS <http://getmangos.com/>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -19,12 +19,7 @@
 #ifndef MODELHEADERS_H
 #define MODELHEADERS_H
 
-/* typedef unsigned char uint8;
-typedef char int8;
-typedef unsigned short uint16;
-typedef short int16;
-typedef unsigned int uint32;
-typedef int int32; */
+#include "mpqfile.h"    // integer typedefs
 
 #pragma pack(push,1)
 
@@ -41,8 +36,6 @@ struct ModelHeader
     uint32 ofsAnimations;
     uint32 nAnimationLookup;
     uint32 ofsAnimationLookup;
-    uint32 nD;
-    uint32 ofsD;
     uint32 nBones;
     uint32 ofsBones;
     uint32 nKeyBoneLookup;
@@ -50,15 +43,12 @@ struct ModelHeader
     uint32 nVertices;
     uint32 ofsVertices;
     uint32 nViews;
-    uint32 ofsViews;
     uint32 nColors;
     uint32 ofsColors;
     uint32 nTextures;
     uint32 ofsTextures;
     uint32 nTransparency;
     uint32 ofsTransparency;
-    uint32 nI;
-    uint32 ofsI;
     uint32 nTextureanimations;
     uint32 ofsTextureanimations;
     uint32 nTexReplace;
@@ -98,27 +88,6 @@ struct ModelHeader
     uint32 ofsRibbonEmitters;
     uint32 nParticleEmitters;
     uint32 ofsParticleEmitters;
-
-};
-
-struct ModelVertex
-{
-    Vec3D pos;
-    uint8 weights[4];
-    uint8 bones[4];
-    Vec3D normal;
-    Vec2D texcoords;
-    int unk1, unk2; // always 0,0 so this is probably unused
-};
-
-struct ModelView
-{
-    uint32 nIndex, ofsIndex; // Vertices in this model (index into vertices[])
-    uint32 nTris, ofsTris;   // indices
-    uint32 nProps, ofsProps; // additional vtx properties
-    uint32 nSub, ofsSub;     // materials/renderops/submeshes
-    uint32 nTex, ofsTex;     // material properties/textures
-    int32 lod;               // LOD bias?
 };
 
 #pragma pack(pop)

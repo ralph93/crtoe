@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2005-2013 MaNGOS <http://getmangos.com/>
+ * Copyright (C) 2005-2012 MaNGOS <http://getmangos.com/>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -106,7 +106,7 @@ void AggressorAI::EnterEvadeMode()
 
     if (!m_creature->isCharmed())
     {
-        m_creature->RemoveAllAurasOnEvade();
+        m_creature->RemoveAllAuras();
 
         // Remove ChaseMovementGenerator from MotionMaster stack list, and add HomeMovementGenerator instead
         if (m_creature->GetMotionMaster()->GetCurrentMovementGeneratorType() == CHASE_MOTION_TYPE)
@@ -152,6 +152,6 @@ AggressorAI::AttackStart(Unit* u)
         m_creature->SetInCombatWith(u);
         u->SetInCombatWith(m_creature);
 
-        HandleMovementOnAttackStart(u);
+        m_creature->GetMotionMaster()->MoveChase(u);
     }
 }

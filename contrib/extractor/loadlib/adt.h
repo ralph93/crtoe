@@ -9,10 +9,10 @@
 
 enum LiquidType
 {
-    LIQUID_TYPE_MAGMA = 0,
+    LIQUID_TYPE_WATER = 0,
     LIQUID_TYPE_OCEAN = 1,
-    LIQUID_TYPE_SLIME = 2,
-    LIQUID_TYPE_WATER = 3
+    LIQUID_TYPE_MAGMA = 2,
+    LIQUID_TYPE_SLIME = 3
 };
 
 //**************************************************************************************
@@ -25,6 +25,7 @@ enum LiquidType
 //
 // Adt file height map chunk
 //
+class ADT_file;
 class adt_MCVT
 {
         union
@@ -262,9 +263,11 @@ class adt_MHDR
             uint32 fcc;
             char   fcc_txt[4];
         };
+
+    public:
         uint32 size;
 
-        uint32 pad;
+        uint32 flags;
         uint32 offsMCIN;           // MCIN
         uint32 offsTex;            // MTEX
         uint32 offsModels;         // MMDX
@@ -282,8 +285,8 @@ class adt_MHDR
         uint32 data5;
     public:
         bool prepareLoadedData();
-        adt_MCIN* getMCIN() { return (adt_MCIN*)((uint8*)&pad + offsMCIN);}
-        adt_MH2O* getMH2O() { return offsMH2O ? (adt_MH2O*)((uint8*)&pad + offsMH2O) : 0;}
+        adt_MCIN* getMCIN() { return offsMCIN ? (adt_MCIN*)((uint8*)&flags + offsMCIN) : 0; }
+        adt_MH2O* getMH2O() { return offsMH2O ? (adt_MH2O*)((uint8*)&flags + offsMH2O) : 0; }
 
 };
 
@@ -296,6 +299,7 @@ class ADT_file : public FileLoader
         void free();
 
         adt_MHDR* a_grid;
+        adt_MCNK* cells[ADT_CELLS_PER_GRID][ADT_CELLS_PER_GRID];
 };
 
 bool isHole(int holes, int i, int j);

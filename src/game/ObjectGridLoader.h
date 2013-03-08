@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2005-2013 MaNGOS <http://getmangos.com/>
+ * Copyright (C) 2005-2012 MaNGOS <http://getmangos.com/>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -74,7 +74,7 @@ class MANGOS_DLL_DECL ObjectGridUnloader
         }
 
         void Unload(GridType& grid);
-        template<class T> void Visit(GridRefManager<T> &m);
+        template<class T> void Visit(GridRefManager<T>& m);
     private:
         NGridType& i_grid;
 };
@@ -100,7 +100,7 @@ class MANGOS_DLL_DECL ObjectGridStoper
         void Stop(GridType& grid);
         void Visit(CreatureMapType& m);
 
-        template<class NONACTIVE> void Visit(GridRefManager<NONACTIVE> &) {}
+        template<class NONACTIVE> void Visit(GridRefManager<NONACTIVE>&) {}
     private:
         NGridType& i_grid;
 };

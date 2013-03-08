@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2005-2013 MaNGOS <http://getmangos.com/>
+ * Copyright (C) 2005-2012 MaNGOS <http://getmangos.com/>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -28,7 +28,7 @@
 #include "BattleGround/BattleGroundMgr.h"
 #include "MassMailMgr.h"
 #include "SpellMgr.h"
-#include "Policies/Singleton.h"
+#include "Policies/SingletonImp.h"
 
 INSTANTIATE_SINGLETON_1(GameEventMgr);
 
@@ -153,8 +153,18 @@ void GameEventMgr::LoadFromDB()
 
             if (pGameEvent.occurence < pGameEvent.length)   // occurence < length is useless. This also asserts that occurence > 0!
             {
+                pGameEvent.length = 0;                      // disable event (GameEventData::isValid() returns false when it gets updated)
                 sLog.outErrorDb("`game_event` game event id (%i) has occurence %u  < length %u and can't be used.", event_id, pGameEvent.occurence, pGameEvent.length);
                 continue;
+            }
+
+            if (pGameEvent.holiday_id != HOLIDAY_NONE)
+            {
+                if (!sHolidaysStore.LookupEntry(pGameEvent.holiday_id))
+                {
+                    sLog.outErrorDb("`game_event` game event id (%i) have nonexistent holiday id %u.", event_id, pGameEvent.holiday_id);
+                    pGameEvent.holiday_id = HOLIDAY_NONE;
+                }
             }
 
             pGameEvent.description  = fields[6].GetCppString();
@@ -392,9 +402,9 @@ void GameEventMgr::LoadFromDB()
             newData.spell_id_start = fields[5].GetUInt32();
             newData.spell_id_end = fields[6].GetUInt32();
 
-            if (newData.equipment_id && !sObjectMgr.GetEquipmentInfo(newData.equipment_id) && !sObjectMgr.GetEquipmentInfoRaw(newData.equipment_id))
+            if (newData.equipment_id && !sObjectMgr.GetEquipmentInfo(newData.equipment_id))
             {
-                sLog.outErrorDb("Table `game_event_creature_data` have creature (Guid: %u) with equipment_id %u not found in table `creature_equip_template` or `creature_equip_template_raw`, set to no equipment.", guid, newData.equipment_id);
+                sLog.outErrorDb("Table `game_event_creature_data` have creature (Guid: %u) with equipment_id %u not found in table `creature_equip_template`, set to no equipment.", guid, newData.equipment_id);
                 newData.equipment_id = 0;
             }
 
@@ -614,6 +624,9 @@ uint32 GameEventMgr::Update(ActiveEvents const* activeAtShutdown /*= NULL*/)
     uint32 calcDelay;
     for (uint16 itr = 1; itr < mGameEvent.size(); ++itr)
     {
+        if (!mGameEvent[itr].isValid())
+            continue;
+
         // sLog.outErrorDb("Checking event %u",itr);
         if (CheckOneGameEvent(itr, currenttime))
         {
@@ -636,6 +649,7 @@ uint32 GameEventMgr::Update(ActiveEvents const* activeAtShutdown /*= NULL*/)
                     int16 event_nid = (-1) * (itr);
                     // spawn all negative ones for this event
                     GameEventSpawn(event_nid);
+                    UpdateWorldStates(itr, false);
                 }
             }
         }
@@ -662,6 +676,7 @@ void GameEventMgr::UnApplyEvent(uint16 event_id)
     UpdateCreatureData(event_id, false);
     // Remove quests that are events only to non event npc
     UpdateEventQuests(event_id, false);
+    UpdateWorldStates(event_id, false);
     SendEventMails(event_nid);
 }
 
@@ -683,6 +698,7 @@ void GameEventMgr::ApplyNewEvent(uint16 event_id, bool resume)
     UpdateCreatureData(event_id, true);
     // Add quests that are events only to non event npc
     UpdateEventQuests(event_id, true);
+    UpdateWorldStates(event_id, true);
 
     // Not send mails at game event startup, if game event just resume after server shutdown (has been active at server before shutdown)
     if (!resume)
@@ -920,6 +936,25 @@ void GameEventMgr::UpdateEventQuests(uint16 event_id, bool Activate)
         //}
 
         const_cast<Quest*>(pQuest)->SetQuestActiveState(Activate);
+    }
+}
+
+void GameEventMgr::UpdateWorldStates(uint16 event_id, bool Activate)
+{
+    GameEventData const& event = mGameEvent[event_id];
+    if (event.holiday_id != HOLIDAY_NONE)
+    {
+        BattleGroundTypeId bgTypeId = BattleGroundMgr::WeekendHolidayIdToBGType(event.holiday_id);
+        if (bgTypeId != BATTLEGROUND_TYPE_NONE)
+        {
+            BattlemasterListEntry const* bl = sBattlemasterListStore.LookupEntry(bgTypeId);
+            if (bl && bl->HolidayWorldStateId)
+            {
+                WorldPacket data;
+                sBattleGroundMgr.BuildUpdateWorldStatePacket(&data, bl->HolidayWorldStateId, Activate ? 1 : 0);
+                sWorld.SendGlobalMessage(&data);
+            }
+        }
     }
 }
 

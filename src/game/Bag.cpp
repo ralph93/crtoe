@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2005-2013 MaNGOS <http://getmangos.com/>
+ * Copyright (C) 2005-2012 MaNGOS <http://getmangos.com/>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -183,6 +183,15 @@ Item* Bag::GetItemByEntry(uint32 item) const
     return NULL;
 }
 
+Item* Bag::GetItemByLimitedCategory(uint32 limitedCategory) const
+{
+    for (uint32 i = 0; i < GetBagSize(); ++i)
+        if (m_bagslot[i] && m_bagslot[i]->GetProto()->ItemLimitCategory == limitedCategory)
+            return m_bagslot[i];
+
+    return NULL;
+}
+
 uint32 Bag::GetItemCount(uint32 item, Item* eItem) const
 {
     uint32 count = 0;
@@ -197,6 +206,18 @@ uint32 Bag::GetItemCount(uint32 item, Item* eItem) const
             if (m_bagslot[i])
                 if (m_bagslot[i] != eItem && m_bagslot[i]->GetProto()->Socket[0].Color)
                     count += m_bagslot[i]->GetGemCountWithID(item);
+
+    return count;
+}
+
+uint32 Bag::GetItemCountWithLimitCategory(uint32 limitCategory, Item* eItem) const
+{
+    uint32 count = 0;
+
+    for (uint32 i = 0; i < GetBagSize(); ++i)
+        if (m_bagslot[i])
+            if (m_bagslot[i] != eItem && m_bagslot[i]->GetProto()->ItemLimitCategory == limitCategory)
+                count += m_bagslot[i]->GetCount();
 
     return count;
 }

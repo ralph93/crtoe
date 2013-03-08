@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2005-2013 MaNGOS <http://getmangos.com/>
+ * Copyright (C) 2005-2012 MaNGOS <http://getmangos.com/>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -42,6 +42,7 @@
 
 #include "Common.h"
 #include "Auth/AuthCrypt.h"
+#include "Auth/BigNumber.h"
 
 class ACE_Message_Block;
 class WorldPacket;
@@ -101,9 +102,6 @@ class WorldSocket : protected WorldHandler
         typedef ACE_Thread_Mutex LockType;
         typedef ACE_Guard<LockType> GuardType;
 
-        /// Queue for storing packets for which there is no space.
-        typedef ACE_Unbounded_Queue< WorldPacket* > PacketQueueT;
-
         /// Check if socket is closed.
         bool IsClosed(void) const;
 
@@ -124,12 +122,17 @@ class WorldSocket : protected WorldHandler
         /// Remove reference to this object.
         long RemoveReference(void);
 
+        /// Return the session key
+        BigNumber& GetSessionKey() { return m_s; }
+
     protected:
         /// things called by ACE framework.
         WorldSocket(void);
         virtual ~WorldSocket(void);
 
         /// Called on open ,the void* is the acceptor.
+        int HandleWowConnection(WorldPacket& recvPacket);
+
         virtual int open(void*) override;
 
         /// Called on failures inside of the acceptor, don't call from your code.
@@ -159,6 +162,9 @@ class WorldSocket : protected WorldHandler
         int cancel_wakeup_output(GuardType& g);
         int schedule_wakeup_output(GuardType& g);
 
+        /// Drain the queue if its not empty.
+        int handle_output_queue(GuardType& g);
+
         /// process one incoming packet.
         /// @param new_pct received packet ,note that you need to delete it.
         int ProcessIncoming(WorldPacket* new_pct);
@@ -168,16 +174,6 @@ class WorldSocket : protected WorldHandler
 
         /// Called by ProcessIncoming() on CMSG_PING.
         int HandlePing(WorldPacket& recvPacket);
-
-        /// Try to write WorldPacket to m_OutBuffer ,return -1 if no space
-        /// Need to be called with m_OutBufferLock lock held
-        int iSendPacket(const WorldPacket& pct);
-
-        /// Flush m_PacketQueue if there are packets in it
-        /// Need to be called with m_OutBufferLock lock held
-        /// @return true if it wrote to the buffer ( AKA you need
-        /// to mark the socket for output ).
-        bool iFlushPacketQueue();
 
     private:
         /// Time in which the last ping was received
@@ -218,14 +214,12 @@ class WorldSocket : protected WorldHandler
         /// Size of the m_OutBuffer.
         size_t m_OutBufferSize;
 
-        /// Here are stored packets for which there was no space on m_OutBuffer,
-        /// this allows not-to kick player if its buffer is overflowed.
-        PacketQueueT m_PacketQueue;
-
         /// True if the socket is registered with the reactor for output
         bool m_OutActive;
 
         uint32 m_Seed;
+
+        BigNumber m_s;
 };
 
 #endif  /* _WORLDSOCKET_H */

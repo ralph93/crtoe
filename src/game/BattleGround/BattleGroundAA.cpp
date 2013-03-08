@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2005-2013 MaNGOS <http://getmangos.com/>
+ * Copyright (C) 2005-2012 MaNGOS <http://getmangos.com/>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -35,6 +35,24 @@ BattleGroundAA::BattleGroundAA()
     m_StartMessageIds[BG_STARTING_EVENT_FOURTH] = LANG_ARENA_HAS_BEGUN;
 }
 
+BattleGroundAA::~BattleGroundAA()
+{
+
+}
+
+void BattleGroundAA::Update(uint32 diff)
+{
+    BattleGround::Update(diff);
+}
+
+void BattleGroundAA::StartingEventCloseDoors()
+{
+}
+
+void BattleGroundAA::StartingEventOpenDoors()
+{
+}
+
 void BattleGroundAA::AddPlayer(Player* plr)
 {
     BattleGround::AddPlayer(plr);
@@ -42,4 +60,22 @@ void BattleGroundAA::AddPlayer(Player* plr)
     BattleGroundAAScore* sc = new BattleGroundAAScore;
 
     m_PlayerScores[plr->GetObjectGuid()] = sc;
+}
+
+void BattleGroundAA::RemovePlayer(Player* /*plr*/, ObjectGuid /*guid*/)
+{
+}
+
+void BattleGroundAA::HandleKillPlayer(Player* player, Player* killer)
+{
+    BattleGround::HandleKillPlayer(player, killer);
+}
+
+void BattleGroundAA::HandleAreaTrigger(Player* /*Source*/, uint32 /*Trigger*/)
+{
+}
+
+bool BattleGroundAA::SetupBattleGround()
+{
+    return true;
 }

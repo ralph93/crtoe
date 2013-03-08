@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2005-2013 MaNGOS <http://getmangos.com/>
+ * Copyright (C) 2005-2012 MaNGOS <http://getmangos.com/>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -27,7 +27,8 @@
 
 #include "MovementGenerator.h"
 #include "WaypointManager.h"
-#include "DBCStructure.h"
+
+#include "Player.h"
 
 #include <vector>
 #include <set>
@@ -82,19 +83,26 @@ class MANGOS_DLL_SPEC WaypointMovementGenerator<Creature>
 
         bool GetResetPosition(Creature&, float& x, float& y, float& z);
 
-        void AddToWaypointPauseTime(int32 waitTimeDiff);
-
-        uint32 getLastReachedWaypoint() const { return m_isArrivalDone ? i_currentNode + 1 : i_currentNode; }
-
     private:
+
         void Stop(int32 time) { i_nextMoveTime.Reset(time); }
-        bool Stopped(Creature& u);
-        bool CanMove(int32 diff, Creature& u);
+
+        bool Stopped() { return !i_nextMoveTime.Passed(); }
+
+        bool CanMove(int32 diff)
+        {
+            i_nextMoveTime.Update(diff);
+            return i_nextMoveTime.Passed();
+        }
 
         void OnArrived(Creature&);
         void StartMove(Creature&);
 
-        void StartMoveNow(Creature& creature);
+        void StartMoveNow(Creature& creature)
+        {
+            i_nextMoveTime.Reset(0);
+            StartMove(creature);
+        }
 
         ShortTimeTracker i_nextMoveTime;
         bool m_isArrivalDone;

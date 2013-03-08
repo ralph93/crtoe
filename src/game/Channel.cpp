@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2005-2013 MaNGOS <http://getmangos.com/>
+ * Copyright (C) 2005-2012 MaNGOS <http://getmangos.com/>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -81,9 +81,7 @@ void Channel::Join(ObjectGuid p, const char* pass)
 
     if (plr)
     {
-        if (HasFlag(CHANNEL_FLAG_LFG) &&
-                sWorld.getConfig(CONFIG_BOOL_RESTRICTED_LFG_CHANNEL) && plr->GetSession()->GetSecurity() == SEC_PLAYER &&
-                (plr->GetGroup() || plr->m_lookingForGroup.Empty()))
+        if (HasFlag(CHANNEL_FLAG_LFG) && sWorld.getConfig(CONFIG_BOOL_RESTRICTED_LFG_CHANNEL) && plr->GetSession()->GetSecurity() == SEC_PLAYER)
         {
             MakeNotInLfg(&data);
             SendToOne(&data, p);
@@ -437,7 +435,7 @@ void Channel::List(Player* player)
     }
     else
     {
-        WorldPacket data(SMSG_CHANNEL_LIST, 1 + (GetName().size() + 1) + 1 + 4 + m_players.size()*(8 + 1));
+        WorldPacket data(SMSG_CHANNEL_LIST, 1 + (GetName().size() + 1) + 1 + 4 + m_players.size() * (8 + 1));
         data << uint8(1);                                   // channel type?
         data << GetName();                                  // channel name
         data << uint8(GetFlags());                          // channel flags?

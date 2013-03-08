@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2005-2013 MaNGOS <http://getmangos.com/>
+ * Copyright (C) 2005-2012 MaNGOS <http://getmangos.com/>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -39,10 +39,14 @@ void CharacterDatabaseCleaner::CleanDatabase()
     delete result;
 
     // clean up
+    if (flags & CLEANING_FLAG_ACHIEVEMENT_PROGRESS)
+        CleanCharacterAchievementProgress();
     if (flags & CLEANING_FLAG_SKILLS)
         CleanCharacterSkills();
     if (flags & CLEANING_FLAG_SPELLS)
         CleanCharacterSpell();
+    if (flags & CLEANING_FLAG_TALENTS)
+        CleanCharacterTalent();
     CharacterDatabase.Execute("UPDATE saved_variables SET cleaning_flags = 0");
 }
 
@@ -88,6 +92,16 @@ void CharacterDatabaseCleaner::CheckUnique(const char* column, const char* table
     }
 }
 
+bool CharacterDatabaseCleaner::AchievementProgressCheck(uint32 criteria)
+{
+    return sAchievementCriteriaStore.LookupEntry(criteria);
+}
+
+void CharacterDatabaseCleaner::CleanCharacterAchievementProgress()
+{
+    CheckUnique("criteria", "character_achievement_progress", &AchievementProgressCheck);
+}
+
 bool CharacterDatabaseCleaner::SkillCheck(uint32 skill)
 {
     return sSkillLineStore.LookupEntry(skill);
@@ -100,10 +114,26 @@ void CharacterDatabaseCleaner::CleanCharacterSkills()
 
 bool CharacterDatabaseCleaner::SpellCheck(uint32 spell_id)
 {
-    return sSpellStore.LookupEntry(spell_id);
+    return sSpellStore.LookupEntry(spell_id) && !GetTalentSpellPos(spell_id);
 }
 
 void CharacterDatabaseCleaner::CleanCharacterSpell()
 {
     CheckUnique("spell", "character_spell", &SpellCheck);
+}
+
+bool CharacterDatabaseCleaner::TalentCheck(uint32 talent_id)
+{
+    TalentEntry const* talentInfo = sTalentStore.LookupEntry(talent_id);
+    if (!talentInfo)
+        return false;
+
+    return sTalentTabStore.LookupEntry(talentInfo->TalentTab);
+}
+
+void CharacterDatabaseCleaner::CleanCharacterTalent()
+{
+    CharacterDatabase.DirectPExecute("DELETE FROM character_talent WHERE spec > %u OR current_rank > %u", MAX_TALENT_SPEC_COUNT, MAX_TALENT_RANK);
+
+    CheckUnique("talent_id", "character_talent", &TalentCheck);
 }

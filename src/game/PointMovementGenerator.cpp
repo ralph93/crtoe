@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2005-2013 MaNGOS <http://getmangos.com/>
+ * Copyright (C) 2005-2012 MaNGOS <http://getmangos.com/>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -29,9 +29,6 @@
 template<class T>
 void PointMovementGenerator<T>::Initialize(T& unit)
 {
-    if (unit.hasUnitState(UNIT_STAT_CAN_NOT_REACT | UNIT_STAT_NOT_MOVE))
-        return;
-
     if (!unit.IsStopped())
         unit.StopMoving();
 
@@ -77,9 +74,7 @@ bool PointMovementGenerator<T>::Update(T& unit, const uint32& diff)
         return true;
     }
 
-    if (!unit.hasUnitState(UNIT_STAT_ROAMING_MOVE) && unit.movespline->Finalized())
-        Initialize(unit);
-
+    unit.addUnitState(UNIT_STAT_ROAMING_MOVE);
     return !unit.movespline->Finalized();
 }
 
@@ -97,7 +92,7 @@ void PointMovementGenerator<Creature>::MovementInform(Creature& unit)
     if (unit.IsTemporarySummon())
     {
         TemporarySummon* pSummon = (TemporarySummon*)(&unit);
-        if (pSummon->GetSummonerGuid().IsCreature())
+        if (pSummon->GetSummonerGuid().IsCreatureOrVehicle())
             if (Creature* pSummoner = unit.GetMap()->GetCreature(pSummon->GetSummonerGuid()))
                 if (pSummoner->AI())
                     pSummoner->AI()->SummonedMovementInform(&unit, POINT_MOTION_TYPE, id);
@@ -138,7 +133,7 @@ void EffectMovementGenerator::Finalize(Unit& unit)
     if (((Creature&)unit).AI() && unit.movespline->Finalized())
         ((Creature&)unit).AI()->MovementInform(EFFECT_MOTION_TYPE, m_Id);
     // Need restore previous movement since we have no proper states system
-    if (unit.isAlive() && !unit.hasUnitState(UNIT_STAT_CONFUSED | UNIT_STAT_FLEEING | UNIT_STAT_NO_COMBAT_MOVEMENT))
+    if (unit.isAlive() && !unit.hasUnitState(UNIT_STAT_CONFUSED | UNIT_STAT_FLEEING))
     {
         if (Unit* victim = unit.getVictim())
             unit.GetMotionMaster()->MoveChase(victim);

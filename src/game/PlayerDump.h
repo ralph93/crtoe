@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2005-2013 MaNGOS <http://getmangos.com/>
+ * Copyright (C) 2005-2012 MaNGOS <http://getmangos.com/>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -27,13 +27,16 @@ enum DumpTableType
 {
     DTT_CHARACTER,      //    -> guid, name                 // characters
 
-    DTT_CHAR_TABLE,     //                                  // character_action,
-    // character_aura
+    DTT_CHAR_TABLE,     //                                  // character_account_data, character_achievement,
+    // character_achievement_progress, character_action,
+    // character_aura, character_glyphs,
     // character_homebind, character_queststatus,
-    // character_reputation, character_spell,
-    // character_spell_cooldown, character_ticket
+    // character_reputation, character_skills, character_spell,
+    // character_spell_cooldown, character_talent, character_ticket
 
     DTT_CHAR_NAME_TABLE,// <- guid, name                    // character_declinedname
+
+    DTT_EQSET_TABLE,    // <- guid                          // character_equipmentsets
 
     DTT_INVENTORY,      //    -> item guids collection      // character_inventory
 
@@ -44,7 +47,6 @@ enum DumpTableType
     //    -> item guids collection
 
     DTT_ITEM,           // <- item guids                    // item_instance
-    //    -> item_text
 
     DTT_ITEM_GIFT,      // <- item guids                    // character_gifts
 
@@ -52,7 +54,6 @@ enum DumpTableType
 
     DTT_PET,            //    -> pet guids collection       // character_pet
     DTT_PET_TABLE,      // <- pet guids                     // pet_aura, pet_spell, pet_spell_cooldown
-    DTT_ITEM_TEXT,      // <- item_text                     // item_text
     DTT_PET_DECL,       // <- pet guids                     // character_pet_declinedname
 };
 
@@ -88,7 +89,6 @@ class PlayerDumpWriter : public PlayerDump
         GUIDs pets;
         GUIDs mails;
         GUIDs items;
-        GUIDs texts;
 };
 
 class PlayerDumpReader : public PlayerDump

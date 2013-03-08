@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2005-2013 MaNGOS <http://getmangos.com/>
+ * Copyright (C) 2005-2012 MaNGOS <http://getmangos.com/>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -138,6 +138,13 @@ void BattleGroundAB::Update(uint32 diff)
                     UpdateWorldState(BG_AB_OP_RESOURCES_ALLY, m_TeamScores[team]);
                 if (team == BG_TEAM_HORDE)
                     UpdateWorldState(BG_AB_OP_RESOURCES_HORDE, m_TeamScores[team]);
+
+                // update achievement flags
+                // we increased m_TeamScores[team] so we just need to check if it is 500 more than other teams resources
+                // horde will be a bit disadvantaged, but we can assume that points aren't updated for both team in same Update() call
+                uint8 otherTeam = (team + 1) % BG_TEAMS_COUNT;
+                if (m_TeamScores[team] > m_TeamScores[otherTeam] + 500)
+                    m_TeamScores500Disadvantage[otherTeam] = true;
             }
         }
 
@@ -152,6 +159,9 @@ void BattleGroundAB::Update(uint32 diff)
 void BattleGroundAB::StartingEventOpenDoors()
 {
     OpenDoorEvent(BG_EVENT_DOOR);
+
+    // Players that join battleground after start are not eligible to get achievement.
+    StartTimedAchievement(ACHIEVEMENT_CRITERIA_TYPE_WIN_BG, AB_EVENT_START_BATTLE);
 }
 
 void BattleGroundAB::AddPlayer(Player* plr)
@@ -163,7 +173,7 @@ void BattleGroundAB::AddPlayer(Player* plr)
     m_PlayerScores[plr->GetObjectGuid()] = sc;
 }
 
-void BattleGroundAB::RemovePlayer(Player * /*plr*/, ObjectGuid /*guid*/)
+void BattleGroundAB::RemovePlayer(Player* /*plr*/, ObjectGuid /*guid*/)
 {
 
 }
@@ -227,7 +237,7 @@ int32 BattleGroundAB::_GetNodeNameId(uint8 node)
         case BG_AB_NODE_STABLES:    return LANG_BG_AB_NODE_STABLES;
         case BG_AB_NODE_BLACKSMITH: return LANG_BG_AB_NODE_BLACKSMITH;
         case BG_AB_NODE_FARM:       return LANG_BG_AB_NODE_FARM;
-        case BG_AB_NODE_LUMBER_MILL:return LANG_BG_AB_NODE_LUMBER_MILL;
+        case BG_AB_NODE_LUMBER_MILL: return LANG_BG_AB_NODE_LUMBER_MILL;
         case BG_AB_NODE_GOLD_MINE:  return LANG_BG_AB_NODE_GOLD_MINE;
         default:
             MANGOS_ASSERT(0);
@@ -426,6 +436,7 @@ void BattleGroundAB::Reset()
         m_lastTick[i] = 0;
         m_honorScoreTicks[i] = 0;
         m_ReputationScoreTics[i] = 0;
+        m_TeamScores500Disadvantage[i] = false;
     }
 
     m_IsInformedNearVictory = false;
@@ -494,7 +505,7 @@ WorldSafeLocsEntry const* BattleGroundAB::GetClosestGraveYard(Player* player)
     }
     // If not, place ghost on starting location
     if (!good_entry)
-        good_entry = sWorldSafeLocsStore.LookupEntry(BG_AB_GraveyardIds[teamIndex+5]);
+        good_entry = sWorldSafeLocsStore.LookupEntry(BG_AB_GraveyardIds[teamIndex + 5]);
 
     return good_entry;
 }
@@ -517,4 +528,14 @@ void BattleGroundAB::UpdatePlayerScore(Player* source, uint32 type, uint32 value
             BattleGround::UpdatePlayerScore(source, type, value);
             break;
     }
+}
+
+bool BattleGroundAB::IsAllNodesControlledByTeam(Team team) const
+{
+    for (uint8 i = 0; i < BG_AB_NODES_MAX; ++i)
+        if ((team == ALLIANCE && m_Nodes[i] != BG_AB_NODE_STATUS_ALLY_OCCUPIED) ||
+                (team == HORDE && m_Nodes[i] != BG_AB_NODE_STATUS_HORDE_OCCUPIED))
+            return false;
+
+    return true;
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2005-2013 MaNGOS <http://getmangos.com/>
+ * Copyright (C) 2005-2012 MaNGOS <http://getmangos.com/>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -299,6 +299,10 @@ void AuthSocket::SendProof(Sha1Hash sha)
         case 11403:                                         // 3.3.2
         case 11723:                                         // 3.3.3a
         case 12340:                                         // 3.3.5a
+        case 13623:                                         // 4.0.6a
+        case 15050:                                         // 4.3.0
+        case 15595:                                         // 4.3.4
+        case 16357:                                         // 5.1.0
         default:                                            // or later
         {
             sAuthLogonProof_S proof;
@@ -389,7 +393,7 @@ bool AuthSocket::_HandleLogonChallenge()
         ///- Get the account details from the account table
         // No SQL injection (escaped user name)
 
-        result = LoginDatabase.PQuery("SELECT sha_pass_hash,id,locked,last_ip,gmlevel,v,s FROM account WHERE username = '%s'", _safelogin.c_str());
+        result = LoginDatabase.PQuery("SELECT a.sha_pass_hash,a.id,a.locked,a.last_ip,aa.gmlevel,a.v,a.s FROM account a LEFT JOIN account_access aa ON (a.id = aa.id) WHERE username = '%s'", _safelogin.c_str());
         if (result)
         {
             ///- If the IP is 'locked', check that the player comes indeed from the correct IP address
@@ -954,6 +958,10 @@ void AuthSocket::LoadRealmlist(ByteBuffer& pkt, uint32 acctid)
         case 11403:                                         // 3.3.2
         case 11723:                                         // 3.3.3a
         case 12340:                                         // 3.3.5a
+        case 13623:                                         // 4.0.6a
+        case 15050:                                         // 4.3.0
+        case 15595:                                         // 4.3.4
+        case 16357:                                         // 5.1.0
         default:                                            // and later
         {
             pkt << uint32(0);                               // unused value

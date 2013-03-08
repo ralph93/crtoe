@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2005-2013 MaNGOS <http://getmangos.com/>
+ * Copyright (C) 2005-2012 MaNGOS <http://getmangos.com/>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -16,13 +16,17 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
+#define _CRT_SECURE_NO_WARNINGS
+
 #include "vmapexport.h"
 #include "model.h"
 #include "wmo.h"
-#include "mpq_libmpq04.h"
+#include "mpqfile.h"
 #include <cassert>
 #include <algorithm>
 #include <cstdio>
+
+extern HANDLE WorldMpq;
 
 Model::Model(std::string& filename) : filename(filename), vertices(0), indices(0)
 {
@@ -30,7 +34,7 @@ Model::Model(std::string& filename) : filename(filename), vertices(0), indices(0
 
 bool Model::open(StringSet& failedPaths)
 {
-    MPQFile f(filename.c_str());
+    MPQFile f(WorldMpq, filename.c_str());
 
     ok = !f.isEof();
 
@@ -46,25 +50,18 @@ bool Model::open(StringSet& failedPaths)
     memcpy(&header, f.getBuffer(), sizeof(ModelHeader));
     if (header.nBoundingTriangles > 0)
     {
-        origVertices = (ModelVertex*)(f.getBuffer() + header.ofsVertices);
-        vertices = new Vec3D[header.nVertices];
-
-        for (size_t i = 0; i < header.nVertices; i++)
+        f.seek(0);
+        f.seekRelative(header.ofsBoundingVertices);
+        vertices = new Vec3D[header.nBoundingVertices];
+        f.read(vertices, header.nBoundingVertices * 12);
+        for (uint32 i = 0; i < header.nBoundingVertices; i++)
         {
-            vertices[i] = fixCoordSystem(origVertices[i].pos);;
+            vertices[i] = fixCoordSystem(vertices[i]);
         }
-
-        ModelView* view = (ModelView*)(f.getBuffer() + header.ofsViews);
-
-        uint16* indexLookup = (uint16*)(f.getBuffer() + view->ofsIndex);
-        uint16* triangles = (uint16*)(f.getBuffer() + view->ofsTris);
-
-        nIndices = view->nTris;
-        indices = new uint16[nIndices];
-        for (size_t i = 0; i < nIndices; i++)
-        {
-            indices[i] = indexLookup[triangles[i]];
-        }
+        f.seek(0);
+        f.seekRelative(header.ofsBoundingTriangles);
+        indices = new uint16[header.nBoundingTriangles];
+        f.read(indices, header.nBoundingTriangles * 2);
         f.close();
     }
     else
@@ -87,7 +84,7 @@ bool Model::ConvertToVMAPModel(const char* outfilename)
     }
     fwrite(szRawVMAPMagic, 8, 1, output);
     uint32 nVertices = 0;
-    nVertices = header.nVertices;
+    nVertices = header.nBoundingVertices;
     fwrite(&nVertices, sizeof(int), 1, output);
     uint32 nofgroups = 1;
     fwrite(&nofgroups, sizeof(uint32), 1, output);
@@ -100,7 +97,8 @@ bool Model::ConvertToVMAPModel(const char* outfilename)
     wsize = sizeof(branches) + sizeof(uint32) * branches;
     fwrite(&wsize, sizeof(int), 1, output);
     fwrite(&branches, sizeof(branches), 1, output);
-    uint32 nIndexes = (uint32) nIndices;
+    uint32 nIndexes = 0;
+    nIndexes = header.nBoundingTriangles;
     fwrite(&nIndexes, sizeof(uint32), 1, output);
     fwrite("INDX", 4, 1, output);
     wsize = sizeof(uint32) + sizeof(unsigned short) * nIndexes;

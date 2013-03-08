@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2005-2013 MaNGOS <http://getmangos.com/>
+ * Copyright (C) 2005-2012 MaNGOS <http://getmangos.com/>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -15,6 +15,8 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
+
+#define _CRT_SECURE_NO_WARNINGS
 
 #include "vmapexport.h"
 #include "adtfile.h"
@@ -79,7 +81,9 @@ char* GetExtension(char* FileName)
     return NULL;
 }
 
-ADTFile::ADTFile(char* filename): ADT(filename)
+extern HANDLE WorldMpq;
+
+ADTFile::ADTFile(char* filename): ADT(WorldMpq, filename)
 {
     Adtfilename.append(filename);
 }

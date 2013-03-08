@@ -23,7 +23,7 @@ creature_id                     Creature ID which should trigger this event (Thi
 event_type                      The type of event you want to script. (see "Event Types" below for different values)
 event_inverse_phase_mask        Mask with phases this event should NOT trigger in* (See footnote for more details on using any other value then 0)
 event_chance                    Percentage chance of triggering the event (1 - 100)
-event_flags                     Event Flags (Used to select Repeatable or Dungeon Heroic Mode)... See "Event Flags" Below For Defined Values
+event_flags                     Event Flags (Used to select Repeatable or Dungeon/Raid Difficulty Level)... See "Event Flags" Below For Defined Values
 event_param1                    Variables for the event (depends on event_type)
 event_param2                    Variables for the event (depends on event_type)
 event_param3                    Variables for the event (depends on event_type)
@@ -540,7 +540,6 @@ Parameter 2: Target - The Target Type defining who the creature should cast the 
 Parameter 3: CastFlags - See Table Below for Cast Flag Bitmask Values. If you are unsure what to set this value at leave it at 0.
 
 The creature will cast a spell specified by a spell ID on a target specified by the target type.
-If the spell is normal cast, random target types will select only targets within LOS and in spell range
 This is commonly used for NPC's who cast spells.
 
 ---------------------
@@ -876,10 +875,6 @@ Target types are used by certain actions and may effect actions differently
 4    TARGET_T_HOSTILE_RANDOM            Random Target on The Threat List
 5    TARGET_T_HOSTILE_RANDOM_NOT_TOP    Any Random Target Except Top Threat
 6    TARGET_T_ACTION_INVOKER            Unit Who Caused This Event to Occur (only works for EVENT_T_AGGRO, EVENT_T_KILL, EVENT_T_DEATH, EVENT_T_SPELLHIT, EVENT_T_OOC_LOS, EVENT_T_FRIENDLY_HP)
-7    TARGET_T_ACTION_INVOKER_OWNER      Unit who is responsible for Event to occur (only works for EVENT_T_AGGRO, EVENT_T_KILL, EVENT_T_DEATH, EVENT_T_SPELLHIT, EVENT_T_OOC_LOS, EVENT_T_FRIENDLY_HP, EVENT_T_FRIENDLY_IS_CC, EVENT_T_FRIENDLY_MISSING_BUFF)
-8    TARGET_T_HOSTILE_RANDOM_PLAYER          Random Player on The Threat List
-9    TARGET_T_HOSTILE_RANDOM_NOT_TOP_PLAYER  Any Random Player Except Top Threat
-
 
 =========================================
 Cast Flags
@@ -909,16 +904,34 @@ Below is the list of current Event Flags that EventAI can handle. Event flags ar
 #       Decimal   Internal Name                  Description
 ------------------------------------------------------------
 0       1         EFLAG_REPEATABLE               Event repeats (Does not repeat if this flag is not set)
-1       2         EFLAG_NORMAL                   Event occurs in Normal instance difficulty (will not occur in Normal if not set)
-2       4         EFLAG_HEROIC                   Event occurs in Heroic instance difficulty (will not occur in Heroic if not set)
-3       8
-4       16
+1       2         EFLAG_DIFFICULTY_0             Event occurs in instance difficulty 0 (will not occur if not set)
+2       4         EFLAG_DIFFICULTY_1             Event occurs in instance difficulty 1 (will not occur if not set)
+3       8         EFLAG_DIFFICULTY_2             Event occurs in instance difficulty 2 (will not occur if not set)
+4       16        EFLAG_DIFFICULTY_3             Event occurs in instance difficulty 3 (will not occur if not set)
 5       32        EFLAG_RANDOM_ACTION            At event occur execute one random action from event actions instead all actions.
 6       64
 7       128       EFLAG_DEBUG_ONLY              Prevents events from occuring on Release builds. Useful for testing new features.
 
 NOTE: You can add the numbers in the decimal column to combine flags.
 
+ * PLEASE NOTE THE DIFFERENCES BETWEEN DUNGEON INSTANCE DIFFICULTY LEVELS AND RAID Instance SIZE/DIFFICULTY LEVELS - PLEASE CHECK "MapDifficulty.dbc" For Information *
+
+Dungeons:
+---------
+EFLAG_DIFFICULTY_0             Event occurs in DUNGEON_DIFFICULTY_NORMAL
+EFLAG_DIFFICULTY_1             Event occurs in DUNGEON_DIFFICULTY_HEROIC
+EFLAG_DIFFICULTY_2             None (Not Implimented)
+EFLAG_DIFFICULTY_3             None (Not Implimented)
+
+10/25 Man Raids:
+----------------
+EFLAG_DIFFICULTY_0             Event Occurs in RAID_DIFFICULTY_10MAN_NORMAL  <--- Use This Difficulty Setting For Raids Designed For Single Man Size (Whatever Size It Is)
+EFLAG_DIFFICULTY_1             Event Occurs in RAID_DIFFICULTY_25MAN_NORMAL
+EFLAG_DIFFICULTY_2             Event Occurs in RAID_DIFFICULTY_10MAN_HEROIC (ONLY IF SUPPORTED BY RAID INSTANCE)  <--- NOTE: Currently Only a Couple Raids Support This Mode
+EFLAG_DIFFICULTY_3             Event Occurs in RAID_DIFFICULTY_25MAN_HEROIC (ONLY IF SUPPORTED BY RAID INSTANCE)  <--- NOTE: Currently Only a Couple Raids Support This Mode
+
+
+* Currently Only: Trial of the Crusader and Icecrown Citadel and Ruby Sanctum Raids Support Heroic Modes *
 
 =========================================
 Basic Structure of creature_ai_texts

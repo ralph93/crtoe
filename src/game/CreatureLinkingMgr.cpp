@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2005-2013 MaNGOS <http://getmangos.com/>
+ * Copyright (C) 2005-2012 MaNGOS <http://getmangos.com/>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -33,7 +33,7 @@
  */
 
 #include "CreatureLinkingMgr.h"
-#include "Policies/Singleton.h"
+#include "Policies/SingletonImp.h"
 #include "ProgressBar.h"
 #include "Database/DatabaseEnv.h"
 #include "ObjectMgr.h"
@@ -230,7 +230,7 @@ bool CreatureLinkingMgr::IsLinkingEntryValid(uint32 slaveEntry, CreatureLinkingI
     }
 
     // Additional checks, depending on flags
-    if (pTmp->linkingFlag& FLAG_DESPAWN_ON_RESPAWN && slaveEntry == pTmp->masterId)
+    if (pTmp->linkingFlag & FLAG_DESPAWN_ON_RESPAWN && slaveEntry == pTmp->masterId)
     {
         sLog.outErrorDb("`creature_linking%s` has pointless FLAG_DESPAWN_ON_RESPAWN for self, (entry: %u, map: %u), skipped", byEntry ? "_template" : "", slaveEntry, pTmp->mapId);
         return false;

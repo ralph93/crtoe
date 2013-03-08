@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2005-2013 MaNGOS <http://getmangos.com/>
+ * Copyright (C) 2005-2012 MaNGOS <http://getmangos.com/>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -20,7 +20,7 @@
 #include "Creature.h"
 #include "CreatureAIImpl.h"
 #include "NullCreatureAI.h"
-#include "Policies/Singleton.h"
+#include "Policies/SingletonImp.h"
 #include "MovementGenerator.h"
 #include "ScriptMgr.h"
 #include "Pet.h"

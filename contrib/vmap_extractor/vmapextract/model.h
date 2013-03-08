@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2005-2013 MaNGOS <http://getmangos.com/>
+ * Copyright (C) 2005-2012 MaNGOS <http://getmangos.com/>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -19,7 +19,6 @@
 #ifndef MODEL_H
 #define MODEL_H
 
-#include "loadlib/loadlib.h"
 #include "vec3d.h"
 //#include "mpq.h"
 #include "modelheaders.h"
@@ -35,9 +34,9 @@ class Model
 {
     public:
         ModelHeader header;
-        ModelVertex* origVertices;
-        Vec3D* vertices;
-        uint16* indices;
+        uint32 offsBB_vertices, offsBB_indices;
+        Vec3D* BB_vertices, *vertices;
+        uint16* BB_indices, *indices;
         size_t nIndices;
 
         bool open(StringSet& failedPaths);

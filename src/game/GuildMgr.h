@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2005-2013 MaNGOS <http://getmangos.com/>
+ * Copyright (C) 2005-2012 MaNGOS <http://getmangos.com/>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -36,11 +36,14 @@ class GuildMgr
 
         void AddGuild(Guild* guild);
         void RemoveGuild(uint32 guildId);
+        void RemoveGuild(ObjectGuid guildGuid);
 
         Guild* GetGuildById(uint32 guildId) const;
+        Guild* GetGuildByGuid(ObjectGuid guildGuid) const;
         Guild* GetGuildByName(std::string const& name) const;
         Guild* GetGuildByLeader(ObjectGuid const& guid) const;
         std::string GetGuildNameById(uint32 guildId) const;
+        std::string GetGuildNameByGuid(ObjectGuid guildGuid) const;
 
         void LoadGuilds();
 };

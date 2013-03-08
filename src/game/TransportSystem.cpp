@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2005-2013 MaNGOS <http://getmangos.com/>
+ * Copyright (C) 2005-2012 MaNGOS <http://getmangos.com/>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -29,6 +29,7 @@
 
 #include "TransportSystem.h"
 #include "Unit.h"
+#include "Vehicle.h"
 #include "MapManager.h"
 
 /* **************************************** TransportBase ****************************************/
@@ -57,7 +58,7 @@ void TransportBase::Update(uint32 diff)
         if (fabs(m_owner->GetPositionX() - m_lastPosition.x) +
                 fabs(m_owner->GetPositionY() - m_lastPosition.y) +
                 fabs(m_owner->GetPositionZ() - m_lastPosition.z) > 1.0f ||
-                MapManager::NormalizeOrientation(m_owner->GetOrientation() - m_lastPosition.o) > 0.01f)
+                NormalizeOrientation(m_owner->GetOrientation() - m_lastPosition.o) > 0.01f)
             UpdateGlobalPositions();
 
         m_updatePositionsTimer = 500;
@@ -73,7 +74,7 @@ void TransportBase::UpdateGlobalPositions()
                  m_owner->GetPositionZ(), m_owner->GetOrientation());
 
     // Calculate new direction multipliers
-    if (MapManager::NormalizeOrientation(pos.o - m_lastPosition.o) > 0.01f)
+    if (NormalizeOrientation(pos.o - m_lastPosition.o) > 0.01f)
     {
         m_sinO = sin(pos.o);
         m_cosO = cos(pos.o);
@@ -101,6 +102,10 @@ void TransportBase::UpdateGlobalPositionOf(WorldObject* passenger, float lx, flo
         }
         else
             m_owner->GetMap()->CreatureRelocation((Creature*)passenger, gx, gy, gz, go);
+
+        // If passenger is vehicle
+        if (((Unit*)passenger)->IsVehicle())
+            ((Unit*)passenger)->GetVehicleInfo()->UpdateGlobalPositions();
     }
     // ToDo: Add gameobject relocation
     // ToDo: Add passenger relocation for MO transports
@@ -128,12 +133,31 @@ void TransportBase::CalculateGlobalPositionOf(float lx, float ly, float lz, floa
     gy += m_owner->GetPositionY();
 
     gz = lz + m_owner->GetPositionZ();
-    go = MapManager::NormalizeOrientation(lo + m_owner->GetOrientation());
+    go = NormalizeOrientation(lo + m_owner->GetOrientation());
 }
 
-void TransportBase::BoardPassenger(WorldObject* passenger, float lx, float ly, float lz, float lo)
+//  Helper function to check if a unit is boarded onto this transporter (or a transporter boarded onto this) recursively
+bool TransportBase::HasOnBoard(WorldObject const* passenger) const
 {
-    TransportInfo* transportInfo = new TransportInfo(passenger, this, lx, ly, lz, lo);
+    MANGOS_ASSERT(passenger);
+
+    // For efficiency we go down from the (possible) passenger until we reached our owner, or until we reached no passenger
+    // Note, this will not catch, if self and passenger are boarded onto the same transporter (as it should not)
+    while (passenger->IsBoarded())
+    {
+        // pasenger is boarded onto this
+        if (passenger->GetTransportInfo()->GetTransport() == m_owner)
+            return true;
+        else
+            passenger = passenger->GetTransportInfo()->GetTransport();
+    }
+
+    return false;
+}
+
+void TransportBase::BoardPassenger(WorldObject* passenger, float lx, float ly, float lz, float lo, uint8 seat)
+{
+    TransportInfo* transportInfo = new TransportInfo(passenger, this, lx, ly, lz, lo, seat);
 
     // Insert our new passenger
     m_passengers.insert(PassengerMap::value_type(passenger, transportInfo));
@@ -161,10 +185,11 @@ void TransportBase::UnBoardPassenger(WorldObject* passenger)
 
 /* **************************************** TransportInfo ****************************************/
 
-TransportInfo::TransportInfo(WorldObject* owner, TransportBase* transport, float lx, float ly, float lz, float lo) :
+TransportInfo::TransportInfo(WorldObject* owner, TransportBase* transport, float lx, float ly, float lz, float lo, uint8 seat) :
     m_owner(owner),
     m_transport(transport),
-    m_localPosition(lx, ly, lz, lo)
+    m_localPosition(lx, ly, lz, lo),
+    m_seat(seat)
 {
     MANGOS_ASSERT(owner && m_transport);
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2005-2013 MaNGOS <http://getmangos.com/>
+ * Copyright (C) 2005-2012 MaNGOS <http://getmangos.com/>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -18,7 +18,6 @@
 
 #include "Common.h"
 #include "Database/DatabaseEnv.h"
-#include "DBCStores.h"
 #include "WorldPacket.h"
 #include "Player.h"
 #include "Opcodes.h"
@@ -51,6 +50,7 @@ bool ChatHandler::HandleDebugSendSpellFailCommand(char* args)
         return false;
 
     WorldPacket data(SMSG_CAST_FAILED, 5);
+    data << uint8(0);
     data << uint32(133);
     data << uint8(failnum);
     if (failarg1 || failarg2)
@@ -129,7 +129,7 @@ bool ChatHandler::HandleDebugSendOpcodeCommand(char* /*args*/)
     uint32 opcode;
     ifs >> opcode;
 
-    WorldPacket data(Opcodes(opcode), 0);
+    WorldPacket data(opcode, 0);
 
     while (!ifs.eof())
     {
@@ -186,7 +186,7 @@ bool ChatHandler::HandleDebugSendOpcodeCommand(char* /*args*/)
         }
     }
     ifs.close();
-    DEBUG_LOG("Sending opcode %u, %s", data.GetOpcode(), data.GetOpcodeName());
+    DEBUG_LOG("Sending opcode %u", data.GetOpcode());
     data.hexlike();
     ((Player*)unit)->GetSession()->SendPacket(&data);
     PSendSysMessage(LANG_COMMAND_OPCODESENT, data.GetOpcode(), unit->GetName());
@@ -223,6 +223,25 @@ bool ChatHandler::HandleDebugPlayCinematicCommand(char* args)
     }
 
     m_session->GetPlayer()->SendCinematicStart(dwId);
+    return true;
+}
+
+bool ChatHandler::HandleDebugPlayMovieCommand(char* args)
+{
+    // USAGE: .debug play movie #movieid
+    // #movieid - ID decimal number from Movie.dbc (1st column)
+    uint32 dwId;
+    if (!ExtractUInt32(&args, dwId))
+        return false;
+
+    if (!sMovieStore.LookupEntry(dwId))
+    {
+        PSendSysMessage(LANG_MOVIE_NOT_EXIST, dwId);
+        SetSentErrorMessage(true);
+        return false;
+    }
+
+    m_session->GetPlayer()->SendMovieStart(dwId);
     return true;
 }
 
@@ -402,7 +421,7 @@ bool ChatHandler::HandleDebugGetItemStateCommand(char* args)
 
     if (list_queue)
     {
-        std::vector<Item*> &updateQueue = player->GetItemUpdateQueue();
+        std::vector<Item*>& updateQueue = player->GetItemUpdateQueue();
         for (size_t i = 0; i < updateQueue.size(); ++i)
         {
             Item* item = updateQueue[i];
@@ -430,7 +449,7 @@ bool ChatHandler::HandleDebugGetItemStateCommand(char* args)
     if (check_all)
     {
         bool error = false;
-        std::vector<Item*> &updateQueue = player->GetItemUpdateQueue();
+        std::vector<Item*>& updateQueue = player->GetItemUpdateQueue();
         for (uint8 i = PLAYER_SLOT_START; i < PLAYER_SLOT_END; ++i)
         {
             if (i >= BUYBACK_SLOT_START && i < BUYBACK_SLOT_END)
@@ -629,6 +648,30 @@ bool ChatHandler::HandleDebugSpellCheckCommand(char* /*args*/)
 {
     sLog.outString("Check expected in code spell properties base at table 'spell_check' content...");
     sSpellMgr.CheckUsedSpells("spell_check");
+    return true;
+}
+
+bool ChatHandler::HandleDebugSendLargePacketCommand(char* /*args*/)
+{
+    const char* stuffingString = "This is a dummy string to push the packet's size beyond 128000 bytes. ";
+    std::ostringstream ss;
+    while (ss.str().size() < 128000)
+        ss << stuffingString;
+    SendSysMessage(ss.str().c_str());
+    return true;
+}
+
+bool ChatHandler::HandleDebugSendSetPhaseShiftCommand(char* args)
+{
+    if (!*args)
+        return false;
+
+    char* m = strtok((char*)args, " ");
+    char* p = strtok(NULL, " ");
+
+    uint16 MapId = atoi(m);
+    uint32 PhaseShift = atoi(p);
+    m_session->SendSetPhaseShift(PhaseShift, MapId);
     return true;
 }
 
@@ -1019,9 +1062,12 @@ bool ChatHandler::HandleDebugSpellCoefsCommand(char* args)
     bool isDirectHeal = false;
     for (int i = 0; i < 3; ++i)
     {
+        SpellEffectEntry const* spellEffect = spellEntry->GetSpellEffect(SpellEffectIndex(i));
+        if(!spellEffect)
+            continue;
         // Heals (Also count Mana Shield and Absorb effects as heals)
-        if (spellEntry->Effect[i] == SPELL_EFFECT_HEAL || spellEntry->Effect[i] == SPELL_EFFECT_HEAL_MAX_HEALTH ||
-                (spellEntry->Effect[i] == SPELL_EFFECT_APPLY_AURA && (spellEntry->EffectApplyAuraName[i] == SPELL_AURA_SCHOOL_ABSORB || spellEntry->EffectApplyAuraName[i] == SPELL_AURA_PERIODIC_HEAL)))
+        if (spellEffect->Effect == SPELL_EFFECT_HEAL || spellEffect->Effect == SPELL_EFFECT_HEAL_MAX_HEALTH ||
+            (spellEffect->Effect == SPELL_EFFECT_APPLY_AURA && (spellEffect->EffectApplyAuraName == SPELL_AURA_SCHOOL_ABSORB || spellEffect->EffectApplyAuraName == SPELL_AURA_PERIODIC_HEAL)))
         {
             isDirectHeal = true;
             break;
@@ -1031,8 +1077,11 @@ bool ChatHandler::HandleDebugSpellCoefsCommand(char* args)
     bool isDotHeal = false;
     for (int i = 0; i < 3; ++i)
     {
+        SpellEffectEntry const* spellEffect = spellEntry->GetSpellEffect(SpellEffectIndex(i));
+        if(!spellEffect)
+            continue;
         // Periodic Heals
-        if (spellEntry->Effect[i] == SPELL_EFFECT_APPLY_AURA && spellEntry->EffectApplyAuraName[i] == SPELL_AURA_PERIODIC_HEAL)
+        if (spellEffect->Effect == SPELL_EFFECT_APPLY_AURA && spellEffect->EffectApplyAuraName == SPELL_AURA_PERIODIC_HEAL)
         {
             isDotHeal = true;
             break;
@@ -1058,7 +1107,7 @@ bool ChatHandler::HandleDebugSpellModsCommand(char* args)
     if (!typeStr)
         return false;
 
-    Opcodes opcode;
+    uint16 opcode;
     if (strncmp(typeStr, "flat", strlen(typeStr)) == 0)
         opcode = SMSG_SET_FLAT_SPELL_MODIFIER;
     else if (strncmp(typeStr, "pct", strlen(typeStr)) == 0)
@@ -1067,7 +1116,7 @@ bool ChatHandler::HandleDebugSpellModsCommand(char* args)
         return false;
 
     uint32 effidx;
-    if (!ExtractUInt32(&args, effidx) || effidx >= 64)
+    if (!ExtractUInt32(&args, effidx) || effidx >= 64 + 32)
         return false;
 
     uint32 spellmodop;
@@ -1097,8 +1146,10 @@ bool ChatHandler::HandleDebugSpellModsCommand(char* args)
                                          opcode == SMSG_SET_FLAT_SPELL_MODIFIER ? "flat" : "pct", spellmodop, value, effidx);
 
     WorldPacket data(opcode, (1 + 1 + 2 + 2));
-    data << uint8(effidx);
+    data << uint32(1);
+    data << uint32(1);
     data << uint8(spellmodop);
+    data << uint8(effidx);
     data << int32(value);
     chr->GetSession()->SendPacket(&data);
 

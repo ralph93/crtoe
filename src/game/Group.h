@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2005-2013 MaNGOS <http://getmangos.com/>
+ * Copyright (C) 2005-2012 MaNGOS <http://getmangos.com/>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -31,6 +31,8 @@
 #include <map>
 #include <vector>
 
+struct ItemPrototype;
+
 class WorldSession;
 class Map;
 class BattleGround;
@@ -57,15 +59,28 @@ enum RollVote
     ROLL_PASS              = 0,
     ROLL_NEED              = 1,
     ROLL_GREED             = 2,
+    ROLL_DISENCHANT        = 3,
 
     // other not send by client
-    MAX_ROLL_FROM_CLIENT   = 3,
+    MAX_ROLL_FROM_CLIENT   = 4,
 
-    ROLL_NOT_EMITED_YET    = 3,                             // send to client
-    ROLL_NOT_VALID         = 4                              // not send to client
+    ROLL_NOT_EMITED_YET    = 4,                             // send to client
+    ROLL_NOT_VALID         = 5                              // not send to client
 };
 
-enum GroupMemberOnlineStatus
+// set what votes allowed
+enum RollVoteMask
+{
+    ROLL_VOTE_MASK_PASS       = 0x01,
+    ROLL_VOTE_MASK_NEED       = 0x02,
+    ROLL_VOTE_MASK_GREED      = 0x04,
+    ROLL_VOTE_MASK_DISENCHANT = 0x08,
+
+    ROLL_VOTE_MASK_ALL        = 0x0F,
+};
+
+
+enum GroupMemberFlags
 {
     MEMBER_STATUS_OFFLINE   = 0x0000,
     MEMBER_STATUS_ONLINE    = 0x0001,                       // Lua_UnitIsConnected
@@ -78,57 +93,98 @@ enum GroupMemberOnlineStatus
     MEMBER_STATUS_DND       = 0x0080,                       // Lua_UnitIsDND
 };
 
-enum GroupType
+enum GroupType                                              // group type flags?
 {
-    GROUPTYPE_NORMAL = 0,
-    GROUPTYPE_RAID   = 1
+    GROUPTYPE_NORMAL = 0x00,
+    GROUPTYPE_BG     = 0x01,
+    GROUPTYPE_RAID   = 0x02,
+    GROUPTYPE_BGRAID = GROUPTYPE_BG | GROUPTYPE_RAID,       // mask
+    // 0x04?
+    GROUPTYPE_LFD    = 0x08,
+    // 0x10, leave/change group?, I saw this flag when leaving group and after leaving BG while in group
+};
+
+enum GroupFlagMask
+{
+    GROUP_ASSISTANT      = 0x01,
+    GROUP_MAIN_ASSISTANT = 0x02,
+    GROUP_MAIN_TANK      = 0x04,
 };
 
 enum GroupUpdateFlags
 {
     GROUP_UPDATE_FLAG_NONE              = 0x00000000,       // nothing
     GROUP_UPDATE_FLAG_STATUS            = 0x00000001,       // uint16, flags
-    GROUP_UPDATE_FLAG_CUR_HP            = 0x00000002,       // uint16
-    GROUP_UPDATE_FLAG_MAX_HP            = 0x00000004,       // uint16
+    GROUP_UPDATE_FLAG_CUR_HP            = 0x00000002,       // uint32
+    GROUP_UPDATE_FLAG_MAX_HP            = 0x00000004,       // uint32
     GROUP_UPDATE_FLAG_POWER_TYPE        = 0x00000008,       // uint8
     GROUP_UPDATE_FLAG_CUR_POWER         = 0x00000010,       // uint16
     GROUP_UPDATE_FLAG_MAX_POWER         = 0x00000020,       // uint16
     GROUP_UPDATE_FLAG_LEVEL             = 0x00000040,       // uint16
     GROUP_UPDATE_FLAG_ZONE              = 0x00000080,       // uint16
-    GROUP_UPDATE_FLAG_POSITION          = 0x00000100,       // uint16, uint16
-    GROUP_UPDATE_FLAG_AURAS             = 0x00000200,       // uint64 mask, for each bit set uint16 spellid + uint8 unk
-    GROUP_UPDATE_FLAG_PET_GUID          = 0x00000400,       // uint64 pet guid
-    GROUP_UPDATE_FLAG_PET_NAME          = 0x00000800,       // pet name, NULL terminated string
-    GROUP_UPDATE_FLAG_PET_MODEL_ID      = 0x00001000,       // uint16, model id
-    GROUP_UPDATE_FLAG_PET_CUR_HP        = 0x00002000,       // uint16 pet cur health
-    GROUP_UPDATE_FLAG_PET_MAX_HP        = 0x00004000,       // uint16 pet max health
-    GROUP_UPDATE_FLAG_PET_POWER_TYPE    = 0x00008000,       // uint8 pet power type
-    GROUP_UPDATE_FLAG_PET_CUR_POWER     = 0x00010000,       // uint16 pet cur power
-    GROUP_UPDATE_FLAG_PET_MAX_POWER     = 0x00020000,       // uint16 pet max power
-    GROUP_UPDATE_FLAG_PET_AURAS         = 0x00040000,       // uint64 mask, for each bit set uint16 spellid + uint8 unk, pet auras...
-    GROUP_UPDATE_PET                    = 0x0007FC00,       // all pet flags
-    GROUP_UPDATE_FULL                   = 0x0007FFFF,       // all known flags
+    GROUP_UPDATE_FLAG_UNK               = 0x00000100,       // uint16
+    GROUP_UPDATE_FLAG_POSITION          = 0x00000200,       // uint16, uint16, uint16
+    GROUP_UPDATE_FLAG_AURAS             = 0x00000400,       // uint64 mask, for each bit set uint32 spellid + uint8 unk
+    GROUP_UPDATE_FLAG_PET_GUID          = 0x00000800,       // uint64 pet guid
+    GROUP_UPDATE_FLAG_PET_NAME          = 0x00001000,       // pet name, NULL terminated string
+    GROUP_UPDATE_FLAG_PET_MODEL_ID      = 0x00002000,       // uint16, model id
+    GROUP_UPDATE_FLAG_PET_CUR_HP        = 0x00004000,       // uint32 pet cur health
+    GROUP_UPDATE_FLAG_PET_MAX_HP        = 0x00008000,       // uint32 pet max health
+    GROUP_UPDATE_FLAG_PET_POWER_TYPE    = 0x00010000,       // uint8 pet power type
+    GROUP_UPDATE_FLAG_PET_CUR_POWER     = 0x00020000,       // uint16 pet cur power
+    GROUP_UPDATE_FLAG_PET_MAX_POWER     = 0x00040000,       // uint16 pet max power
+    GROUP_UPDATE_FLAG_PET_AURAS         = 0x00080000,       // uint64 mask, for each bit set uint32 spellid + uint8 unk, pet auras...
+    GROUP_UPDATE_FLAG_VEHICLE_SEAT      = 0x00100000,       // uint32 vehicle_seat_id (index from VehicleSeat.dbc)
+    GROUP_UPDATE_FLAG_PHASE             = 0x00200000,       // uint32, uint32, some bitstring or string
+
+    GROUP_UPDATE_PET = GROUP_UPDATE_FLAG_PET_GUID |
+        GROUP_UPDATE_FLAG_PET_NAME |
+        GROUP_UPDATE_FLAG_PET_MODEL_ID |
+        GROUP_UPDATE_FLAG_PET_CUR_HP |
+        GROUP_UPDATE_FLAG_PET_MAX_HP |
+        GROUP_UPDATE_FLAG_PET_POWER_TYPE |
+        GROUP_UPDATE_FLAG_PET_CUR_POWER |
+        GROUP_UPDATE_FLAG_PET_MAX_POWER |
+        GROUP_UPDATE_FLAG_PET_AURAS,
+
+    GROUP_UPDATE_FULL = GROUP_UPDATE_PET |
+        GROUP_UPDATE_FLAG_STATUS |
+        GROUP_UPDATE_FLAG_CUR_HP |
+        GROUP_UPDATE_FLAG_MAX_HP |
+        GROUP_UPDATE_FLAG_POWER_TYPE |
+        GROUP_UPDATE_FLAG_CUR_POWER |
+        GROUP_UPDATE_FLAG_MAX_POWER |
+        GROUP_UPDATE_FLAG_LEVEL |
+        GROUP_UPDATE_FLAG_ZONE |
+        GROUP_UPDATE_FLAG_POSITION |
+        GROUP_UPDATE_FLAG_AURAS |
+        GROUP_UPDATE_FLAG_PHASE,
 };
 
-#define GROUP_UPDATE_FLAGS_COUNT          20
-// 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10,11,12,13,14,15,16,17,18,19
-static const uint8 GroupUpdateLength[GROUP_UPDATE_FLAGS_COUNT] = { 0, 2, 2, 2, 1, 2, 2, 2, 2, 4, 8, 8, 1, 2, 2, 2, 1, 2, 2, 8};
+#define GROUP_UPDATE_FLAGS_COUNT          22
+                                                                // 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10,11,12,13,14,15,16,17,18,19,20,21
+static const uint8 GroupUpdateLength[GROUP_UPDATE_FLAGS_COUNT] = { 0, 2, 2, 2, 1, 2, 2, 2, 2, 2, 6, 8, 8, 1, 2, 2, 2, 1, 2, 2, 8, 5 };
 
 class Roll : public LootValidatorRef
 {
     public:
-        Roll(ObjectGuid _lootedTragetGuid, LootItem const& li)
+        Roll(ObjectGuid _lootedTragetGuid, LootMethod method, LootItem const& li)
             : lootedTargetGUID(_lootedTragetGuid), itemid(li.itemid), itemRandomPropId(li.randomPropertyId), itemRandomSuffix(li.randomSuffix),
-              totalPlayersRolling(0), totalNeed(0), totalGreed(0), totalPass(0), itemSlot(0) {}
+              itemCount(li.count), totalPlayersRolling(0), totalNeed(0), totalGreed(0), totalPass(0), itemSlot(0),
+              m_method(method), m_commonVoteMask(ROLL_VOTE_MASK_ALL) {}
         ~Roll() { }
         void setLoot(Loot* pLoot) { link(pLoot, this); }
         Loot* getLoot() { return getTarget(); }
         void targetObjectBuildLink() override;
 
+        void CalculateCommonVoteMask(uint32 max_enchanting_skill);
+        RollVoteMask GetVoteMaskFor(Player* player) const;
+
         ObjectGuid lootedTargetGUID;
         uint32 itemid;
         int32  itemRandomPropId;
         uint32 itemRandomSuffix;
+        uint8 itemCount;
         typedef UNORDERED_MAP<ObjectGuid, RollVote> PlayerVote;
         PlayerVote playerVote;                              // vote position correspond with player position (in group)
         uint8 totalPlayersRolling;
@@ -136,6 +192,10 @@ class Roll : public LootValidatorRef
         uint8 totalGreed;
         uint8 totalPass;
         uint8 itemSlot;
+
+    private:
+        LootMethod m_method;
+        RollVoteMask m_commonVoteMask;
 };
 
 struct InstanceGroupBind
@@ -158,6 +218,7 @@ class MANGOS_DLL_SPEC Group
             std::string name;
             uint8       group;
             bool        assistant;
+            uint32      lastMap;
         };
         typedef std::list<MemberSlot> MemberSlotList;
         typedef MemberSlotList::const_iterator member_citerator;
@@ -193,7 +254,7 @@ class MANGOS_DLL_SPEC Group
         uint32 GetId() const { return m_Id; }
         ObjectGuid GetObjectGuid() const { return ObjectGuid(HIGHGUID_GROUP, GetId()); }
         bool IsFull() const { return (m_groupType == GROUPTYPE_NORMAL) ? (m_memberSlots.size() >= MAX_GROUP_SIZE) : (m_memberSlots.size() >= MAX_RAID_SIZE); }
-        bool isRaidGroup() const { return m_groupType == GROUPTYPE_RAID; }
+        bool isRaidGroup() const { return m_groupType & GROUPTYPE_RAID; }
         bool isBGGroup()   const { return m_bgGroup != NULL; }
         bool IsCreated()   const { return GetMembersCount() > 0; }
         ObjectGuid GetLeaderGuid() const { return m_leaderGuid; }
@@ -234,7 +295,7 @@ class MANGOS_DLL_SPEC Group
         MemberSlotList const& GetMemberSlots() const { return m_memberSlots; }
         GroupReference* GetFirstMember() { return m_memberMgr.getFirst(); }
         uint32 GetMembersCount() const { return m_memberSlots.size(); }
-        void GetDataForXPAtKill(Unit const* victim, uint32& count, uint32& sum_level, Player* & member_with_max_level, Player* & not_gray_member_with_max_level, Player* additional = NULL);
+        void GetDataForXPAtKill(Unit const* victim, uint32& count, uint32& sum_level, Player*& member_with_max_level, Player*& not_gray_member_with_max_level, Player* additional = NULL);
         uint8 GetMemberGroup(ObjectGuid guid) const
         {
             member_citerator mslot = _getMemberCSlot(guid);
@@ -248,7 +309,7 @@ class MANGOS_DLL_SPEC Group
         void ConvertToRaid();
 
         void SetBattlegroundGroup(BattleGround* bg) { m_bgGroup = bg; }
-        uint32 CanJoinBattleGroundQueue(BattleGroundTypeId bgTypeId, BattleGroundQueueTypeId bgQueueTypeId, uint32 MinPlayerCount, uint32 MaxPlayerCount, bool isRated, uint32 arenaSlot);
+        GroupJoinBattlegroundResult CanJoinBattleGroundQueue(BattleGround const* bgOrTemplate, BattleGroundQueueTypeId bgQueueTypeId, uint32 MinPlayerCount, uint32 MaxPlayerCount, bool isRated, uint32 arenaSlot);
 
         void ChangeMembersGroup(ObjectGuid guid, uint8 group);
         void ChangeMembersGroup(Player* player, uint8 group);
@@ -280,13 +341,16 @@ class MANGOS_DLL_SPEC Group
                 SendUpdate();
         }
 
-        void SetTargetIcon(uint8 id, ObjectGuid targetGuid);
+        void SetTargetIcon(uint8 id, ObjectGuid whoGuid, ObjectGuid targetGuid);
 
-        void SetDifficulty(Difficulty difficulty);
-        Difficulty GetDifficulty() const { return m_difficulty; }
+        Difficulty GetDifficulty(bool isRaid) const { return isRaid ? m_raidDifficulty : m_dungeonDifficulty; }
+        Difficulty GetDungeonDifficulty() const { return m_dungeonDifficulty; }
+        Difficulty GetRaidDifficulty() const { return m_raidDifficulty; }
+        void SetDungeonDifficulty(Difficulty difficulty);
+        void SetRaidDifficulty(Difficulty difficulty);
         uint16 InInstance();
         bool InCombatToInstance(uint32 instanceId);
-        void ResetInstances(InstanceResetMethod method, Player* SendMsgTo);
+        void ResetInstances(InstanceResetMethod method, bool isRaid, Player* SendMsgTo);
 
         void SendTargetIconList(WorldSession* session);
         void SendUpdate();
@@ -298,19 +362,21 @@ class MANGOS_DLL_SPEC Group
 
         void RewardGroupAtKill(Unit* pVictim, Player* player_tap);
 
+        bool SetPlayerMap(ObjectGuid guid, uint32 mapid);
+
         /*********************************************************/
         /***                   LOOT SYSTEM                     ***/
         /*********************************************************/
 
-        void SendLootStartRoll(uint32 CountDown, const Roll& r);
-        void SendLootRoll(ObjectGuid const& targetGuid, uint8 rollNumber, uint8 rollType, const Roll& r);
-        void SendLootRollWon(ObjectGuid const& targetGuid, uint8 rollNumber, RollVote rollType, const Roll& r);
+        void SendLootStartRoll(uint32 CountDown, uint32 mapid, const Roll& r);
+        void SendLootRoll(ObjectGuid const& targetGuid, uint32 rollNumber, uint8 rollType, const Roll& r);
+        void SendLootRollWon(ObjectGuid const& targetGuid, uint32 rollNumber, RollVote rollType, const Roll& r);
         void SendLootAllPassed(const Roll& r);
         void GroupLoot(WorldObject* pSource, Loot* loot);
         void NeedBeforeGreed(WorldObject* pSource, Loot* loot);
         void MasterLoot(WorldObject* pSource, Loot* loot);
         bool CountRollVote(Player* player, ObjectGuid const& lootedTarget, uint32 itemSlot, RollVote vote);
-        void StartLootRoll(WorldObject* lootTarget, LootMethod method, Loot* loot, uint8 itemSlot);
+        void StartLootRoll(WorldObject* lootTarget, LootMethod method, Loot* loot, uint8 itemSlot, uint32 maxEnchantingSkill);
         void EndRoll();
 
         void LinkMember(GroupReference* pRef) { m_memberMgr.insertFirst(pRef); }
@@ -379,8 +445,22 @@ class MANGOS_DLL_SPEC Group
                 --m_subGroupsCounts[subgroup];
         }
 
+        uint32 GetMaxSkillValueForGroup(SkillType skill);
+
         void CountTheRoll(Rolls::iterator& roll);           // iterator update to next, in CountRollVote if true
         bool CountRollVote(ObjectGuid const& playerGUID, Rolls::iterator& roll, RollVote vote);
+
+        GroupFlagMask GetFlags(MemberSlot const& slot) const
+        {
+            uint8 flags = 0;
+            if (slot.assistant)
+                flags |= GROUP_ASSISTANT;
+            if (slot.guid == m_mainAssistantGuid)
+                flags |= GROUP_MAIN_ASSISTANT;
+            if (slot.guid == m_mainTankGuid)
+                flags |= GROUP_MAIN_TANK;
+            return GroupFlagMask(flags);
+        }
 
         uint32              m_Id;                           // 0 for not created or BG groups
         MemberSlotList      m_memberSlots;
@@ -391,7 +471,8 @@ class MANGOS_DLL_SPEC Group
         ObjectGuid          m_mainTankGuid;
         ObjectGuid          m_mainAssistantGuid;
         GroupType           m_groupType;
-        Difficulty          m_difficulty;
+        Difficulty          m_dungeonDifficulty;
+        Difficulty          m_raidDifficulty;
         BattleGround*       m_bgGroup;
         ObjectGuid          m_targetIcons[TARGET_ICON_COUNT];
         LootMethod          m_lootMethod;

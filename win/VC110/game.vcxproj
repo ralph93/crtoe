@@ -54,6 +54,7 @@
     <ProjectGUID>{1DC6C4DA-A028-41F3-877D-D5400C594F88}</ProjectGUID>
     <RootNamespace>game</RootNamespace>
     <Keyword>Win32Proj</Keyword>
+    <VCTargetsPath Condition="'$(VCTargetsPath11)' != '' and '$(VSVersion)' == '' and $(VisualStudioVersion) == ''">$(VCTargetsPath11)</VCTargetsPath>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
@@ -98,18 +99,6 @@
   <ImportGroup Label="PropertySheets">
     <Import Project="$(LocalAppData)\Microsoft\VisualStudio\10.0\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(LocalAppData)\Microsoft\VisualStudio\10.0\Microsoft.Cpp.$(Platform).user.props')" />
   </ImportGroup>
-  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
-    <Import Project="Precompiled Headers.props" />
-  </ImportGroup>
-  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <Import Project="Precompiled Headers.props" />
-  </ImportGroup>
-  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
-    <Import Project="Precompiled Headers.props" />
-  </ImportGroup>
-  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
-    <Import Project="Precompiled Headers.props" />
-  </ImportGroup>
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup>
     <_ProjectFileVersion>10.0.20506.1</_ProjectFileVersion>
@@ -152,6 +141,7 @@
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
+      <AdditionalOptions>/Zm300 %(AdditionalOptions)</AdditionalOptions>
       <Optimization>Disabled</Optimization>
       <AdditionalIncludeDirectories>..\..\dep\include;..\..\src\framework;..\..\src\shared;..\..\src\game\vmap;..\..\dep\ACE_wrappers;..\..\dep\include\g3dlite;..\..\src\game;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>WIN32;_DEBUG;MANGOS_DEBUG;_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
@@ -160,6 +150,9 @@
       <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <RuntimeTypeInfo>true</RuntimeTypeInfo>
+      <PrecompiledHeader>Use</PrecompiledHeader>
+      <PrecompiledHeaderFile>pchdef.h</PrecompiledHeaderFile>
+      <PrecompiledHeaderOutputFile>.\game__$(Platform)_$(Configuration)\game.pch</PrecompiledHeaderOutputFile>
       <AssemblerListingLocation>.\game__$(Platform)_$(Configuration)\</AssemblerListingLocation>
       <ObjectFileName>.\game__$(Platform)_$(Configuration)\</ObjectFileName>
       <ProgramDataBaseFileName>.\game__$(Platform)_$(Configuration)\</ProgramDataBaseFileName>
@@ -167,6 +160,7 @@
       <SuppressStartupBanner>true</SuppressStartupBanner>
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
       <CallingConvention>Cdecl</CallingConvention>
+      <ForcedIncludeFiles>pchdef.h;%(ForcedIncludeFiles)</ForcedIncludeFiles>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
     </ClCompile>
     <ResourceCompile>
@@ -184,15 +178,18 @@
       <TargetEnvironment>X64</TargetEnvironment>
     </Midl>
     <ClCompile>
-      <AdditionalOptions>/bigobj %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalOptions>/bigobj /Zm300 %(AdditionalOptions)</AdditionalOptions>
       <Optimization>Disabled</Optimization>
-      <AdditionalIncludeDirectories>..\..\dep\include;..\..\src\framework;..\..\src\shared;..\..\src\game\vmap;..\..\dep\ACE_wrappers;..\..\dep\include\g3dlite;..\..\src\game;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\..\dep\include;..\..\src\framework;..\..\src\shared;..\..\src\game\vmap;..\..\dep\ACE_wrappers;..\..\dep\include\g3dlite;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>WIN32;_DEBUG;MANGOS_DEBUG;_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <MinimalRebuild>false</MinimalRebuild>
       <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
       <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <RuntimeTypeInfo>true</RuntimeTypeInfo>
+      <PrecompiledHeader>Use</PrecompiledHeader>
+      <PrecompiledHeaderFile>pchdef.h</PrecompiledHeaderFile>
+      <PrecompiledHeaderOutputFile>.\game__$(Platform)_$(Configuration)\game.pch</PrecompiledHeaderOutputFile>
       <AssemblerListingLocation>.\game__$(Platform)_$(Configuration)\</AssemblerListingLocation>
       <ObjectFileName>.\game__$(Platform)_$(Configuration)\</ObjectFileName>
       <ProgramDataBaseFileName>.\game__$(Platform)_$(Configuration)\</ProgramDataBaseFileName>
@@ -200,6 +197,7 @@
       <SuppressStartupBanner>true</SuppressStartupBanner>
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
       <CallingConvention>Cdecl</CallingConvention>
+      <ForcedIncludeFiles>pchdef.h;%(ForcedIncludeFiles)</ForcedIncludeFiles>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
     </ClCompile>
     <ResourceCompile>
@@ -214,6 +212,7 @@
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <ClCompile>
+      <AdditionalOptions>/Zm300 %(AdditionalOptions)</AdditionalOptions>
       <InlineFunctionExpansion>OnlyExplicitInline</InlineFunctionExpansion>
       <AdditionalIncludeDirectories>..\..\dep\include;..\..\src\framework;..\..\src\shared;..\..\src\game\vmap;..\..\dep\ACE_wrappers;..\..\dep\include\g3dlite;..\..\src\game;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>WIN32;NDEBUG;_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
@@ -222,6 +221,9 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <EnableEnhancedInstructionSet>StreamingSIMDExtensions</EnableEnhancedInstructionSet>
       <RuntimeTypeInfo>true</RuntimeTypeInfo>
+      <PrecompiledHeader>Use</PrecompiledHeader>
+      <PrecompiledHeaderFile>pchdef.h</PrecompiledHeaderFile>
+      <PrecompiledHeaderOutputFile>.\game__$(Platform)_$(Configuration)\game.pch</PrecompiledHeaderOutputFile>
       <AssemblerListingLocation>.\game__$(Platform)_$(Configuration)\</AssemblerListingLocation>
       <ObjectFileName>.\game__$(Platform)_$(Configuration)\</ObjectFileName>
       <ProgramDataBaseFileName>.\game__$(Platform)_$(Configuration)\</ProgramDataBaseFileName>
@@ -229,6 +231,7 @@
       <SuppressStartupBanner>true</SuppressStartupBanner>
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
       <CallingConvention>Cdecl</CallingConvention>
+      <ForcedIncludeFiles>pchdef.h;%(ForcedIncludeFiles)</ForcedIncludeFiles>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
     </ClCompile>
     <ResourceCompile>
@@ -246,15 +249,18 @@
       <TargetEnvironment>X64</TargetEnvironment>
     </Midl>
     <ClCompile>
-      <AdditionalOptions>/bigobj %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalOptions>/bigobj /Zm300 %(AdditionalOptions)</AdditionalOptions>
       <InlineFunctionExpansion>OnlyExplicitInline</InlineFunctionExpansion>
-      <AdditionalIncludeDirectories>..\..\dep\include;..\..\src\framework;..\..\src\shared;..\..\src\game\vmap;..\..\dep\ACE_wrappers;..\..\dep\include\g3dlite;..\..\src\game;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\..\dep\include;..\..\src\framework;..\..\src\shared;..\..\src\game\vmap;..\..\dep\ACE_wrappers;..\..\dep\include\g3dlite;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>WIN32;NDEBUG;_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <StringPooling>true</StringPooling>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <EnableEnhancedInstructionSet>NotSet</EnableEnhancedInstructionSet>
       <RuntimeTypeInfo>true</RuntimeTypeInfo>
+      <PrecompiledHeader>Use</PrecompiledHeader>
+      <PrecompiledHeaderFile>pchdef.h</PrecompiledHeaderFile>
+      <PrecompiledHeaderOutputFile>.\game__$(Platform)_$(Configuration)\game.pch</PrecompiledHeaderOutputFile>
       <AssemblerListingLocation>.\game__$(Platform)_$(Configuration)\</AssemblerListingLocation>
       <ObjectFileName>.\game__$(Platform)_$(Configuration)\</ObjectFileName>
       <ProgramDataBaseFileName>.\game__$(Platform)_$(Configuration)\</ProgramDataBaseFileName>
@@ -262,6 +268,7 @@
       <SuppressStartupBanner>true</SuppressStartupBanner>
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
       <CallingConvention>Cdecl</CallingConvention>
+      <ForcedIncludeFiles>pchdef.h;%(ForcedIncludeFiles)</ForcedIncludeFiles>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
     </ClCompile>
     <ResourceCompile>
@@ -284,6 +291,9 @@
       <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <RuntimeTypeInfo>true</RuntimeTypeInfo>
+      <PrecompiledHeader>
+      </PrecompiledHeader>
+      <PrecompiledHeaderOutputFile>.\game__$(Platform)_$(Configuration)\game.pch</PrecompiledHeaderOutputFile>
       <AssemblerListingLocation>.\game__$(Platform)_$(Configuration)\</AssemblerListingLocation>
       <ObjectFileName>.\game__$(Platform)_$(Configuration)\</ObjectFileName>
       <ProgramDataBaseFileName>.\game__$(Platform)_$(Configuration)\</ProgramDataBaseFileName>
@@ -310,13 +320,16 @@
     <ClCompile>
       <AdditionalOptions>/bigobj %(AdditionalOptions)</AdditionalOptions>
       <Optimization>Disabled</Optimization>
-      <AdditionalIncludeDirectories>..\..\dep\include;..\..\src\framework;..\..\src\shared;..\..\src\game\vmap;..\..\dep\ACE_wrappers;..\..\dep\include\g3dlite;..\..\src\game;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\..\dep\include;..\..\src\framework;..\..\src\shared;..\..\src\game\vmap;..\..\dep\ACE_wrappers;..\..\dep\include\g3dlite;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>WIN32;_DEBUG;MANGOS_DEBUG;_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <MinimalRebuild>false</MinimalRebuild>
       <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
       <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <RuntimeTypeInfo>true</RuntimeTypeInfo>
+      <PrecompiledHeader>
+      </PrecompiledHeader>
+      <PrecompiledHeaderOutputFile>.\game__$(Platform)_$(Configuration)\game.pch</PrecompiledHeaderOutputFile>
       <AssemblerListingLocation>.\game__$(Platform)_$(Configuration)\</AssemblerListingLocation>
       <ObjectFileName>.\game__$(Platform)_$(Configuration)\</ObjectFileName>
       <ProgramDataBaseFileName>.\game__$(Platform)_$(Configuration)\</ProgramDataBaseFileName>
@@ -338,7 +351,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="..\..\src\game\AccountMgr.cpp" />
-    <ClCompile Include="..\..\src\game\AddonHandler.cpp" />
+    <ClCompile Include="..\..\src\game\AchievementMgr.cpp" />
     <ClCompile Include="..\..\src\game\AggressorAI.cpp" />
     <ClCompile Include="..\..\src\game\ArenaTeam.cpp" />
     <ClCompile Include="..\..\src\game\ArenaTeamHandler.cpp" />
@@ -351,12 +364,19 @@
     <ClCompile Include="..\..\src\game\BattleGround\BattleGroundAB.cpp" />
     <ClCompile Include="..\..\src\game\BattleGround\BattleGroundAV.cpp" />
     <ClCompile Include="..\..\src\game\BattleGround\BattleGroundBE.cpp" />
+    <ClCompile Include="..\..\src\game\BattleGround\BattleGroundDS.cpp" />
     <ClCompile Include="..\..\src\game\BattleGround\BattleGroundEY.cpp" />
     <ClCompile Include="..\..\src\game\BattleGround\BattleGroundHandler.cpp" />
+    <ClCompile Include="..\..\src\game\BattleGround\BattleGroundIC.cpp" />
     <ClCompile Include="..\..\src\game\BattleGround\BattleGroundMgr.cpp" />
     <ClCompile Include="..\..\src\game\BattleGround\BattleGroundNA.cpp" />
+    <ClCompile Include="..\..\src\game\BattleGround\BattleGroundRB.cpp" />
     <ClCompile Include="..\..\src\game\BattleGround\BattleGroundRL.cpp" />
+    <ClCompile Include="..\..\src\game\BattleGround\BattleGroundRV.cpp" />
+    <ClCompile Include="..\..\src\game\BattleGround\BattleGroundSA.cpp" />
     <ClCompile Include="..\..\src\game\BattleGround\BattleGroundWS.cpp" />
+    <ClCompile Include="..\..\src\game\Calendar.cpp" />
+    <ClCompile Include="..\..\src\game\CalendarHandler.cpp" />
     <ClCompile Include="..\..\src\game\Camera.cpp" />
     <ClCompile Include="..\..\src\game\Channel.cpp" />
     <ClCompile Include="..\..\src\game\ChannelHandler.cpp" />
@@ -375,7 +395,9 @@
     <ClCompile Include="..\..\src\game\CreatureEventAI.cpp" />
     <ClCompile Include="..\..\src\game\CreatureEventAIMgr.cpp" />
     <ClCompile Include="..\..\src\game\CreatureLinkingMgr.cpp" />
+    <ClCompile Include="..\..\src\game\DB2Stores.cpp" />
     <ClCompile Include="..\..\src\game\DBCStores.cpp" />
+    <ClCompile Include="..\..\src\game\DBCStructure.cpp" />
     <ClCompile Include="..\..\src\game\debugcmds.cpp" />
     <ClCompile Include="..\..\src\game\DuelHandler.cpp" />
     <ClCompile Include="..\..\src\game\DynamicObject.cpp" />
@@ -435,12 +457,25 @@
     <ClCompile Include="..\..\src\game\ObjectGuid.cpp" />
     <ClCompile Include="..\..\src\game\ObjectPosSelector.cpp" />
     <ClCompile Include="..\..\src\game\Opcodes.cpp" />
+    <ClCompile Include="..\..\src\game\OutdoorPvP\OutdoorPvP.cpp" />
+    <ClCompile Include="..\..\src\game\OutdoorPvP\OutdoorPvPEP.cpp" />
+    <ClCompile Include="..\..\src\game\OutdoorPvP\OutdoorPvPGH.cpp" />
+    <ClCompile Include="..\..\src\game\OutdoorPvP\OutdoorPvPHP.cpp" />
+    <ClCompile Include="..\..\src\game\OutdoorPvP\OutdoorPvPMgr.cpp" />
+    <ClCompile Include="..\..\src\game\OutdoorPvP\OutdoorPvPNA.cpp" />
+    <ClCompile Include="..\..\src\game\OutdoorPvP\OutdoorPvPSI.cpp" />
+    <ClCompile Include="..\..\src\game\OutdoorPvP\OutdoorPvPTF.cpp" />
+    <ClCompile Include="..\..\src\game\OutdoorPvP\OutdoorPvPZM.cpp" />
     <ClCompile Include="..\..\src\game\PathFinder.cpp" />
     <ClCompile Include="..\..\src\game\pchdef.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Create</PrecompiledHeader>
+      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">pchdef.h</PrecompiledHeaderFile>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|X64'">Create</PrecompiledHeader>
+      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Debug|X64'">pchdef.h</PrecompiledHeaderFile>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Create</PrecompiledHeader>
+      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">pchdef.h</PrecompiledHeaderFile>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|X64'">Create</PrecompiledHeader>
+      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Release|X64'">pchdef.h</PrecompiledHeaderFile>
     </ClCompile>
     <ClCompile Include="..\..\src\game\Pet.cpp" />
     <ClCompile Include="..\..\src\game\PetAI.cpp" />
@@ -480,25 +515,16 @@
     <ClCompile Include="..\..\src\game\Transports.cpp" />
     <ClCompile Include="..\..\src\game\Unit.cpp" />
     <ClCompile Include="..\..\src\game\UpdateData.cpp" />
+    <ClCompile Include="..\..\src\game\Vehicle.cpp" />
     <ClCompile Include="..\..\src\game\VoiceChatHandler.cpp" />
     <ClCompile Include="..\..\src\game\WaypointManager.cpp" />
     <ClCompile Include="..\..\src\game\WaypointMovementGenerator.cpp" />
     <ClCompile Include="..\..\src\game\Weather.cpp" />
     <ClCompile Include="..\..\src\game\World.cpp" />
-    <ClCompile Include="..\..\src\game\OutdoorPvP\OutdoorPvP.cpp" />
-    <ClCompile Include="..\..\src\game\OutdoorPvP\OutdoorPvPEP.cpp" />
-    <ClCompile Include="..\..\src\game\OutdoorPvP\OutdoorPvPHP.cpp" />
-    <ClCompile Include="..\..\src\game\OutdoorPvP\OutdoorPvPMgr.cpp" />
-    <ClCompile Include="..\..\src\game\OutdoorPvP\OutdoorPvPNA.cpp" />
-    <ClCompile Include="..\..\src\game\OutdoorPvP\OutdoorPvPSI.cpp" />
-    <ClCompile Include="..\..\src\game\OutdoorPvP\OutdoorPvPTF.cpp" />
-    <ClCompile Include="..\..\src\game\OutdoorPvP\OutdoorPvPZM.cpp" />
     <ClCompile Include="..\..\src\game\WorldSession.cpp" />
     <ClCompile Include="..\..\src\game\WorldSocket.cpp" />
     <ClCompile Include="..\..\src\game\WorldSocketMgr.cpp" />
     <ClCompile Include="..\..\src\game\vmap\BIH.cpp" />
-    <ClCompile Include="..\..\src\game\vmap\DynamicTree.cpp" />
-    <ClCompile Include="..\..\src\game\vmap\GameObjectModel.cpp" />
     <ClCompile Include="..\..\src\game\vmap\MapTree.cpp" />
     <ClCompile Include="..\..\src\game\vmap\ModelInstance.cpp" />
     <ClCompile Include="..\..\src\game\vmap\TileAssembler.cpp" />
@@ -508,7 +534,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\src\game\AccountMgr.h" />
-    <ClInclude Include="..\..\src\game\AddonHandler.h" />
+    <ClInclude Include="..\..\src\game\AchievementMgr.h" />
     <ClInclude Include="..\..\src\game\AggressorAI.h" />
     <ClInclude Include="..\..\src\game\ArenaTeam.h" />
     <ClInclude Include="..\..\src\game\AuctionHouseBot\AuctionHouseBot.h" />
@@ -519,11 +545,17 @@
     <ClInclude Include="..\..\src\game\BattleGround\BattleGroundAB.h" />
     <ClInclude Include="..\..\src\game\BattleGround\BattleGroundAV.h" />
     <ClInclude Include="..\..\src\game\BattleGround\BattleGroundBE.h" />
+    <ClInclude Include="..\..\src\game\BattleGround\BattleGroundDS.h" />
     <ClInclude Include="..\..\src\game\BattleGround\BattleGroundEY.h" />
+    <ClInclude Include="..\..\src\game\BattleGround\BattleGroundIC.h" />
     <ClInclude Include="..\..\src\game\BattleGround\BattleGroundMgr.h" />
     <ClInclude Include="..\..\src\game\BattleGround\BattleGroundNA.h" />
+    <ClInclude Include="..\..\src\game\BattleGround\BattleGroundRB.h" />
     <ClInclude Include="..\..\src\game\BattleGround\BattleGroundRL.h" />
+    <ClInclude Include="..\..\src\game\BattleGround\BattleGroundRV.h" />
+    <ClInclude Include="..\..\src\game\BattleGround\BattleGroundSA.h" />
     <ClInclude Include="..\..\src\game\BattleGround\BattleGroundWS.h" />
+    <ClInclude Include="..\..\src\game\Calendar.h" />
     <ClInclude Include="..\..\src\game\Camera.h" />
     <ClInclude Include="..\..\src\game\Cell.h" />
     <ClInclude Include="..\..\src\game\CellImpl.h" />
@@ -541,6 +573,9 @@
     <ClInclude Include="..\..\src\game\CreatureEventAI.h" />
     <ClInclude Include="..\..\src\game\CreatureEventAIMgr.h" />
     <ClInclude Include="..\..\src\game\CreatureLinkingMgr.h" />
+    <ClInclude Include="..\..\src\game\DB2fmt.h" />
+    <ClInclude Include="..\..\src\game\DB2Stores.h" />
+    <ClInclude Include="..\..\src\game\DB2Structure.h" />
     <ClInclude Include="..\..\src\game\DBCEnums.h" />
     <ClInclude Include="..\..\src\game\DBCfmt.h" />
     <ClInclude Include="..\..\src\game\DBCStores.h" />
@@ -585,6 +620,7 @@
     <ClInclude Include="..\..\src\game\MoveMap.h" />
     <ClInclude Include="..\..\src\game\MoveMapSharedDefines.h" />
     <ClInclude Include="..\..\src\game\MovementGenerator.h" />
+    <ClInclude Include="..\..\src\game\movement\MovementStructures.h" />
     <ClInclude Include="..\..\src\game\movement\MoveSpline.h" />
     <ClInclude Include="..\..\src\game\movement\MoveSplineFlag.h" />
     <ClInclude Include="..\..\src\game\movement\MoveSplineInit.h" />
@@ -602,6 +638,15 @@
     <ClInclude Include="..\..\src\game\ObjectMgr.h" />
     <ClInclude Include="..\..\src\game\ObjectPosSelector.h" />
     <ClInclude Include="..\..\src\game\Opcodes.h" />
+    <ClInclude Include="..\..\src\game\OutdoorPvP\OutdoorPvP.h" />
+    <ClInclude Include="..\..\src\game\OutdoorPvP\OutdoorPvPEP.h" />
+    <ClInclude Include="..\..\src\game\OutdoorPvP\OutdoorPvPGH.h" />
+    <ClInclude Include="..\..\src\game\OutdoorPvP\OutdoorPvPHP.h" />
+    <ClInclude Include="..\..\src\game\OutdoorPvP\OutdoorPvPMgr.h" />
+    <ClInclude Include="..\..\src\game\OutdoorPvP\OutdoorPvPNA.h" />
+    <ClInclude Include="..\..\src\game\OutdoorPvP\OutdoorPvPSI.h" />
+    <ClInclude Include="..\..\src\game\OutdoorPvP\OutdoorPvPTF.h" />
+    <ClInclude Include="..\..\src\game\OutdoorPvP\OutdoorPvPZM.h" />
     <ClInclude Include="..\..\src\game\Path.h" />
     <ClInclude Include="..\..\src\game\PathFinder.h" />
     <ClInclude Include="..\..\src\game\pchdef.h" />
@@ -637,29 +682,18 @@
     <ClInclude Include="..\..\src\game\UpdateData.h" />
     <ClInclude Include="..\..\src\game\UpdateFields.h" />
     <ClInclude Include="..\..\src\game\UpdateMask.h" />
+    <ClInclude Include="..\..\src\game\Vehicle.h" />
     <ClInclude Include="..\..\src\game\WaypointManager.h" />
     <ClInclude Include="..\..\src\game\WaypointMovementGenerator.h" />
     <ClInclude Include="..\..\src\game\Weather.h" />
     <ClInclude Include="..\..\src\game\World.h" />
-    <ClInclude Include="..\..\src\game\OutdoorPvP\OutdoorPvP.h" />
-    <ClInclude Include="..\..\src\game\OutdoorPvP\OutdoorPvPEP.h" />
-    <ClInclude Include="..\..\src\game\OutdoorPvP\OutdoorPvPHP.h" />
-    <ClInclude Include="..\..\src\game\OutdoorPvP\OutdoorPvPMgr.h" />
-    <ClInclude Include="..\..\src\game\OutdoorPvP\OutdoorPvPNA.h" />
-    <ClInclude Include="..\..\src\game\OutdoorPvP\OutdoorPvPSI.h" />
-    <ClInclude Include="..\..\src\game\OutdoorPvP\OutdoorPvPTF.h" />
-    <ClInclude Include="..\..\src\game\OutdoorPvP\OutdoorPvPZM.h" />
     <ClInclude Include="..\..\src\game\WorldSession.h" />
     <ClInclude Include="..\..\src\game\WorldSocket.h" />
     <ClInclude Include="..\..\src\game\WorldSocketMgr.h" />
     <ClInclude Include="..\..\src\game\vmap\BIH.h" />
-    <ClInclude Include="..\..\src\game\vmap\BIHWrap.h" />
-    <ClInclude Include="..\..\src\game\vmap\DynamicTree.h" />
-    <ClInclude Include="..\..\src\game\vmap\GameObjectModel.h" />
     <ClInclude Include="..\..\src\game\vmap\IVMapManager.h" />
     <ClInclude Include="..\..\src\game\vmap\MapTree.h" />
     <ClInclude Include="..\..\src\game\vmap\ModelInstance.h" />
-    <ClInclude Include="..\..\src\game\vmap\RegularGrid.h" />
     <ClInclude Include="..\..\src\game\vmap\TileAssembler.h" />
     <ClInclude Include="..\..\src\game\vmap\VMapDefinitions.h" />
     <ClInclude Include="..\..\src\game\vmap\VMapFactory.h" />

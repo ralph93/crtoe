@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2005-2013 MaNGOS <http://getmangos.com/>
+ * Copyright (C) 2005-2012 MaNGOS <http://getmangos.com/>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -17,11 +17,12 @@
  */
 
 #include "OutdoorPvPMgr.h"
-#include "Policies/Singleton.h"
+#include "Policies/SingletonImp.h"
 #include "OutdoorPvP.h"
 #include "World.h"
 #include "Log.h"
 #include "OutdoorPvPEP.h"
+#include "OutdoorPvPGH.h"
 #include "OutdoorPvPHP.h"
 #include "OutdoorPvPNA.h"
 #include "OutdoorPvPSI.h"
@@ -61,6 +62,7 @@ void OutdoorPvPMgr::InitOutdoorPvP()
     LOAD_OPVP_ZONE(ZM);
     LOAD_OPVP_ZONE(TF);
     LOAD_OPVP_ZONE(NA);
+    LOAD_OPVP_ZONE(GH);
 
     sLog.outString();
     sLog.outString(">> Loaded %u Outdoor PvP zones", counter);
@@ -82,6 +84,8 @@ OutdoorPvP* OutdoorPvPMgr::GetScript(uint32 zoneId)
             return m_scripts[OPVP_ID_TF];
         case ZONE_ID_NAGRAND:
             return m_scripts[OPVP_ID_NA];
+        case ZONE_ID_GRIZZLY_HILLS:
+            return m_scripts[OPVP_ID_GH];
         default:
             return NULL;
     }

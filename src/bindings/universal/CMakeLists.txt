@@ -16,17 +16,7 @@
 # Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 #
 
-set(LIBRARY_NAME mangosscript)
-
-set(LIBRARY_SRCS
-    config.h
-    ScriptMgr.cpp
-    ScriptMgr.h
-    system.cpp
-    Scripts/sc_default.cpp
-    Scripts/sc_defines.cpp
-    Scripts/sc_defines.h
-   )
+file(GLOB_RECURSE mangosscript_SRCS RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} *.cpp *.h)
 
 include_directories(
   ${CMAKE_SOURCE_DIR}/src/shared
@@ -36,59 +26,60 @@ include_directories(
   ${MYSQL_INCLUDE_DIR}
 )
 
-add_library(${LIBRARY_NAME} SHARED
-  ${LIBRARY_SRCS}
+add_library(mangosscript SHARED
+  ${mangosscript_SRCS}
 )
 
-add_dependencies(${LIBRARY_NAME} revision.h)
+add_dependencies(mangosscript revision.h)
 if(NOT ACE_USE_EXTERNAL)
-  add_dependencies(${LIBRARY_NAME} ACE_Project)
+  add_dependencies(mangosscript ACE_Project)
+# add_dependencies(mangosscript ace)
 endif()
 
-target_link_libraries(${LIBRARY_NAME}
+target_link_libraries(mangosscript
   ${ZLIB_LIBRARIES}
   ${ACE_LIBRARIES}
 )
 
 if(WIN32)
-  target_link_libraries(${LIBRARY_NAME}
+  target_link_libraries(mangosscript
     mangosd # FIXME: could this be done for unix? because unix won't generate exe.libs
   )
   if(WIN32 AND PLATFORM MATCHES X86)
-    target_link_libraries(${LIBRARY_NAME}
+    target_link_libraries(mangosscript
       debug ${WIN_DEBUGLIBS}
     )
   endif()
 endif()
 
 if(UNIX)
-  set(LIBRARY_LINK_FLAGS "-pthread")
+  set(mangosscript_LINK_FLAGS "-pthread")
   if(APPLE)
-    set(LIBRARY_LINK_FLAGS "-framework Carbon ${LIBRARY_LINK_FLAGS}")
+    set(mangosscript_LINK_FLAGS "-framework Carbon ${mangosscript_LINK_FLAGS}")
     # Needed for the linking because of the missing symbols
-    set(LIBRARY_LINK_FLAGS "-Wl,-undefined -Wl,dynamic_lookup ${LIBRARY_LINK_FLAGS}")
+    set(mangosscript_LINK_FLAGS "-Wl,-undefined -Wl,dynamic_lookup ${mangosscript_LINK_FLAGS}")
   endif()
 
   if(APPLE)
-    set(LIBRARY_PROPERTIES INSTALL_NAME_DIR "${LIBS_DIR}")
+    set(mangosscript_PROPERTIES INSTALL_NAME_DIR "${LIBS_DIR}")
   else()
-    set(LIBRARY_PROPERTIES INSTALL_RPATH ${LIBS_DIR})
+    set(mangosscript_PROPERTIES INSTALL_RPATH ${LIBS_DIR})
   endif()
 
   # Run out of build tree
-  set(LIBRARY_PROPERTIES
-    ${LIBRARY_PROPERTIES}
+  set(mangosscript_PROPERTIES
+    ${mangosscript_PROPERTIES}
     BUILD_WITH_INSTALL_RPATH OFF
   )
 
-  set_target_properties(${LIBRARY_NAME} PROPERTIES
-    LINK_FLAGS ${LIBRARY_LINK_FLAGS}
-    ${LIBRARY_PROPERTIES}
+  set_target_properties(mangosscript PROPERTIES
+    LINK_FLAGS ${mangosscript_LINK_FLAGS}
+    ${mangosscript_PROPERTIES}
   )
 endif()
 
 # LIBRARY = dyld / so, RUNTIME = dll
-install(TARGETS ${LIBRARY_NAME}
+install(TARGETS mangosscript
   LIBRARY DESTINATION ${LIBS_DIR}
   RUNTIME DESTINATION ${LIBS_DIR}
 )
