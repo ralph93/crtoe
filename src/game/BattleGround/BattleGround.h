@@ -41,6 +41,7 @@ class Player;
 class WorldPacket;
 class BattleGroundMap;
 
+struct PvPDifficultyEntry;
 struct WorldSafeLocsEntry;
 
 struct BattleGroundEventIdx
@@ -69,13 +70,15 @@ enum BattleGroundQuests
 
 enum BattleGroundMarks
 {
-    SPELL_WS_MARK_LOSER             = 24950,
-    SPELL_WS_MARK_WINNER            = 24951,
-    SPELL_AB_MARK_LOSER             = 24952,
-    SPELL_AB_MARK_WINNER            = 24953,
-    SPELL_AV_MARK_LOSER             = 24954,
-    SPELL_AV_MARK_WINNER            = 24955,
-    ITEM_EY_MARK_OF_HONOR           = 29024
+    SPELL_WS_MARK_LOSER             = 24950,                // not create marks now
+    SPELL_WS_MARK_WINNER            = 24951,                // not create marks now
+    SPELL_AB_MARK_LOSER             = 24952,                // not create marks now
+    SPELL_AB_MARK_WINNER            = 24953,                // not create marks now
+    SPELL_AV_MARK_LOSER             = 24954,                // not create marks now
+    SPELL_AV_MARK_WINNER            = 24955,                // not create marks now
+
+    SPELL_WG_MARK_VICTORY           = 24955,                // honor + mark
+    SPELL_WG_MARK_DEFEAT            = 58494,                // honor + mark
 };
 
 enum BattleGroundMarksCount
@@ -93,14 +96,16 @@ enum BattleGroundSpells
     SPELL_HORDE_GREEN_FLAG          = 35775,
     SPELL_PREPARATION               = 44521,                // Preparation
     SPELL_RECENTLY_DROPPED_FLAG     = 42792,                // Recently Dropped Flag
-    SPELL_AURA_PLAYER_INACTIVE      = 43681                 // Inactive
+    SPELL_AURA_PLAYER_INACTIVE      = 43681,                // Inactive
+    SPELL_ARENA_DAMPENING           = 74410,                // Arena - Dampening
+    SPELL_BATTLEGROUND_DAMPENING    = 74411,                // Battleground - Dampening
 };
 
 enum BattleGroundTimeIntervals
 {
     RESURRECTION_INTERVAL           = 30000,                // ms
-    INVITATION_REMIND_TIME          = 60000,                // ms
-    INVITE_ACCEPT_WAIT_TIME         = 80000,                // ms
+    INVITATION_REMIND_TIME          = 20000,                // ms
+    INVITE_ACCEPT_WAIT_TIME         = 40000,                // ms
     TIME_TO_AUTOREMOVE              = 120000,               // ms
     MAX_OFFLINE_TIME                = 300,                  // secs
     RESPAWN_ONE_DAY                 = 86400,                // secs
@@ -159,20 +164,16 @@ enum BattleGroundQueueTypeId
     BATTLEGROUND_QUEUE_WS       = 2,
     BATTLEGROUND_QUEUE_AB       = 3,
     BATTLEGROUND_QUEUE_EY       = 4,
-    BATTLEGROUND_QUEUE_2v2      = 5,
-    BATTLEGROUND_QUEUE_3v3      = 6,
-    BATTLEGROUND_QUEUE_5v5      = 7,
-};
-#define MAX_BATTLEGROUND_QUEUE_TYPES 8
-
-enum BattleGroundBracketId                                  // bracketId for level ranges
-{
-    BG_BRACKET_ID_TEMPLATE       = -1,                      // used to mark bg as template
-    BG_BRACKET_ID_FIRST          = 0,                       // brackets start from specific BG min level and each include 10 levels range
-    BG_BRACKET_ID_LAST           = 6,                       // so for start level 10 will be 10-19, 20-29, ...  all greater max bg level included in last breaket
+    BATTLEGROUND_QUEUE_SA       = 5,
+    BATTLEGROUND_QUEUE_IC       = 6,
+    BATTLEGROUND_QUEUE_TP       = 7,
+    BATTLEGROUND_QUEUE_BG       = 8,
+    BATTLEGROUND_QUEUE_2v2      = 9,
+    BATTLEGROUND_QUEUE_3v3      = 10,
+    BATTLEGROUND_QUEUE_5v5      = 11,
 };
 
-#define MAX_BATTLEGROUND_BRACKETS  7
+#define MAX_BATTLEGROUND_QUEUE_TYPES 12
 
 enum ScoreType
 {
@@ -180,7 +181,7 @@ enum ScoreType
     SCORE_DEATHS                = 2,
     SCORE_HONORABLE_KILLS       = 3,
     SCORE_BONUS_HONOR           = 4,
-    // EY, but in MSG_PVP_LOG_DATA opcode!
+    // EY, but in SMSG_PVP_LOG_DATA opcode!
     SCORE_DAMAGE_DONE           = 5,
     SCORE_HEALING_DONE          = 6,
     // WS
@@ -229,18 +230,35 @@ enum BattleGroundStartingEventsIds
 };
 #define BG_STARTING_EVENT_COUNT 4
 
-enum BattleGroundJoinError
+enum GroupJoinBattlegroundResult
 {
-    BG_JOIN_ERR_OK = 0,
-    BG_JOIN_ERR_OFFLINE_MEMBER = 1,
-    BG_JOIN_ERR_GROUP_TOO_MANY = 2,
-    BG_JOIN_ERR_MIXED_FACTION = 3,
-    BG_JOIN_ERR_MIXED_LEVELS = 4,
-    BG_JOIN_ERR_MIXED_ARENATEAM = 5,
-    BG_JOIN_ERR_GROUP_MEMBER_ALREADY_IN_QUEUE = 6,
-    BG_JOIN_ERR_GROUP_DESERTER = 7,
-    BG_JOIN_ERR_ALL_QUEUES_USED = 8,
-    BG_JOIN_ERR_GROUP_NOT_ENOUGH = 9
+    ERR_BATTLEGROUND_NONE                           = 0,
+    ERR_GROUP_JOIN_BATTLEGROUND_DESERTERS           = 2,    // You cannot join the battleground yet because you or one of your party members is flagged as a Deserter.
+    ERR_ARENA_TEAM_PARTY_SIZE                       = 3,    // Incorrect party size for this arena.
+    ERR_BATTLEGROUND_TOO_MANY_QUEUES                = 4,    // You can only be queued for 2 battles at once
+    ERR_BATTLEGROUND_CANNOT_QUEUE_FOR_RATED         = 5,    // You cannot queue for a rated match while queued for other battles
+    ERR_BATTLEDGROUND_QUEUED_FOR_RATED              = 6,    // You cannot queue for another battle while queued for a rated arena match
+    ERR_BATTLEGROUND_TEAM_LEFT_QUEUE                = 7,    // Your team has left the arena queue
+    ERR_BATTLEGROUND_NOT_IN_BATTLEGROUND            = 8,    // You can't do that in a battleground.
+    ERR_BATTLEGROUND_JOIN_XP_GAIN                   = 9,    // wtf, doesn't exist in client...
+    ERR_BATTLEGROUND_JOIN_RANGE_INDEX               = 10,   // Cannot join the queue unless all members of your party are in the same battleground level range.
+    ERR_BATTLEGROUND_JOIN_TIMED_OUT                 = 11,   // %s was unavailable to join the queue. (uint64 guid exist in client cache)
+    ERR_BATTLEGROUND_JOIN_TIMED_OUT2                = 12,   // same as 11
+    ERR_BATTLEGROUND_TEAM_LEFT_QUEUE2               = 13,   // same as 7
+    ERR_LFG_CANT_USE_BATTLEGROUND                   = 14,   // You cannot queue for a battleground or arena while using the dungeon system.
+    ERR_IN_RANDOM_BG                                = 15,   // Can't do that while in a Random Battleground queue.
+    ERR_IN_NON_RANDOM_BG                            = 16,   // Can't queue for Random Battleground while in another Battleground queue.
+    ERR_BG_DEVELOPER_ONLY                           = 17,
+    ERR_BATTLEGROUND_INVITATION_DECLINED            = 18,
+    ERR_MEETING_STONE_NOT_FOUND                     = 19,
+    ERR_WARGAME_REQUEST_FAILURE                     = 20,
+    ERR_BATTLEFIELD_TEAM_PARTY_SIZE                 = 22,
+    ERR_NOT_ON_TOURNAMENT_REALM                     = 23,
+    ERR_BATTLEGROUND_PLAYERS_FROM_DIFFERENT_REALMS  = 24,
+    ERR_REMOVE_FROM_PVP_QUEUE_GRANT_LEVEL           = 33,
+    ERR_REMOVE_FROM_PVP_QUEUE_FACTION_CHANGE        = 34,
+    ERR_BATTLEGROUND_JOIN_FAILED                    = 35,
+    ERR_BATTLEGROUND_DUPE_QUEUE                     = 43,
 };
 
 class BattleGroundScore
@@ -276,12 +294,21 @@ class BattleGround
         /*BattleGround(const BattleGround& bg);*/
         virtual ~BattleGround();
         virtual void Update(uint32 diff);                   // must be implemented in BG subclass of BG specific update code, but must in begginning call parent version
+        virtual bool SetupBattleGround()                    // must be implemented in BG subclass
+        {
+            return true;
+        }
         virtual void Reset();                               // resets all common properties for battlegrounds, must be implemented and called in BG subclass
         virtual void StartingEventCloseDoors() {}
         virtual void StartingEventOpenDoors() {}
 
+        /* achievement req. */
+        virtual bool IsAllNodesControlledByTeam(Team /*team*/) const { return false; }
+        bool IsTeamScoreInRange(Team team, uint32 minScore, uint32 maxScore) const;
+
         /* Battleground */
         // Get methods:
+        ObjectGuid GetObjectGuid() { return ObjectGuid(HIGHGUID_BATTLEGROUND, uint32(m_ArenaType), uint32(m_TypeID)); }
         char const* GetName() const         { return m_Name; }
         BattleGroundTypeId GetTypeID() const { return m_TypeID; }
         BattleGroundBracketId GetBracketId() const { return m_BracketId; }
@@ -310,7 +337,8 @@ class BattleGround
         // Set methods:
         void SetName(char const* Name)      { m_Name = Name; }
         void SetTypeID(BattleGroundTypeId TypeID) { m_TypeID = TypeID; }
-        void SetBracketId(BattleGroundBracketId ID) { m_BracketId = ID; }
+        // here we can count minlevel and maxlevel for players
+        void SetBracket(PvPDifficultyEntry const* bracketEntry);
         void SetStatus(BattleGroundStatus Status) { m_Status = Status; }
         void SetClientInstanceID(uint32 InstanceID) { m_ClientInstanceID = InstanceID; }
         void SetStartTime(uint32 Time)      { m_StartTime = Time; }
@@ -358,6 +386,8 @@ class BattleGround
         uint32 GetPlayerScoresSize() const { return m_PlayerScores.size(); }
 
         void StartBattleGround();
+
+        void StartTimedAchievement(AchievementCriteriaTypes type, uint32 entry);
 
         /* Location */
         void SetMapId(uint32 MapID) { m_MapId = MapID; }
@@ -487,13 +517,17 @@ class BattleGround
 
         void HandleTriggerBuff(ObjectGuid go_guid);
 
+        // TODO drop m_BGObjects
+        GuidVector m_BgObjects;
         void SpawnBGObject(ObjectGuid guid, uint32 respawntime);
+        bool AddObject(uint32 type, uint32 entry, float x, float y, float z, float o, float rotation0, float rotation1, float rotation2, float rotation3, uint32 respawnTime = 0);
         void SpawnBGCreature(ObjectGuid guid, uint32 respawntime);
+        bool DelObject(uint32 type);
 
         void DoorOpen(ObjectGuid guid);
         void DoorClose(ObjectGuid guid);
 
-        virtual bool HandlePlayerUnderMap(Player * /*plr*/) { return false; }
+        virtual bool HandlePlayerUnderMap(Player* /*plr*/) { return false; }
 
         // since arenas can be AvA or Hvh, we have to get the "temporary" team of a player
         Team GetPlayerTeam(ObjectGuid guid);
@@ -529,7 +563,7 @@ class BattleGround
 
         BattleGroundScoreMap m_PlayerScores;                // Player scores
         // must be implemented in BG subclass
-        virtual void RemovePlayer(Player * /*player*/, ObjectGuid /*guid*/) {}
+        virtual void RemovePlayer(Player* /*player*/, ObjectGuid /*guid*/) {}
 
         /* Player lists, those need to be accessible by inherited classes */
         BattleGroundPlayerMap  m_Players;

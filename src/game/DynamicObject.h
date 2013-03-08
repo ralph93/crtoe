@@ -28,6 +28,7 @@ enum DynamicObjectType
     DYNAMIC_OBJECT_PORTAL           = 0x0,      // unused
     DYNAMIC_OBJECT_AREA_SPELL       = 0x1,
     DYNAMIC_OBJECT_FARSIGHT_FOCUS   = 0x2,
+    DYNAMIC_OBJECT_RAID_MARKER      = 0x3,
 };
 
 struct SpellEntry;
@@ -65,7 +66,7 @@ class DynamicObject : public WorldObject
 
         bool isVisibleForInState(Player const* u, WorldObject const* viewPoint, bool inVisibleList) const override;
 
-        GridReference<DynamicObject> &GetGridRef() { return m_gridRef; }
+        GridReference<DynamicObject>& GetGridRef() { return m_gridRef; }
 
     protected:
         uint32 m_spellId;

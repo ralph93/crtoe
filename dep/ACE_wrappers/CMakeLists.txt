@@ -1,5 +1,5 @@
 #
-# Copyright (C) 2005-2012 MaNGOS project <http://getmangos.com/>
+# Copyright (C) 2005-2013 MaNGOS project <http://getmangos.com/>
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -55,12 +55,20 @@ if(WIN32 AND MSVC)
     ALWAYS 0
   )
 elseif(UNIX)
+  if(CMAKE_BUILD_TOOL MATCHES "/gmake")
+    set(ACE_BUILD_TOOL gmake)
+  else()
+    set(ACE_BUILD_TOOL make)
+  endif()
+
   ExternalProject_Add(ACE_Project
     SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}
     BINARY_DIR ${CMAKE_CURRENT_BINARY_DIR}
     INSTALL_DIR ${CMAKE_INSTALL_PREFIX}
     DOWNLOAD_COMMAND ""
-    CONFIGURE_COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/configure --prefix=${CMAKE_INSTALL_PREFIX} --disable-ssl
+    CONFIGURE_COMMAND <SOURCE_DIR>/configure --prefix=<INSTALL_DIR> --disable-ssl
+    BUILD_COMMAND ${ACE_BUILD_TOOL} -j2 # export arch="ia32" &&
+    INSTALL_COMMAND ${ACE_BUILD_TOOL} install
   )
 else()
   message(FATAL_ERROR

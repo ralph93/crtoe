@@ -68,6 +68,8 @@
 #define BG_AV_REP_OWNED_MINE                24
 #define BG_AV_REP_OWNED_MINE_HOLIDAY        36
 
+#define BG_AV_EVENT_START_BATTLE            9166
+
 enum BG_AV_Sounds
 {
     BG_AV_SOUND_NEAR_LOSE               = 8456,             // not confirmed yet
@@ -318,15 +320,18 @@ class BattleGroundAV : public BattleGround
 
     public:
         BattleGroundAV();
+        ~BattleGroundAV();
         void Update(uint32 diff) override;
 
         /* inherited from BattlegroundClass */
         virtual void AddPlayer(Player* plr) override;
 
+        virtual void StartingEventCloseDoors() override;
         virtual void StartingEventOpenDoors() override;
         // world states
         virtual void FillInitialWorldStates(WorldPacket& data, uint32& count) override;
 
+        void RemovePlayer(Player* plr, ObjectGuid guid) override;
         void HandleAreaTrigger(Player* source, uint32 trigger) override;
         virtual void Reset() override;
 

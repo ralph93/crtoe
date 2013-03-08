@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# Copyright (C) 2005-2012 MaNGOS project <http://getmangos.com/>
+# Copyright (C) 2005-2013 MaNGOS project <http://getmangos.com/>
 #
 # This file is free software; as a special exception the author gives
 # unlimited permission to copy and/or distribute it, with or without
@@ -148,7 +148,7 @@ then
   echo "`date`: Extracting of vmaps finished" | tee -a $LOG_FILE
   mkdir vmaps
   echo "`date`: Start assembling of vmaps..." | tee -a $LOG_FILE
-  vmap_assembler Buildings vmaps | tee -a $DETAIL_LOG_FILE
+  vmap_assembler buildings vmaps | tee -a $DETAIL_LOG_FILE
   echo "`date`: Assembling of vmaps finished" | tee -a $LOG_FILE
 
   echo | tee -a $LOG_FILE

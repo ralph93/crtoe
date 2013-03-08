@@ -1,12 +1,38 @@
+/*
+ * Copyright (C) 2005-2013 MaNGOS <http://getmangos.com/>
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ */
+
 #ifndef DBCFILE_H
 #define DBCFILE_H
+
 #include <cassert>
 #include <string>
+
+#ifdef _DLL
+#undef _DLL
+#endif
+
+#include "StormLib.h"
 
 class DBCFile
 {
     public:
         DBCFile(const std::string& filename);
+        DBCFile(HANDLE file);
         ~DBCFile();
 
         // Open database. It must be openened before it can be used.
@@ -65,8 +91,7 @@ class DBCFile
                 friend class DBCFile;
                 friend class DBCFile::Iterator;
         };
-        /** Iterator that iterates over records
-        */
+        /* Iterator that iterates over records */
         class Iterator
         {
             public:
@@ -109,6 +134,7 @@ class DBCFile
         size_t getMaxId();
     private:
         std::string filename;
+        HANDLE fileHandle;
         size_t recordSize;
         size_t recordCount;
         size_t fieldCount;

@@ -41,9 +41,11 @@ struct GameObjectInfo
     char*   name;
     char*   IconName;
     char*   castBarCaption;
+    char*   unk1;
     uint32  faction;
     uint32  flags;
     float   size;
+    uint32  questItems[6];
     union                                                   // different GO types have different data field
     {
         //0 GAMEOBJECT_TYPE_DOOR
@@ -51,17 +53,18 @@ struct GameObjectInfo
         {
             uint32 startOpen;                               //0 used client side to determine GO_ACTIVATED means open/closed
             uint32 lockId;                                  //1 -> Lock.dbc
-            uint32 autoCloseTime;                           //2 secs till autoclose = autoCloseTime / 0x10000
+            uint32 autoCloseTime;                           //2 secs till autoclose = autoCloseTime / IN_MILLISECONDS (previous was 0x10000)
             uint32 noDamageImmune;                          //3 break opening whenever you recieve damage?
             uint32 openTextID;                              //4 can be used to replace castBarCaption?
             uint32 closeTextID;                             //5
+            uint32 ignoredByPathing;                        //6
         } door;
         //1 GAMEOBJECT_TYPE_BUTTON
         struct
         {
             uint32 startOpen;                               //0
             uint32 lockId;                                  //1 -> Lock.dbc
-            uint32 autoCloseTime;                           //2 secs till autoclose = autoCloseTime / 0x10000
+            uint32 autoCloseTime;                           //2 secs till autoclose = autoCloseTime / IN_MILLISECONDS (previous was 0x10000)
             uint32 linkedTrapId;                            //3
             uint32 noDamageImmune;                          //4 isBattlegroundObject
             uint32 large;                                   //5
@@ -102,6 +105,7 @@ struct GameObjectInfo
             uint32 logLoot;                                 //13
             uint32 openTextID;                              //14 can be used to replace castBarCaption?
             uint32 groupLootRules;                          //15
+            uint32 floatingTooltip;                         //16
         } chest;
         //4 GAMEOBJECT_TYPE_BINDER - empty
         //5 GAMEOBJECT_TYPE_GENERIC
@@ -123,7 +127,7 @@ struct GameObjectInfo
             uint32 spellId;                                 //3
             uint32 charges;                                 //4 need respawn (if > 0)
             uint32 cooldown;                                //5 time in secs
-            uint32 autoCloseTime;                           //6
+            uint32 autoCloseTime;                           //6 secs till autoclose = autoCloseTime / IN_MILLISECONDS (previous was 0x10000)
             uint32 startDelay;                              //7
             uint32 serverOnly;                              //8
             uint32 stealthed;                               //9
@@ -131,6 +135,7 @@ struct GameObjectInfo
             uint32 stealthAffected;                         //11
             uint32 openTextID;                              //12 can be used to replace castBarCaption?
             uint32 closeTextID;                             //13
+            uint32 ignoreTotems;                            //14
         } trap;
         //7 GAMEOBJECT_TYPE_CHAIR
         struct
@@ -138,6 +143,7 @@ struct GameObjectInfo
             uint32 slots;                                   //0
             uint32 height;                                  //1
             uint32 onlyCreatorUse;                          //2
+            uint32 triggeredEvent;                          //3
         } chair;
         //8 GAMEOBJECT_TYPE_SPELL_FOCUS
         struct
@@ -148,6 +154,7 @@ struct GameObjectInfo
             uint32 serverOnly;                              //3
             uint32 questID;                                 //4
             uint32 large;                                   //5
+            uint32 floatingTooltip;                         //6
         } spellFocus;
         //9 GAMEOBJECT_TYPE_TEXT
         struct
@@ -163,7 +170,7 @@ struct GameObjectInfo
             uint32 lockId;                                  //0 -> Lock.dbc
             uint32 questId;                                 //1
             uint32 eventId;                                 //2
-            uint32 autoCloseTime;                           //3
+            uint32 autoCloseTime;                           //3 secs till autoclose = autoCloseTime / IN_MILLISECONDS (previous was 0x10000)
             uint32 customAnim;                              //4
             uint32 consumable;                              //5
             uint32 cooldown;                                //6
@@ -180,13 +187,16 @@ struct GameObjectInfo
             uint32 allowMounted;                            //17
             uint32 floatingTooltip;                         //18
             uint32 gossipID;                                //19
+            uint32 WorldStateSetsState;                     //20
         } goober;
         //11 GAMEOBJECT_TYPE_TRANSPORT
         struct
         {
             uint32 pause;                                   //0
             uint32 startOpen;                               //1
-            uint32 autoCloseTime;                           //2 secs till autoclose = autoCloseTime / 0x10000
+            uint32 autoCloseTime;                           //2 secs till autoclose = autoCloseTime / IN_MILLISECONDS (previous was 0x10000)
+            uint32 pause1EventID;                           //3
+            uint32 pause2EventID;                           //4
         } transport;
         //12 GAMEOBJECT_TYPE_AREADAMAGE
         struct
@@ -196,7 +206,7 @@ struct GameObjectInfo
             uint32 damageMin;                               //2
             uint32 damageMax;                               //3
             uint32 damageSchool;                            //4
-            uint32 autoCloseTime;                           //5 secs till autoclose = autoCloseTime / 0x10000
+            uint32 autoCloseTime;                           //5 secs till autoclose = autoCloseTime / IN_MILLISECONDS (previous was 0x10000)
             uint32 openTextID;                              //6
             uint32 closeTextID;                             //7
         } areadamage;
@@ -219,14 +229,10 @@ struct GameObjectInfo
             uint32 stopEventID;                             //4
             uint32 transportPhysics;                        //5
             uint32 mapID;                                   //6
+            uint32 worldState1;                             //7
         } moTransport;
         //16 GAMEOBJECT_TYPE_DUELFLAG - empty
-        //17 GAMEOBJECT_TYPE_FISHINGNODE
-        struct
-        {
-            uint32 _data0;                                  //0
-            uint32 lootId;                                  //1
-        } fishnode;
+        //17 GAMEOBJECT_TYPE_FISHINGNODE - empty
         //18 GAMEOBJECT_TYPE_SUMMONING_RITUAL
         struct
         {
@@ -240,11 +246,7 @@ struct GameObjectInfo
             uint32 ritualNoTargetCheck;                     //7
         } summoningRitual;
         //19 GAMEOBJECT_TYPE_MAILBOX - empty
-        //20 GAMEOBJECT_TYPE_AUCTIONHOUSE
-        struct
-        {
-            uint32 actionHouseID;                           //0
-        } auctionhouse;
+        //20 GAMEOBJECT_TYPE_DONOTUSE - empty
         //21 GAMEOBJECT_TYPE_GUARDPOST
         struct
         {
@@ -257,6 +259,8 @@ struct GameObjectInfo
             uint32 spellId;                                 //0
             uint32 charges;                                 //1
             uint32 partyOnly;                               //2
+            uint32 allowMounted;                            //3
+            uint32 large;                                   //4
         } spellcaster;
         //23 GAMEOBJECT_TYPE_MEETINGSTONE
         struct
@@ -323,6 +327,8 @@ struct GameObjectInfo
             uint32 maxTime;                                 //17
             uint32 large;                                   //18
             uint32 highlight;                               //19
+            uint32 startingValue;                           //20
+            uint32 unidirectional;                          //21
         } capturePoint;
         //30 GAMEOBJECT_TYPE_AURA_GENERATOR
         struct
@@ -341,29 +347,57 @@ struct GameObjectInfo
             uint32 mapID;                                   //0
             uint32 difficulty;                              //1
         } dungeonDifficulty;
-        //32 GAMEOBJECT_TYPE_DO_NOT_USE_YET
+        //32 GAMEOBJECT_TYPE_BARBER_CHAIR
         struct
         {
-            uint32 mapID;                                   //0
-            uint32 difficulty;                              //1
-        } doNotUseYet;
+            uint32 chairheight;                             //0
+            uint32 heightOffset;                            //1
+        } barberChair;
         //33 GAMEOBJECT_TYPE_DESTRUCTIBLE_BUILDING
         struct
         {
-            uint32 dmgPctState1;                            //0
-            uint32 dmgPctState2;                            //1
-            uint32 state1Name;                              //2
-            uint32 state2Name;                              //3
+            uint32 intactNumHits;                           //0
+            uint32 creditProxyCreature;                     //1
+            uint32 empty1;                                  //2
+            uint32 intactEvent;                             //3
+            uint32 empty2;                                  //4
+            uint32 damagedNumHits;                          //5
+            uint32 empty3;                                  //6
+            uint32 empty4;                                  //7
+            uint32 empty5;                                  //8
+            uint32 damagedEvent;                            //9
+            uint32 empty6;                                  //10
+            uint32 empty7;                                  //11
+            uint32 empty8;                                  //12
+            uint32 empty9;                                  //13
+            uint32 destroyedEvent;                          //14
+            uint32 empty10;                                 //15
+            uint32 debuildingTimeSecs;                      //16
+            uint32 empty11;                                 //17
+            uint32 destructibleData;                        //18
+            uint32 rebuildingEvent;                         //19
+            uint32 empty12;                                 //20
+            uint32 empty13;                                 //21
+            uint32 damageEvent;                             //22
+            uint32 empty14;                                 //23
         } destructibleBuilding;
         //34 GAMEOBJECT_TYPE_GUILDBANK - empty
+        //35 GAMEOBJECT_TYPE_TRAPDOOR
+        struct
+        {
+            uint32 whenToPause;                             // 0
+            uint32 startOpen;                               // 1
+            uint32 autoClose;                               // 2
+        } trapDoor;
 
         // not use for specific field access (only for output with loop by all filed), also this determinate max union size
         struct
         {
-            uint32 data[24];
+            uint32 data[32];
         } raw;
     };
 
+    uint32 unk2;
     uint32 MinMoneyLoot;
     uint32 MaxMoneyLoot;
     uint32 ScriptId;
@@ -392,7 +426,7 @@ struct GameObjectInfo
             case GAMEOBJECT_TYPE_AREADAMAGE: return areadamage.lockId;
             case GAMEOBJECT_TYPE_CAMERA:     return camera.lockId;
             case GAMEOBJECT_TYPE_FLAGSTAND:  return flagstand.lockId;
-            case GAMEOBJECT_TYPE_FISHINGHOLE:return fishinghole.lockId;
+            case GAMEOBJECT_TYPE_FISHINGHOLE: return fishinghole.lockId;
             case GAMEOBJECT_TYPE_FLAGDROP:   return flagdrop.lockId;
             default: return 0;
         }
@@ -458,7 +492,7 @@ struct GameObjectInfo
             case GAMEOBJECT_TYPE_AREADAMAGE:    autoCloseTime = areadamage.autoCloseTime; break;
             default: break;
         }
-        return autoCloseTime / 0x10000;
+        return autoCloseTime / IN_MILLISECONDS;             // prior to 3.0.3, conversion was / 0x10000;
     }
 
     uint32 GetLootId() const
@@ -477,6 +511,17 @@ struct GameObjectInfo
         {
             case GAMEOBJECT_TYPE_QUESTGIVER:    return questgiver.gossipID;
             case GAMEOBJECT_TYPE_GOOBER:        return goober.gossipID;
+            default: return 0;
+        }
+    }
+
+    uint32 GetEventScriptId() const
+    {
+        switch (type)
+        {
+            case GAMEOBJECT_TYPE_GOOBER:        return goober.eventId;
+            case GAMEOBJECT_TYPE_CHEST:         return chest.eventId;
+            case GAMEOBJECT_TYPE_CAMERA:        return camera.eventID;
             default: return 0;
         }
     }
@@ -505,23 +550,38 @@ enum GOState
 
 #define MAX_GO_STATE              3
 
+struct QuaternionData
+{
+    float x, y, z, w;
+
+    QuaternionData() : x(0.f), y(0.f), z(0.f), w(0.f) {}
+    QuaternionData(float X, float Y, float Z, float W) : x(X), y(Y), z(Z), w(W) {}
+
+    bool isUnit() const { return fabs(x * x + y * y + z * z + w * w - 1.f) < 1e-5;}
+};
+
 // from `gameobject`
 struct GameObjectData
 {
     uint32 id;                                              // entry in gamobject_template
-    uint32 mapid;
+    uint16 mapid;
+    uint16 phaseMask;
     float posX;
     float posY;
     float posZ;
     float orientation;
-    float rotation0;
-    float rotation1;
-    float rotation2;
-    float rotation3;
+    QuaternionData rotation;
     int32  spawntimesecs;
     uint32 animprogress;
     GOState go_state;
     uint8 spawnMask;
+};
+
+// from `gameobject_addon`
+struct GameObjectDataAddon
+{
+    uint32 guid;
+    QuaternionData path_rotation;
 };
 
 // For containers:  [GO_NOT_READY]->GO_READY (close)->GO_ACTIVATED (open) ->GO_JUST_DEACTIVATED->GO_READY        -> ...
@@ -555,13 +615,12 @@ enum CapturePointSlider
 };
 
 class Unit;
-class GameObjectModel;
 struct GameObjectDisplayInfoEntry;
 
 // 5 sec for bobber catch
 #define FISHING_BOBBER_READY_TIME 5
 
-#define GO_ANIMPROGRESS_DEFAULT 100                         // in 3.x 0xFF
+#define GO_ANIMPROGRESS_DEFAULT 0xFF
 
 class MANGOS_DLL_SPEC GameObject : public WorldObject
 {
@@ -572,8 +631,8 @@ class MANGOS_DLL_SPEC GameObject : public WorldObject
         void AddToWorld() override;
         void RemoveFromWorld() override;
 
-        bool Create(uint32 guidlow, uint32 name_id, Map* map, float x, float y, float z, float ang,
-                    float rotation0 = 0.0f, float rotation1 = 0.0f, float rotation2 = 0.0f, float rotation3 = 0.0f, uint32 animprogress = GO_ANIMPROGRESS_DEFAULT, GOState go_state = GO_STATE_READY);
+        bool Create(uint32 guidlow, uint32 name_id, Map* map, uint32 phaseMask, float x, float y, float z, float ang,
+                    QuaternionData rotation = QuaternionData(), uint8 animprogress = GO_ANIMPROGRESS_DEFAULT, GOState go_state = GO_STATE_READY);
         void Update(uint32 update_diff, uint32 p_time) override;
         GameObjectInfo const* GetGOInfo() const;
 
@@ -581,13 +640,17 @@ class MANGOS_DLL_SPEC GameObject : public WorldObject
 
         bool HasStaticDBSpawnData() const;                  // listed in `gameobject` table and have fixed in DB guid
 
-        void UpdateRotationFields(float rotation2 = 0.0f, float rotation3 = 0.0f);
+        // z_rot, y_rot, x_rot - rotation angles around z, y and x axes
+        void SetWorldRotationAngles(float z_rot, float y_rot, float x_rot);
+        void SetWorldRotation(float qx, float qy, float qz, float qw);
+        void SetTransportPathRotation(QuaternionData rotation);      // transforms(rotates) transport's path
+        int64 GetPackedWorldRotation() const { return m_packedRotation; }
 
         // overwrite WorldObject function for proper name localization
         const char* GetNameForLocaleIdx(int32 locale_idx) const override;
 
         void SaveToDB();
-        void SaveToDB(uint32 mapid, uint8 spawnMask);
+        void SaveToDB(uint32 mapid, uint8 spawnMask, uint32 phaseMask);
         bool LoadFromDB(uint32 guid, Map* map);
         void DeleteFromDB();
 
@@ -637,14 +700,14 @@ class MANGOS_DLL_SPEC GameObject : public WorldObject
         static void AddToRemoveListInMaps(uint32 db_guid, GameObjectData const* data);
         static void SpawnInMaps(uint32 db_guid, GameObjectData const* data);
 
-        GameobjectTypes GetGoType() const { return GameobjectTypes(GetUInt32Value(GAMEOBJECT_TYPE_ID)); }
-        void SetGoType(GameobjectTypes type) { SetUInt32Value(GAMEOBJECT_TYPE_ID, type); }
-        GOState GetGoState() const { return GOState(GetUInt32Value(GAMEOBJECT_STATE)); }
-        void SetGoState(GOState state);
-        uint32 GetGoArtKit() const { return GetUInt32Value(GAMEOBJECT_ARTKIT); }
-        void SetGoArtKit(uint32 artkit) { SetUInt32Value(GAMEOBJECT_ARTKIT, artkit); }
-        uint32 GetGoAnimProgress() const { return GetUInt32Value(GAMEOBJECT_ANIMPROGRESS); }
-        void SetGoAnimProgress(uint32 animprogress) { SetUInt32Value(GAMEOBJECT_ANIMPROGRESS, animprogress); }
+        GameobjectTypes GetGoType() const { return GameobjectTypes(GetByteValue(GAMEOBJECT_BYTES_1, 1)); }
+        void SetGoType(GameobjectTypes type) { SetByteValue(GAMEOBJECT_BYTES_1, 1, type); }
+        GOState GetGoState() const { return GOState(GetByteValue(GAMEOBJECT_BYTES_1, 0)); }
+        void SetGoState(GOState state) { SetByteValue(GAMEOBJECT_BYTES_1, 0, state); }
+        uint8 GetGoArtKit() const { return GetByteValue(GAMEOBJECT_BYTES_1, 2); }
+        void SetGoArtKit(uint8 artkit) { SetByteValue(GAMEOBJECT_BYTES_1, 2, artkit); }
+        uint8 GetGoAnimProgress() const { return GetByteValue(GAMEOBJECT_BYTES_1, 3); }
+        void SetGoAnimProgress(uint8 animprogress) { SetByteValue(GAMEOBJECT_BYTES_1, 3, animprogress); }
         uint32 GetDisplayId() const { return GetUInt32Value(GAMEOBJECT_DISPLAYID); }
         void SetDisplayId(uint32 modelId);
 
@@ -653,7 +716,7 @@ class MANGOS_DLL_SPEC GameObject : public WorldObject
         void Use(Unit* user);
 
         LootState getLootState() const { return m_lootState; }
-        void SetLootState(LootState s);
+        void SetLootState(LootState s) { m_lootState = s; }
 
         void AddToSkillupList(Player* player);
         bool IsInSkillupList(Player* player) const;
@@ -676,6 +739,7 @@ class MANGOS_DLL_SPEC GameObject : public WorldObject
 
         // Loot System
         Loot loot;
+        void getFishLoot(Loot* loot, Player* loot_owner);
         void StartGroupLoot(Group* group, uint32 timer) override;
 
         ObjectGuid GetLootRecipientGuid() const { return m_lootRecipientGuid; }
@@ -702,16 +766,12 @@ class MANGOS_DLL_SPEC GameObject : public WorldObject
 
         bool isVisibleForInState(Player const* u, WorldObject const* viewPoint, bool inVisibleList) const override;
 
-        bool IsCollisionEnabled() const;                    // Check if a go should collide. Like if a door is closed
-
         GameObject* LookupFishingHoleAround(float range);
 
         void SetCapturePointSlider(float value);
         float GetCapturePointSlider() const { return m_captureSlider; }
 
-        GridReference<GameObject> &GetGridRef() { return m_gridRef; }
-
-        GameObjectModel* m_model;
+        GridReference<GameObject>& GetGridRef() { return m_gridRef; }
 
     protected:
         uint32      m_spellId;
@@ -736,6 +796,8 @@ class MANGOS_DLL_SPEC GameObject : public WorldObject
 
         GameObjectInfo const* m_goInfo;
         GameObjectDisplayInfoEntry const* m_displayInfo;
+        int64 m_packedRotation;
+        QuaternionData m_worldRotation;
 
         // Loot System
         uint32 m_groupLootTimer;                            // (msecs)timer used for group loot
@@ -747,10 +809,7 @@ class MANGOS_DLL_SPEC GameObject : public WorldObject
     private:
         void SwitchDoorOrButton(bool activate, bool alternative = false);
         void TickCapturePoint();
-        void UpdateModel();                                 // updates model in case displayId were changed
-        void UpdateCollisionState() const;                  // updates state in Map's dynamic collision tree
 
         GridReference<GameObject> m_gridRef;
 };
-
 #endif

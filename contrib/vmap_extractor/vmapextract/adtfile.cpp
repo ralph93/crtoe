@@ -16,6 +16,8 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
+#define _CRT_SECURE_NO_WARNINGS
+
 #include "vmapexport.h"
 #include "adtfile.h"
 
@@ -79,12 +81,14 @@ char* GetExtension(char* FileName)
     return NULL;
 }
 
-ADTFile::ADTFile(char* filename): ADT(filename)
+extern HANDLE WorldMpq;
+
+ADTFile::ADTFile(char* filename): ADT(WorldMpq, filename)
 {
     Adtfilename.append(filename);
 }
 
-bool ADTFile::init(uint32 map_num, uint32 tileX, uint32 tileY, StringSet& failedPaths)
+bool ADTFile::init(uint32 map_num, uint32 tileX, uint32 tileY)
 {
     if (ADT.isEof())
         return false;
@@ -149,7 +153,6 @@ bool ADTFile::init(uint32 map_num, uint32 tileX, uint32 tileY, StringSet& failed
                     ModelInstansName[t++] = s;
 
                     string path(p);
-                    ExtractSingleModel(path, failedPaths);
 
                     p = p + strlen(p) + 1;
                 }
@@ -211,7 +214,6 @@ bool ADTFile::init(uint32 map_num, uint32 tileX, uint32 tileY, StringSet& failed
     }
     ADT.close();
     fclose(dirfile);
-
     return true;
 }
 

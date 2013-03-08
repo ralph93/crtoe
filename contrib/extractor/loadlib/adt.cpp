@@ -1,3 +1,21 @@
+/*
+ * Copyright (C) 2005-2013 MaNGOS <http://getmangos.com/>
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ */
+
 #define _CRT_SECURE_NO_DEPRECATE
 
 #include "adt.h"
@@ -44,8 +62,29 @@ bool ADT_file::prepareLoadedData()
         return false;
 
     // Check and prepare MHDR
-    a_grid = (adt_MHDR*)(GetData() + 8 + version->size);
+    a_grid = (adt_MHDR *)(GetData() + 8 + version->size);
     if (!a_grid->prepareLoadedData())
+        return false;
+
+    // funny offsets calculations because there is no mapping for them and they have variable lengths
+    uint8* ptr = (uint8*)a_grid + a_grid->size + 8;
+    uint32 mcnk_count = 0;
+    memset(cells, 0, ADT_CELLS_PER_GRID * ADT_CELLS_PER_GRID * sizeof(adt_MCNK*));
+    while (ptr < GetData() + GetDataSize())
+    {
+        uint32 header = *(uint32*)ptr;
+        uint32 size = *(uint32*)(ptr + 4);
+        if (header == 'MCNK')
+        {
+            cells[mcnk_count / ADT_CELLS_PER_GRID][mcnk_count % ADT_CELLS_PER_GRID] = (adt_MCNK*)ptr;
+            ++mcnk_count;
+        }
+
+        // move to next chunk
+        ptr += size + 8;
+    }
+
+    if (mcnk_count != ADT_CELLS_PER_GRID * ADT_CELLS_PER_GRID)
         return false;
 
     return true;

@@ -53,17 +53,21 @@ enum ArenaTeamCommandErrors
     ERR_ARENA_TEAM_NOT_ALLIED               = 0x0C,
     ERR_ARENA_TEAM_IGNORING_YOU_S           = 0x13,
     ERR_ARENA_TEAM_TARGET_TOO_LOW_S         = 0x15,
-    ERR_ARENA_TEAM_TOO_MANY_MEMBERS_S       = 0x16,
+    ERR_ARENA_TEAM_TARGET_TOO_HIGH_S        = 0x16,
+    ERR_ARENA_TEAM_TOO_MANY_MEMBERS_S       = 0x17,
+    ERR_ARENA_TEAM_NOT_FOUND                = 0x1B,
+    ERR_ARENA_TEAMS_LOCKED                  = 0x1E,
+    ERR_ARENA_TEAM_TOO_MANY_CREATE          = 0x21,
 };
 
 enum ArenaTeamEvents
 {
-    ERR_ARENA_TEAM_JOIN_SS                  = 3,            // player name + arena team name
-    ERR_ARENA_TEAM_LEAVE_SS                 = 4,            // player name + arena team name
-    ERR_ARENA_TEAM_REMOVE_SSS               = 5,            // player name + arena team name + captain name
-    ERR_ARENA_TEAM_LEADER_IS_SS             = 6,            // player name + arena team name
-    ERR_ARENA_TEAM_LEADER_CHANGED_SSS       = 7,            // old captain + new captain + arena team name
-    ERR_ARENA_TEAM_DISBANDED_S              = 8             // captain name + arena team name
+    ERR_ARENA_TEAM_JOIN_SS                  = 4,            // player name + arena team name
+    ERR_ARENA_TEAM_LEAVE_SS                 = 5,            // player name + arena team name
+    ERR_ARENA_TEAM_REMOVE_SSS               = 6,            // player name + arena team name + captain name
+    ERR_ARENA_TEAM_LEADER_IS_SS             = 7,            // player name + arena team name
+    ERR_ARENA_TEAM_LEADER_CHANGED_SSS       = 8,            // old captain + new captain + arena team name
+    ERR_ARENA_TEAM_DISBANDED_S              = 9,            // captain name + arena team name
 };
 
 /*
@@ -125,6 +129,7 @@ class ArenaTeam
         ArenaType GetType() const         { return m_Type; }
         uint8  GetSlot() const            { return GetSlotByType(GetType()); }
         static uint8 GetSlotByType(ArenaType type);
+        static ArenaType GetTypeBySlot(uint8 slot);
         ObjectGuid GetCaptainGuid() const { return m_CaptainGuid; }
         std::string GetName() const       { return m_Name; }
         const ArenaTeamStats& GetStats() const { return m_stats; }
@@ -189,15 +194,12 @@ class ArenaTeam
         void Stats(WorldSession* session);
         void InspectStats(WorldSession* session, ObjectGuid guid);
 
-        uint32 GetPoints(uint32 MemberRating);
         float GetChanceAgainst(uint32 own_rating, uint32 enemy_rating);
         int32 WonAgainst(uint32 againstRating);
         void MemberWon(Player* plr, uint32 againstRating);
         int32 LostAgainst(uint32 againstRating);
         void MemberLost(Player* plr, uint32 againstRating);
         void OfflineMemberLost(ObjectGuid guid, uint32 againstRating);
-
-        void UpdateArenaPointsHelper(std::map<uint32, uint32> & PlayerPoints);
 
         void NotifyStatsChanged();
 

@@ -74,7 +74,7 @@ class WaypointManager
 
         WaypointPath* GetPathTemplate(uint32 entry)
         {
-            WaypointPathMap::iterator itr = m_pathTemplateMap.find(entry);
+            WaypointPathTemplateMap::iterator itr = m_pathTemplateMap.find(entry);
             return itr != m_pathTemplateMap.end() ? &itr->second : NULL;
         }
 
@@ -93,7 +93,8 @@ class WaypointManager
 
         typedef UNORDERED_MAP<uint32, WaypointPath> WaypointPathMap;
         WaypointPathMap m_pathMap;
-        WaypointPathMap m_pathTemplateMap;
+        typedef UNORDERED_MAP<uint32, WaypointPath> WaypointPathTemplateMap;
+        WaypointPathTemplateMap m_pathTemplateMap;
 };
 
 #define sWaypointMgr MaNGOS::Singleton<WaypointManager>::Instance()

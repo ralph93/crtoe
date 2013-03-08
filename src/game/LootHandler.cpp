@@ -34,7 +34,7 @@
 
 void WorldSession::HandleAutostoreLootItemOpcode(WorldPacket& recv_data)
 {
-    DEBUG_LOG("WORLD: CMSG_AUTOSTORE_LOOT_ITEM");
+    DEBUG_LOG("WORLD: %s", LookupOpcodeName(recv_data.GetOpcode()));
     Player*  player =   GetPlayer();
     ObjectGuid lguid = player->GetLootGuid();
     Loot*    loot;
@@ -84,6 +84,7 @@ void WorldSession::HandleAutostoreLootItemOpcode(WorldPacket& recv_data)
             break;
         }
         case HIGHGUID_UNIT:
+        case HIGHGUID_VEHICLE:
         {
             Creature* pCreature = GetPlayer()->GetMap()->GetCreature(lguid);
 
@@ -108,8 +109,9 @@ void WorldSession::HandleAutostoreLootItemOpcode(WorldPacket& recv_data)
     QuestItem* qitem = NULL;
     QuestItem* ffaitem = NULL;
     QuestItem* conditem = NULL;
+    QuestItem* currency = NULL;
 
-    LootItem* item = loot->LootItemInSlot(lootSlot, player, &qitem, &ffaitem, &conditem);
+    LootItem* item = loot->LootItemInSlot(lootSlot, player, &qitem, &ffaitem, &conditem, &currency);
 
     if (!item)
     {
@@ -126,6 +128,17 @@ void WorldSession::HandleAutostoreLootItemOpcode(WorldPacket& recv_data)
 
     if (pItem)
         pItem->SetLootState(ITEM_LOOT_CHANGED);
+
+    if (currency)
+    {
+        if (CurrencyTypesEntry const * currencyEntry = sCurrencyTypesStore.LookupEntry(item->itemid))
+            player->ModifyCurrencyCount(item->itemid, int32(item->count * currencyEntry->GetPrecision()));
+
+        player->SendNotifyLootItemRemoved(lootSlot, true);
+        currency->is_looted = true;
+        --loot->unlootedCount;
+        return;
+    }
 
     ItemPosCountVec dest;
     InventoryResult msg = player->CanStoreNewItem(NULL_BAG, NULL_SLOT, dest, item->itemid, item->count);
@@ -166,12 +179,15 @@ void WorldSession::HandleAutostoreLootItemOpcode(WorldPacket& recv_data)
         --loot->unlootedCount;
 
         player->SendNewItem(newitem, uint32(item->count), false, false, true);
+        player->GetAchievementMgr().UpdateAchievementCriteria(ACHIEVEMENT_CRITERIA_TYPE_LOOT_ITEM, item->itemid, item->count);
+        player->GetAchievementMgr().UpdateAchievementCriteria(ACHIEVEMENT_CRITERIA_TYPE_LOOT_TYPE, loot->loot_type, item->count);
+        player->GetAchievementMgr().UpdateAchievementCriteria(ACHIEVEMENT_CRITERIA_TYPE_LOOT_EPIC_ITEM, item->itemid, item->count);
     }
     else
         player->SendEquipError(msg, NULL, NULL, item->itemid);
 }
 
-void WorldSession::HandleLootMoneyOpcode(WorldPacket & /*recv_data*/)
+void WorldSession::HandleLootMoneyOpcode(WorldPacket& /*recv_data*/)
 {
     DEBUG_LOG("WORLD: CMSG_LOOT_MONEY");
 
@@ -214,6 +230,7 @@ void WorldSession::HandleLootMoneyOpcode(WorldPacket & /*recv_data*/)
             break;
         }
         case HIGHGUID_UNIT:
+        case HIGHGUID_VEHICLE:
         {
             Creature* pCreature = GetPlayer()->GetMap()->GetCreature(guid);
 
@@ -246,20 +263,29 @@ void WorldSession::HandleLootMoneyOpcode(WorldPacket & /*recv_data*/)
                     playersNear.push_back(playerGroup);
             }
 
-            uint32 money_per_player = uint32((pLoot->gold) / (playersNear.size()));
+            uint64 money_per_player = uint32((pLoot->gold) / (playersNear.size()));
 
             for (std::vector<Player*>::const_iterator i = playersNear.begin(); i != playersNear.end(); ++i)
             {
                 (*i)->ModifyMoney(money_per_player);
+                (*i)->GetAchievementMgr().UpdateAchievementCriteria(ACHIEVEMENT_CRITERIA_TYPE_LOOT_MONEY, money_per_player);
 
-                WorldPacket data(SMSG_LOOT_MONEY_NOTIFY, 4);
+                WorldPacket data(SMSG_LOOT_MONEY_NOTIFY, 4 + 1);
                 data << uint32(money_per_player);
-
+                data << uint8(playersNear.size() > 1 ? 0 : 1);  // 0 is "you share of loot..."
                 (*i)->GetSession()->SendPacket(&data);
             }
         }
         else
+        {
             player->ModifyMoney(pLoot->gold);
+            player->GetAchievementMgr().UpdateAchievementCriteria(ACHIEVEMENT_CRITERIA_TYPE_LOOT_MONEY, pLoot->gold);
+
+            WorldPacket data(SMSG_LOOT_MONEY_NOTIFY, 4 + 1);
+            data << uint32(pLoot->gold);
+            data << uint8(1);                               // 1 is "you loot..."
+            player->GetSession()->SendPacket(&data);
+        }
 
         pLoot->gold = 0;
 
@@ -415,6 +441,7 @@ void WorldSession::DoLootRelease(ObjectGuid lguid)
             switch (pItem->loot.loot_type)
             {
                     // temporary loot in stacking items, clear loot state, no auto loot move
+                case LOOT_MILLING:
                 case LOOT_PROSPECTING:
                 {
                     uint32 count = pItem->GetCount();
@@ -455,6 +482,7 @@ void WorldSession::DoLootRelease(ObjectGuid lguid)
             return;                                         // item can be looted only single player
         }
         case HIGHGUID_UNIT:
+        case HIGHGUID_VEHICLE:
         {
             Creature* pCreature = GetPlayer()->GetMap()->GetCreature(lguid);
 
@@ -513,7 +541,7 @@ void WorldSession::HandleLootMasterGiveOpcode(WorldPacket& recv_data)
 
     Loot* pLoot = NULL;
 
-    if (lootguid.IsCreature())
+    if (lootguid.IsCreatureOrVehicle())
     {
         Creature* pCreature = GetPlayer()->GetMap()->GetCreature(lootguid);
         if (!pCreature)
@@ -534,11 +562,16 @@ void WorldSession::HandleLootMasterGiveOpcode(WorldPacket& recv_data)
 
     if (slotid > pLoot->items.size())
     {
-        DEBUG_LOG("AutoLootItem: Player %s might be using a hack! (slot %d, size " SIZEFMTD ")", GetPlayer()->GetName(), slotid, pLoot->items.size());
+        DEBUG_LOG("WorldSession::HandleLootMasterGiveOpcode: Player %s might be using a hack! (slot %d, size " SIZEFMTD ")", GetPlayer()->GetName(), slotid, pLoot->items.size());
         return;
     }
 
     LootItem& item = pLoot->items[slotid];
+    if (item.currency)
+    {
+        sLog.outError("WorldSession::HandleLootMasterGiveOpcode: player %s tried to give currency via master loot! Hack alert! Slot %u, currency id %u", GetPlayer()->GetName(), slotid, item.itemid);
+        return;
+    }
 
     ItemPosCountVec dest;
     InventoryResult msg = target->CanStoreNewItem(NULL_BAG, NULL_SLOT, dest, item.itemid, item.count);
@@ -554,6 +587,9 @@ void WorldSession::HandleLootMasterGiveOpcode(WorldPacket& recv_data)
     // now move item from loot to target inventory
     Item* newitem = target->StoreNewItem(dest, item.itemid, true, item.randomPropertyId);
     target->SendNewItem(newitem, uint32(item.count), false, false, true);
+    target->GetAchievementMgr().UpdateAchievementCriteria(ACHIEVEMENT_CRITERIA_TYPE_LOOT_ITEM, item.itemid, item.count);
+    target->GetAchievementMgr().UpdateAchievementCriteria(ACHIEVEMENT_CRITERIA_TYPE_LOOT_TYPE, pLoot->loot_type, item.count);
+    target->GetAchievementMgr().UpdateAchievementCriteria(ACHIEVEMENT_CRITERIA_TYPE_LOOT_EPIC_ITEM, item.itemid, item.count);
 
     // mark as looted
     item.count = 0;

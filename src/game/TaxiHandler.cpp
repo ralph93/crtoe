@@ -30,7 +30,7 @@
 
 void WorldSession::HandleTaxiNodeStatusQueryOpcode(WorldPacket& recv_data)
 {
-    DEBUG_LOG("WORLD: Received opcode CMSG_TAXINODE_STATUS_QUERY");
+    DEBUG_LOG("WORLD: Received CMSG_TAXINODE_STATUS_QUERY");
 
     ObjectGuid guid;
 
@@ -66,7 +66,7 @@ void WorldSession::SendTaxiStatus(ObjectGuid guid)
 
 void WorldSession::HandleTaxiQueryAvailableNodes(WorldPacket& recv_data)
 {
-    DEBUG_LOG("WORLD: Received opcode CMSG_TAXIQUERYAVAILABLENODES");
+    DEBUG_LOG("WORLD: Received CMSG_TAXIQUERYAVAILABLENODES");
 
     ObjectGuid guid;
     recv_data >> guid;
@@ -161,12 +161,12 @@ void WorldSession::SendActivateTaxiReply(ActivateTaxiReply reply)
 
 void WorldSession::HandleActivateTaxiExpressOpcode(WorldPacket& recv_data)
 {
-    DEBUG_LOG("WORLD: Received opcode CMSG_ACTIVATETAXIEXPRESS");
+    DEBUG_LOG("WORLD: Received CMSG_ACTIVATETAXIEXPRESS");
 
     ObjectGuid guid;
-    uint32 node_count, _totalcost;
+    uint32 node_count;
 
-    recv_data >> guid >> _totalcost >> node_count;
+    recv_data >> guid >> node_count;
 
     Creature* npc = GetPlayer()->GetNPCIfCanInteractWith(guid, UNIT_NPC_FLAG_FLIGHTMASTER);
     if (!npc)
@@ -186,20 +186,17 @@ void WorldSession::HandleActivateTaxiExpressOpcode(WorldPacket& recv_data)
     if (nodes.empty())
         return;
 
-    DEBUG_LOG("WORLD: Received opcode CMSG_ACTIVATETAXIEXPRESS from %d to %d" , nodes.front(), nodes.back());
+    DEBUG_LOG("WORLD: Received CMSG_ACTIVATETAXIEXPRESS from %d to %d" , nodes.front(), nodes.back());
 
     GetPlayer()->ActivateTaxiPathTo(nodes, npc);
 }
 
 void WorldSession::HandleMoveSplineDoneOpcode(WorldPacket& recv_data)
 {
-    DEBUG_LOG("WORLD: Received opcode CMSG_MOVE_SPLINE_DONE");
+    DEBUG_LOG("WORLD: Received CMSG_MOVE_SPLINE_DONE");
 
     MovementInfo movementInfo;                              // used only for proper packet read
-
     recv_data >> movementInfo;
-    recv_data >> Unused<uint32>();                          // unk
-
 
     // in taxi flight packet received in 2 case:
     // 1) end taxi path in far (multi-node) flight
@@ -264,14 +261,14 @@ void WorldSession::HandleMoveSplineDoneOpcode(WorldPacket& recv_data)
 
 void WorldSession::HandleActivateTaxiOpcode(WorldPacket& recv_data)
 {
-    DEBUG_LOG("WORLD: Received opcode CMSG_ACTIVATETAXI");
+    DEBUG_LOG("WORLD: Received CMSG_ACTIVATETAXI");
 
     ObjectGuid guid;
     std::vector<uint32> nodes;
     nodes.resize(2);
 
     recv_data >> guid >> nodes[0] >> nodes[1];
-    DEBUG_LOG("WORLD: Received opcode CMSG_ACTIVATETAXI from %d to %d" , nodes[0], nodes[1]);
+    DEBUG_LOG("WORLD: Received CMSG_ACTIVATETAXI from %d to %d" , nodes[0], nodes[1]);
     Creature* npc = GetPlayer()->GetNPCIfCanInteractWith(guid, UNIT_NPC_FLAG_FLIGHTMASTER);
     if (!npc)
     {

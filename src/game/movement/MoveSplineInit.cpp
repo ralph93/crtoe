@@ -28,14 +28,14 @@ namespace Movement
     {
         if (moveFlags & MOVEFLAG_FLYING)
         {
-            if (moveFlags& MOVEFLAG_BACKWARD /*&& speed_obj.flight >= speed_obj.flight_back*/)
+            if (moveFlags & MOVEFLAG_BACKWARD /*&& speed_obj.flight >= speed_obj.flight_back*/)
                 return MOVE_FLIGHT_BACK;
             else
                 return MOVE_FLIGHT;
         }
         else if (moveFlags & MOVEFLAG_SWIMMING)
         {
-            if (moveFlags& MOVEFLAG_BACKWARD /*&& speed_obj.swim >= speed_obj.swim_back*/)
+            if (moveFlags & MOVEFLAG_BACKWARD /*&& speed_obj.swim >= speed_obj.swim_back*/)
                 return MOVE_SWIM_BACK;
             else
                 return MOVE_SWIM;
@@ -45,7 +45,7 @@ namespace Movement
             // if ( speed_obj.run > speed_obj.walk )
             return MOVE_WALK;
         }
-        else if (moveFlags& MOVEFLAG_BACKWARD /*&& speed_obj.run >= speed_obj.run_back*/)
+        else if (moveFlags & MOVEFLAG_BACKWARD /*&& speed_obj.run >= speed_obj.run_back*/)
             return MOVE_RUN_BACK;
 
         return MOVE_RUN;
@@ -64,7 +64,7 @@ namespace Movement
 
         // there is a big chane that current position is unknown if current state is not finalized, need compute it
         // this also allows calculate spline position and update map position in much greater intervals
-        if (!move_spline.Finalized())
+        if (!move_spline.Finalized() && !transportInfo)
             real_position = move_spline.ComputePosition();
 
         if (args.path.empty())
@@ -75,13 +75,15 @@ namespace Movement
 
         // corrent first vertex
         args.path[0] = real_position;
-        uint32 moveFlags = unit.m_movementInfo.GetMovementFlags();
-        if (args.flags.runmode)
-            moveFlags &= ~MOVEFLAG_WALK_MODE;
-        else
-            moveFlags |= MOVEFLAG_WALK_MODE;
+        args.initialOrientation = real_position.orientation;
 
-        moveFlags |= (MOVEFLAG_SPLINE_ENABLED | MOVEFLAG_FORWARD);
+        uint32 moveFlags = unit.m_movementInfo.GetMovementFlags();
+        if (args.flags.walkmode)
+            moveFlags |= MOVEFLAG_WALK_MODE;
+        else
+            moveFlags &= ~MOVEFLAG_WALK_MODE;
+
+        moveFlags |= MOVEFLAG_FORWARD;
 
         if (args.velocity == 0.f)
             args.velocity = unit.GetSpeed(SelectSpeedType(moveFlags));
@@ -99,6 +101,7 @@ namespace Movement
         {
             data.SetOpcode(SMSG_MONSTER_MOVE_TRANSPORT);
             data << transportInfo->GetTransportGuid().WriteAsPacked();
+            data << int8(transportInfo->GetTransportSeat());
         }
 
         PacketBuilder::WriteMonsterMove(move_spline, data);
@@ -110,7 +113,7 @@ namespace Movement
     MoveSplineInit::MoveSplineInit(Unit& m) : unit(m)
     {
         // mix existing state into new
-        args.flags.runmode = !unit.m_movementInfo.HasMovementFlag(MOVEFLAG_WALK_MODE);
+        args.flags.walkmode = unit.m_movementInfo.HasMovementFlag(MOVEFLAG_WALK_MODE);
         args.flags.flying = unit.m_movementInfo.HasMovementFlag((MovementFlags)(MOVEFLAG_FLYING | MOVEFLAG_LEVITATING));
     }
 

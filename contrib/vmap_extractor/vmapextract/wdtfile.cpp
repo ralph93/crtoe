@@ -16,6 +16,7 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
+#define _CRT_SECURE_NO_WARNINGS
 #include "vmapexport.h"
 #include "wdtfile.h"
 #include "adtfile.h"
@@ -30,7 +31,9 @@ char* wdtGetPlainName(char* FileName)
     return FileName;
 }
 
-WDTFile::WDTFile(char* file_name, char* file_name1): WDT(file_name)
+extern HANDLE WorldMpq;
+
+WDTFile::WDTFile(char* file_name, char* file_name1): WDT(WorldMpq, file_name)
 {
     filename.append(file_name1, strlen(file_name1));
 }
@@ -129,6 +132,6 @@ ADTFile* WDTFile::GetMap(int x, int z)
 
     char name[512];
 
-    sprintf(name, "World\\Maps\\%s\\%s_%d_%d.adt", filename.c_str(), filename.c_str(), x, z);
+    sprintf(name, "World\\Maps\\%s\\%s_%d_%d_obj0.adt", filename.c_str(), filename.c_str(), x, z);
     return new ADTFile(name);
 }

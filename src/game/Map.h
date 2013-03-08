@@ -37,7 +37,6 @@
 #include "Utilities/TypeList.h"
 #include "ScriptMgr.h"
 #include "CreatureLinkingMgr.h"
-#include "vmap/DynamicTree.h"
 
 #include <bitset>
 #include <list>
@@ -55,7 +54,6 @@ class BattleGroundPersistentState;
 struct ScriptInfo;
 class BattleGround;
 class GridMap;
-class GameObjectModel;
 
 // GCC have alternative #pragma pack(N) syntax and old gcc version not support pack(push,N), also any gcc version not support it at some platform
 #if defined( __GNUC__ )
@@ -71,8 +69,6 @@ struct InstanceTemplate
     // or 0 (not related to continent 0 map id)
     uint32 levelMin;
     uint32 levelMax;
-    uint32 maxPlayers;
-    uint32 reset_delay;                                     // in days
     uint32 script_id;
 };
 
@@ -137,7 +133,7 @@ class MANGOS_DLL_SPEC Map : public GridRefManager<NGridType>
         void PlayerRelocation(Player*, float x, float y, float z, float angl);
         void CreatureRelocation(Creature* creature, float x, float y, float z, float orientation);
 
-        template<class T, class CONTAINER> void Visit(const Cell& cell, TypeContainerVisitor<T, CONTAINER> &visitor);
+        template<class T, class CONTAINER> void Visit(const Cell& cell, TypeContainerVisitor<T, CONTAINER>& visitor);
 
         bool IsRemovalGrid(float x, float y) const
         {
@@ -178,19 +174,22 @@ class MANGOS_DLL_SPEC Map : public GridRefManager<NGridType>
         virtual bool CanEnter(Player* player);
         const char* GetMapName() const;
 
-        // _currently_ spawnmode == difficulty, but this can be changes later, so use appropriate spawnmode/difficult functions
+        // have meaning only for instanced map (that have set real difficulty), NOT USE its for BaseMap
+        // _currently_ spawnmode == difficulty, but this can be changes later, so use appropriate spawmmode/difficult functions
         // for simplify later code support
-        // regular difficulty = continent/dungeon normal/raid normal difficulty
+        // regular difficulty = continent/dungeon normal/first raid normal difficulty
         uint8 GetSpawnMode() const { return (i_spawnMode); }
         Difficulty GetDifficulty() const { return Difficulty(GetSpawnMode()); }
         bool IsRegularDifficulty() const { return GetDifficulty() == REGULAR_DIFFICULTY; }
-        uint32 GetMaxPlayers() const;
-        uint32 GetMaxResetDelay() const;
+        uint32 GetMaxPlayers() const;                       // dependent from map difficulty
+        uint32 GetMaxResetDelay() const;                    // dependent from map difficulty
+        MapDifficultyEntry const* GetMapDifficulty() const; // dependent from map difficulty
 
         bool Instanceable() const { return i_mapEntry && i_mapEntry->Instanceable(); }
         // NOTE: this duplicate of Instanceable(), but Instanceable() can be changed when BG also will be instanceable
         bool IsDungeon() const { return i_mapEntry && i_mapEntry->IsDungeon(); }
         bool IsRaid() const { return i_mapEntry && i_mapEntry->IsRaid(); }
+        bool IsNonRaidDungeon() const { return i_mapEntry && i_mapEntry->IsNonRaidDungeon(); }
         bool IsRaidOrHeroicDungeon() const { return IsRaid() || GetDifficulty() > DUNGEON_DIFFICULTY_NORMAL; }
         bool IsBattleGround() const { return i_mapEntry && i_mapEntry->IsBattleGround(); }
         bool IsBattleArena() const { return i_mapEntry && i_mapEntry->IsBattleArena(); }
@@ -217,14 +216,7 @@ class MANGOS_DLL_SPEC Map : public GridRefManager<NGridType>
         PlayerList const& GetPlayers() const { return m_mapRefManager; }
 
         // per-map script storage
-        enum ScriptExecutionParam
-        {
-            SCRIPT_EXEC_PARAM_NONE                    = 0x00,   // Start regardless if already started
-            SCRIPT_EXEC_PARAM_UNIQUE_BY_SOURCE        = 0x01,   // Start Script only if not yet started (uniqueness identified by id and source)
-            SCRIPT_EXEC_PARAM_UNIQUE_BY_TARGET        = 0x02,   // Start Script only if not yet started (uniqueness identified by id and target)
-            SCRIPT_EXEC_PARAM_UNIQUE_BY_SOURCE_TARGET = 0x03,   // Start Script only if not yet started (uniqueness identified by id, source and target)
-        };
-        bool ScriptsStart(ScriptMapMapName const& scripts, uint32 id, Object* source, Object* target, ScriptExecutionParam execParams = SCRIPT_EXEC_PARAM_NONE);
+        bool ScriptsStart(ScriptMapMapName const& scripts, uint32 id, Object* source, Object* target);
         void ScriptCommandStart(ScriptInfo const& script, uint32 delay, Object* source, Object* target);
 
         // must called with AddToWorld
@@ -235,7 +227,7 @@ class MANGOS_DLL_SPEC Map : public GridRefManager<NGridType>
         Player* GetPlayer(ObjectGuid guid);
         Creature* GetCreature(ObjectGuid guid);
         Pet* GetPet(ObjectGuid guid);
-        Creature* GetAnyTypeCreature(ObjectGuid guid);      // normal creature or pet
+        Creature* GetAnyTypeCreature(ObjectGuid guid);      // normal creature or pet or vehicle
         GameObject* GetGameObject(ObjectGuid guid);
         DynamicObject* GetDynamicObject(ObjectGuid guid);
         Corpse* GetCorpse(ObjectGuid guid);                 // !!! find corpse can be not in world
@@ -262,22 +254,16 @@ class MANGOS_DLL_SPEC Map : public GridRefManager<NGridType>
         const TerrainInfo* GetTerrain() const { return m_TerrainData; }
 
         void CreateInstanceData(bool load);
-        InstanceData* GetInstanceData() const { return i_data; }
+        InstanceData* GetInstanceData() { return i_data; }
         uint32 GetScriptId() const { return i_script_id; }
 
         void MonsterYellToMap(ObjectGuid guid, int32 textId, uint32 language, Unit* target);
         void MonsterYellToMap(CreatureInfo const* cinfo, int32 textId, uint32 language, Unit* target, uint32 senderLowGuid = 0);
         void PlayDirectSoundToMap(uint32 soundId, uint32 zoneId = 0);
 
-        // Dynamic VMaps
-        float GetHeight(float x, float y, float z) const;
-        bool IsInLineOfSight(float x1, float y1, float z1, float x2, float y2, float z2) const;
-        bool GetHitPosition(float srcX, float srcY, float srcZ, float& destX, float& destY, float& destZ, float modifyDist) const;
-
-        // Object Model insertion/remove/test for dynamic vmaps use
-        void InsertGameObjectModel(const GameObjectModel& mdl);
-        void RemoveGameObjectModel(const GameObjectModel& mdl);
-        bool ContainsGameObjectModel(const GameObjectModel& mdl) const;
+        // VMap System
+        bool IsInLineOfSight(float srcX, float srcY, float srcZ, float destX, float destY, float destZ);
+        bool GetObjectHitPos(float srcX, float srcY, float srcZ, float destX, float destY, float destZ, float& resX, float& resY, float& resZ, float pModifyDist);
 
         // Get Holder for Creature Linking
         CreatureLinkingHolder* GetCreatureLinkingHolder() { return &m_creatureLinkingHolder; }
@@ -361,6 +347,7 @@ class MANGOS_DLL_SPEC Map : public GridRefManager<NGridType>
         ObjectGuidGenerator<HIGHGUID_GAMEOBJECT> m_GameObjectGuids;
         ObjectGuidGenerator<HIGHGUID_DYNAMICOBJECT> m_DynObjectGuids;
         ObjectGuidGenerator<HIGHGUID_PET> m_PetGuids;
+        ObjectGuidGenerator<HIGHGUID_VEHICLE> m_VehicleGuids;
 
         // Type specific code for add/remove to/from grid
         template<class T>
@@ -371,9 +358,6 @@ class MANGOS_DLL_SPEC Map : public GridRefManager<NGridType>
 
         // Holder for information about linked mobs
         CreatureLinkingHolder m_creatureLinkingHolder;
-
-        // Dynamic Map tree object
-        DynamicMapTree m_dyn_tree;
 };
 
 class MANGOS_DLL_SPEC WorldMap : public Map
@@ -418,7 +402,7 @@ class MANGOS_DLL_SPEC BattleGroundMap : public Map
     private:
         using Map::GetPersistentState;                      // hide in subclass for overwrite
     public:
-        BattleGroundMap(uint32 id, time_t, uint32 InstanceId);
+        BattleGroundMap(uint32 id, time_t, uint32 InstanceId, uint8 spawnMode);
         ~BattleGroundMap();
 
         void Update(const uint32&) override;
@@ -441,7 +425,7 @@ class MANGOS_DLL_SPEC BattleGroundMap : public Map
 
 template<class T, class CONTAINER>
 inline void
-Map::Visit(const Cell& cell, TypeContainerVisitor<T, CONTAINER> &visitor)
+Map::Visit(const Cell& cell, TypeContainerVisitor<T, CONTAINER>& visitor)
 {
     const uint32 x = cell.GridX();
     const uint32 y = cell.GridY();

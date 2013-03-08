@@ -30,11 +30,15 @@ Tokens StrSplit(const std::string& src, const std::string& sep);
 uint32 GetUInt32ValueFromArray(Tokens const& data, uint16 index);
 float GetFloatValueFromArray(Tokens const& data, uint16 index);
 
+float NormalizeOrientation(float o);
+
 void stripLineInvisibleChars(std::string& src);
 
 std::string secsToTimeString(time_t timeInSecs, bool shortText = false, bool hoursOnly = false);
 uint32 TimeStringToSecs(const std::string& timestring);
 std::string TimeToTimestampStr(time_t t);
+
+std::string MoneyToString(uint64 money);
 
 inline uint32 secsToTimeBitFields(time_t secs)
 {

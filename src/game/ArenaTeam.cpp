@@ -141,10 +141,6 @@ bool ArenaTeam::AddMember(ObjectGuid playerGuid)
         }
     }
 
-    // remove all player signs from another petitions
-    // this will be prevent attempt joining player to many arenateams and corrupt arena team data integrity
-    Player::RemovePetitionsAndSigns(playerGuid, GetType());
-
     ArenaTeamMember newmember;
     newmember.name              = plName;
     newmember.guid              = playerGuid;
@@ -160,7 +156,7 @@ bool ArenaTeam::AddMember(ObjectGuid playerGuid)
         if (sWorld.getConfig(CONFIG_UINT32_ARENA_SEASON_ID) >= 6)
         {
             if (m_stats.rating < 1000)
-                newmember.personal_rating = m_stats.rating;
+                newmember.personal_rating = 0;
             else
                 newmember.personal_rating = 1000;
         }
@@ -178,7 +174,7 @@ bool ArenaTeam::AddMember(ObjectGuid playerGuid)
 
     if (pl)
     {
-        pl->SetInArenaTeam(m_TeamId, GetSlot());
+        pl->SetInArenaTeam(m_TeamId, GetSlot(), GetType());
         pl->SetArenaTeamIdInvited(0);
         pl->SetArenaTeamInfoField(GetSlot(), ARENA_TEAM_PERSONAL_RATING, newmember.personal_rating);
 
@@ -352,8 +348,11 @@ void ArenaTeam::Roster(WorldSession* session)
 {
     Player* pl = NULL;
 
+    uint8 unk308 = 0;
+
     WorldPacket data(SMSG_ARENA_TEAM_ROSTER, 100);
     data << uint32(GetId());                                // team id
+    data << uint8(unk308);                                  // 308 unknown value but affect packet structure
     data << uint32(GetMembersSize());                       // members count
     data << uint32(GetType());                              // arena team type?
 
@@ -372,6 +371,11 @@ void ArenaTeam::Roster(WorldSession* session)
         data << uint32(itr->games_season);                  // played this season
         data << uint32(itr->wins_season);                   // wins this season
         data << uint32(itr->personal_rating);               // personal rating
+        if (unk308)
+        {
+            data << float(0.0);                             // 308 unk
+            data << float(0.0);                             // 308 unk
+        }
     }
 
     session->SendPacket(&data);
@@ -535,6 +539,20 @@ uint8 ArenaTeam::GetSlotByType(ArenaType type)
     return 0xFF;
 }
 
+ArenaType ArenaTeam::GetTypeBySlot(uint8 slot)
+{
+    switch (slot)
+    {
+        case 0: return ARENA_TYPE_2v2;
+        case 1: return ARENA_TYPE_3v3;
+        case 2: return ARENA_TYPE_5v5;
+        default:
+            break;
+    }
+    sLog.outError("FATAL: Unknown arena team slot %u for some arena team", slot);
+    return ArenaType(0xFF);
+}
+
 bool ArenaTeam::HaveMember(ObjectGuid guid) const
 {
     for (MemberList::const_iterator itr = m_members.begin(); itr != m_members.end(); ++itr)
@@ -544,41 +562,14 @@ bool ArenaTeam::HaveMember(ObjectGuid guid) const
     return false;
 }
 
-uint32 ArenaTeam::GetPoints(uint32 MemberRating)
-{
-    // returns how many points would be awarded with this team type with this rating
-    float points;
-
-    uint32 rating = MemberRating + 150 < m_stats.rating ? MemberRating : m_stats.rating;
-
-    if (rating <= 1500)
-    {
-        // As of Season 6 and later, all teams below 1500 rating will earn points as if they were a 1500 rated team
-        if (sWorld.getConfig(CONFIG_UINT32_ARENA_SEASON_ID) >= 6)
-            rating = 1500;
-
-        points = (float)rating * 0.22f + 14.0f;
-    }
-    else
-        points = 1511.26f / (1.0f + 1639.28f * exp(-0.00412f * (float)rating));
-
-    // type penalties for <5v5 teams
-    if (m_Type == ARENA_TYPE_2v2)
-        points *= 0.76f;
-    else if (m_Type == ARENA_TYPE_3v3)
-        points *= 0.88f;
-
-    return (uint32) points;
-}
-
 float ArenaTeam::GetChanceAgainst(uint32 own_rating, uint32 enemy_rating)
 {
     // returns the chance to win against a team with the given rating, used in the rating adjustment calculation
     // ELO system
 
     if (sWorld.getConfig(CONFIG_UINT32_ARENA_SEASON_ID) >= 6)
-        if (enemy_rating < 1500)
-            enemy_rating = 1500;
+        if (enemy_rating < 1000)
+            enemy_rating = 1000;
     return 1.0f / (1.0f + exp(log(10.0f) * (float)((float)enemy_rating - (float)own_rating) / 400.0f));
 }
 
@@ -606,8 +597,9 @@ int32 ArenaTeam::WonAgainst(uint32 againstRating)
     // called when the team has won
     // 'chance' calculation - to beat the opponent
     float chance = GetChanceAgainst(m_stats.rating, againstRating);
-    // calculate the rating modification (ELO system with k=32)
-    int32 mod = (int32)floor(32.0f * (1.0f - chance));
+    float K = (m_stats.rating < 1000) ? 48.0f : 32.0f;
+    // calculate the rating modification (ELO system with k=32 or k=48 if rating<1000)
+    int32 mod = (int32)floor(K * (1.0f - chance));
     // modify the team stats accordingly
     FinishGame(mod);
     m_stats.wins_week += 1;
@@ -622,8 +614,9 @@ int32 ArenaTeam::LostAgainst(uint32 againstRating)
     // called when the team has lost
     //'chance' calculation - to loose to the opponent
     float chance = GetChanceAgainst(m_stats.rating, againstRating);
-    // calculate the rating modification (ELO system with k=32)
-    int32 mod = (int32)ceil(32.0f * (0.0f - chance));
+    float K = (m_stats.rating < 1000) ? 48.0f : 32.0f;
+    // calculate the rating modification (ELO system with k=32 or k=48 if rating<1000)
+    int32 mod = (int32)ceil(K * (0.0f - chance));
     // modify the team stats accordingly
     FinishGame(mod);
 
@@ -640,7 +633,9 @@ void ArenaTeam::MemberLost(Player* plr, uint32 againstRating)
         {
             // update personal rating
             float chance = GetChanceAgainst(itr->personal_rating, againstRating);
-            int32 mod = (int32)ceil(32.0f * (0.0f - chance));
+            float K = (itr->personal_rating < 1000) ? 48.0f : 32.0f;
+            // calculate the rating modification (ELO system with k=32 or k=48 if rating<1000)
+            int32 mod = (int32)ceil(K * (0.0f - chance));
             itr->ModifyPersonalRating(plr, mod, GetSlot());
             // update personal played stats
             itr->games_week += 1;
@@ -662,7 +657,9 @@ void ArenaTeam::OfflineMemberLost(ObjectGuid guid, uint32 againstRating)
         {
             // update personal rating
             float chance = GetChanceAgainst(itr->personal_rating, againstRating);
-            int32 mod = (int32)ceil(32.0f * (0.0f - chance));
+            float K = (itr->personal_rating < 1000) ? 48.0f : 32.0f;
+            // calculate the rating modification (ELO system with k=32 or k=48 if rating<1000)
+            int32 mod = (int32)ceil(K * (0.0f - chance));
             if (int32(itr->personal_rating) + mod < 0)
                 itr->personal_rating = 0;
             else
@@ -684,7 +681,9 @@ void ArenaTeam::MemberWon(Player* plr, uint32 againstRating)
         {
             // update personal rating
             float chance = GetChanceAgainst(itr->personal_rating, againstRating);
-            int32 mod = (int32)floor(32.0f * (1.0f - chance));
+            float K = (itr->personal_rating < 1000) ? 48.0f : 32.0f;
+            // calculate the rating modification (ELO system with k=32 or k=48 if rating<1000)
+            int32 mod = (int32)floor(K * (1.0f - chance));
             itr->ModifyPersonalRating(plr, mod, GetSlot());
             // update personal stats
             itr->games_week += 1;
@@ -696,35 +695,6 @@ void ArenaTeam::MemberWon(Player* plr, uint32 againstRating)
             plr->SetArenaTeamInfoField(GetSlot(), ARENA_TEAM_GAMES_SEASON, itr->games_season);
             return;
         }
-    }
-}
-
-void ArenaTeam::UpdateArenaPointsHelper(std::map<uint32, uint32>& PlayerPoints)
-{
-    // called after a match has ended and the stats are already modified
-    // helper function for arena point distribution (this way, when distributing, no actual calculation is required, just a few comparisons)
-    // 10 played games per week is a minimum
-    if (m_stats.games_week < 10)
-        return;
-    // to get points, a player has to participate in at least 30% of the matches
-    uint32 min_plays = (uint32) ceil(m_stats.games_week * 0.3);
-    for (MemberList::const_iterator itr = m_members.begin(); itr !=  m_members.end(); ++itr)
-    {
-        // the player participated in enough games, update his points
-        uint32 points_to_add = 0;
-        if (itr->games_week >= min_plays)
-            points_to_add = GetPoints(itr->personal_rating);
-        // OBSOLETE : CharacterDatabase.PExecute("UPDATE arena_team_member SET points_to_add = '%u' WHERE arenateamid = '%u' AND guid = '%u'", points_to_add, m_TeamId, itr->guid);
-
-        std::map<uint32, uint32>::iterator plr_itr = PlayerPoints.find(itr->guid.GetCounter());
-        if (plr_itr != PlayerPoints.end())
-        {
-            // check if there is already more points
-            if (plr_itr->second < points_to_add)
-                PlayerPoints[itr->guid.GetCounter()] = points_to_add;
-        }
-        else
-            PlayerPoints[itr->guid.GetCounter()] = points_to_add;
     }
 }
 

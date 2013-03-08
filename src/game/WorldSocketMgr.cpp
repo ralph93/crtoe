@@ -43,6 +43,7 @@
 #include "Config/Config.h"
 #include "Database/DatabaseEnv.h"
 #include "WorldSocket.h"
+#include "Opcodes.h"
 
 /**
 * This is a helper class to WorldSocketMgr ,that manages
@@ -211,6 +212,7 @@ WorldSocketMgr::WorldSocketMgr():
     m_UseNoDelay(true),
     m_Acceptor(0)
 {
+    InitializeOpcodes();
 }
 
 WorldSocketMgr::~WorldSocketMgr()
@@ -267,6 +269,9 @@ int WorldSocketMgr::StartReactiveIO(ACE_UINT16 port, const char* address)
 
 int WorldSocketMgr::StartNetwork(ACE_UINT16 port, std::string& address)
 {
+    m_addr = address;
+    m_port = port;
+
     if (!sLog.HasLogLevelOrHigher(LOG_LVL_DEBUG))
         ACE_Log_Msg::instance()->priority_mask(LM_ERROR, ACE_Log_Msg::PROCESS);
 

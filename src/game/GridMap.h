@@ -41,6 +41,7 @@ struct GridMapFileHeader
 {
     uint32 mapMagic;
     uint32 versionMagic;
+    uint32 buildMagic;
     uint32 areaMapOffset;
     uint32 areaMapSize;
     uint32 heightMapOffset;
@@ -96,22 +97,20 @@ enum GridMapLiquidStatus
     LIQUID_MAP_UNDER_WATER  = 0x00000008
 };
 
-// defined in DBC and left shifted for flag usage
 #define MAP_LIQUID_TYPE_NO_WATER    0x00
-#define MAP_LIQUID_TYPE_MAGMA       0x01
+#define MAP_LIQUID_TYPE_WATER       0x01
 #define MAP_LIQUID_TYPE_OCEAN       0x02
-#define MAP_LIQUID_TYPE_SLIME       0x04
-#define MAP_LIQUID_TYPE_WATER       0x08
+#define MAP_LIQUID_TYPE_MAGMA       0x04
+#define MAP_LIQUID_TYPE_SLIME       0x08
 
-#define MAP_ALL_LIQUIDS   (MAP_LIQUID_TYPE_WATER | MAP_LIQUID_TYPE_MAGMA | MAP_LIQUID_TYPE_OCEAN | MAP_LIQUID_TYPE_SLIME)
+#define MAP_ALL_LIQUIDS   (MAP_LIQUID_TYPE_WATER | MAP_LIQUID_TYPE_OCEAN | MAP_LIQUID_TYPE_MAGMA | MAP_LIQUID_TYPE_SLIME)
 
 #define MAP_LIQUID_TYPE_DARK_WATER  0x10
 #define MAP_LIQUID_TYPE_WMO_WATER   0x20
 
 struct GridMapLiquidData
 {
-    uint32 type_flags;
-    uint32 entry;
+    uint32 type;
     float level;
     float depth_level;
 };
@@ -149,8 +148,7 @@ class GridMap
         uint8 m_liquid_width;
         uint8 m_liquid_height;
         float m_liquidLevel;
-        uint16* m_liquidEntry;
-        uint8* m_liquidFlags;
+        uint8* m_liquid_type;
         float* m_liquid_map;
 
         bool loadAreaData(FILE* in, uint32 offset, uint32 size);
@@ -220,7 +218,7 @@ class MANGOS_DLL_SPEC TerrainInfo : public Referencable<AtomicLong>
 
         // TODO: move all terrain/vmaps data info query functions
         // from 'Map' class into this class
-        float GetHeightStatic(float x, float y, float z, bool checkVMap = true, float maxSearchDist = DEFAULT_HEIGHT_SEARCH) const;
+        float GetHeight(float x, float y, float z, bool pCheckVMap = true, float maxSearchDist = DEFAULT_HEIGHT_SEARCH) const;
         float GetWaterLevel(float x, float y, float z, float* pGround = NULL) const;
         float GetWaterOrGroundLevel(float x, float y, float z, float* pGround = NULL, bool swim = false) const;
         bool IsInWater(float x, float y, float z, GridMapLiquidData* data = 0) const;

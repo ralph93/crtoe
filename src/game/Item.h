@@ -120,7 +120,15 @@ enum InventoryResult
     EQUIP_ERR_NOT_DURING_ARENA_MATCH             = 78,      // ERR_NOT_DURING_ARENA_MATCH
     EQUIP_ERR_CANNOT_TRADE_THAT                  = 79,      // ERR_TRADE_BOUND_ITEM
     EQUIP_ERR_PERSONAL_ARENA_RATING_TOO_LOW      = 80,      // ERR_CANT_EQUIP_RATING
-    // probably exist more
+    EQUIP_ERR_EVENT_AUTOEQUIP_BIND_CONFIRM       = 81,      // EQUIP_ERR_OK, EVENT_AUTOEQUIP_BIND_CONFIRM
+    EQUIP_ERR_ARTEFACTS_ONLY_FOR_OWN_CHARACTERS  = 82,      // ERR_NOT_SAME_ACCOUNT
+    EQUIP_ERR_OK2                                = 83,      // EQUIP_ERR_OK
+    EQUIP_ERR_ITEM_MAX_LIMIT_CATEGORY_COUNT_EXCEEDED_IS     = 84,
+    EQUIP_ERR_ITEM_MAX_LIMIT_CATEGORY_SOCKETED_EXCEEDED_IS  = 85,
+    EQUIP_ERR_SCALING_STAT_ITEM_LEVEL_EXCEEDED              = 86,
+    EQUIP_ERR_PURCHASE_LEVEL_TOO_LOW                        = 87,
+    EQUIP_ERR_CANT_EQUIP_NEED_TALENT                        = 88,
+    EQUIP_ERR_ITEM_MAX_LIMIT_CATEGORY_EQUIPPED_EXCEEDED_IS  = 89
 };
 
 enum BuyResult
@@ -155,17 +163,21 @@ enum EnchantmentSlot
     SOCK_ENCHANTMENT_SLOT_2         = 3,
     SOCK_ENCHANTMENT_SLOT_3         = 4,
     BONUS_ENCHANTMENT_SLOT          = 5,
-    MAX_INSPECTED_ENCHANTMENT_SLOT  = 6,
+    PRISMATIC_ENCHANTMENT_SLOT      = 6,                    // added at apply special permanent enchantment
+    //                              = 7,
+    REFORGE_ENCHANTMENT_SLOT        = 8,
+    TRANSMOGRIFY_ENCHANTMENT_SLOT   = 9,
+    MAX_INSPECTED_ENCHANTMENT_SLOT  = 10,
 
-    PROP_ENCHANTMENT_SLOT_0         = 6,                    // used with RandomSuffix
-    PROP_ENCHANTMENT_SLOT_1         = 7,                    // used with RandomSuffix
-    PROP_ENCHANTMENT_SLOT_2         = 8,                    // used with RandomSuffix and RandomProperty
-    PROP_ENCHANTMENT_SLOT_3         = 9,                    // used with RandomProperty
-    PROP_ENCHANTMENT_SLOT_4         = 10,                   // used with RandomProperty
-    MAX_ENCHANTMENT_SLOT            = 11
+    PROP_ENCHANTMENT_SLOT_0         = 10,                   // used with RandomSuffix
+    PROP_ENCHANTMENT_SLOT_1         = 11,                   // used with RandomSuffix
+    PROP_ENCHANTMENT_SLOT_2         = 12,                   // used with RandomSuffix and RandomProperty
+    PROP_ENCHANTMENT_SLOT_3         = 13,                   // used with RandomProperty
+    PROP_ENCHANTMENT_SLOT_4         = 14,                   // used with RandomProperty
+    MAX_ENCHANTMENT_SLOT            = 15,
 };
 
-#define MAX_VISIBLE_ITEM_OFFSET       16                    // 16 fields per visible item (creator(2) + enchantments(12) + properties(1) + pad(1))
+#define MAX_VISIBLE_ITEM_OFFSET       2                     // 2 fields per visible item (entry+enchantment)
 
 #define MAX_GEM_SOCKETS               MAX_ITEM_PROTO_SOCKETS// (BONUS_ENCHANTMENT_SLOT-SOCK_ENCHANTMENT_SLOT) and item proto size, equal value expected
 
@@ -173,7 +185,7 @@ enum EnchantmentOffset
 {
     ENCHANTMENT_ID_OFFSET       = 0,
     ENCHANTMENT_DURATION_OFFSET = 1,
-    ENCHANTMENT_CHARGES_OFFSET  = 2
+    ENCHANTMENT_CHARGES_OFFSET  = 2                         // now here not only charges, but something new in wotlk
 };
 
 #define MAX_ENCHANTMENT_OFFSET    3
@@ -235,6 +247,10 @@ enum ItemDynFlags
     ITEM_DYNFLAG_UNK25                        = 0x02000000,
     ITEM_DYNFLAG_UNK26                        = 0x04000000,
     ITEM_DYNFLAG_UNK27                        = 0x08000000,
+    ITEM_DYNFLAG_UNK28                        = 0x10000000,
+    ITEM_DYNFLAG_UNK29                        = 0x20000000,
+    ITEM_DYNFLAG_UNK30                        = 0x40000000,
+    ITEM_DYNFLAG_UNK31                        = 0x80000000
 };
 
 enum ItemRequiredTargetType
@@ -275,6 +291,7 @@ class MANGOS_DLL_SPEC Item : public Object
 
         void SetBinding(bool val) { ApplyModFlag(ITEM_FIELD_FLAGS, ITEM_DYNFLAG_BINDED, val); }
         bool IsSoulBound() const { return HasFlag(ITEM_FIELD_FLAGS, ITEM_DYNFLAG_BINDED); }
+        bool IsBoundAccountWide() const { return GetProto()->Flags & ITEM_FLAG_BOA; }
         bool IsBindedNotWith(Player const* player) const;
         bool IsBoundByEnchant() const;
         virtual void SaveToDB();
@@ -285,7 +302,7 @@ class MANGOS_DLL_SPEC Item : public Object
 
         bool IsBag() const { return GetProto()->InventoryType == INVTYPE_BAG; }
         bool IsBroken() const { return GetUInt32Value(ITEM_FIELD_MAXDURABILITY) > 0 && GetUInt32Value(ITEM_FIELD_DURABILITY) == 0; }
-        bool CanBeTraded() const;
+        bool CanBeTraded(bool mail = false) const;
         void SetInTrade(bool b = true) { mb_in_trade = b; }
         bool IsInTrade() const { return mb_in_trade; }
 
@@ -298,6 +315,7 @@ class MANGOS_DLL_SPEC Item : public Object
         void SetCount(uint32 value) { SetUInt32Value(ITEM_FIELD_STACK_COUNT, value); }
         uint32 GetMaxStackCount() const { return GetProto()->GetMaxStackSize(); }
         uint8 GetGemCountWithID(uint32 GemID) const;
+        uint8 GetGemCountWithLimitCategory(uint32 limitCategory) const;
         InventoryResult CanBeMergedPartlyWith(ItemPrototype const* proto) const;
 
         uint8 GetSlot() const {return m_slot;}
@@ -311,7 +329,6 @@ class MANGOS_DLL_SPEC Item : public Object
         bool IsEquipped() const;
 
         uint32 GetSkill();
-        uint32 GetSpell();
 
         // RandomPropertyId (signed but stored as unsigned)
         int32 GetItemRandomPropertyId() const { return GetInt32Value(ITEM_FIELD_RANDOM_PROPERTIES_ID); }
@@ -327,12 +344,17 @@ class MANGOS_DLL_SPEC Item : public Object
         uint32 GetEnchantmentDuration(EnchantmentSlot slot) const { return GetUInt32Value(ITEM_FIELD_ENCHANTMENT_1_1 + slot * MAX_ENCHANTMENT_OFFSET + ENCHANTMENT_DURATION_OFFSET);}
         uint32 GetEnchantmentCharges(EnchantmentSlot slot)  const { return GetUInt32Value(ITEM_FIELD_ENCHANTMENT_1_1 + slot * MAX_ENCHANTMENT_OFFSET + ENCHANTMENT_CHARGES_OFFSET);}
 
+        std::string const& GetText() const { return m_text; }
+        void SetText(std::string const& text) { m_text = text; }
+
         void SendTimeUpdate(Player* owner);
         void UpdateDuration(Player* owner, uint32 diff);
 
         // spell charges (signed but stored as unsigned)
         int32 GetSpellCharges(uint8 index/*0..5*/ = 0) const { return GetInt32Value(ITEM_FIELD_SPELL_CHARGES + index); }
         void SetSpellCharges(uint8 index/*0..5*/, int32 value) { SetInt32Value(ITEM_FIELD_SPELL_CHARGES + index, value); }
+        bool HasMaxCharges() const;
+        void RestoreCharges();
 
         Loot loot;
 
@@ -363,6 +385,7 @@ class MANGOS_DLL_SPEC Item : public Object
         void RemoveFromClientUpdateList() override;
         void BuildUpdateData(UpdateDataMapType& update_players) override;
     private:
+        std::string m_text;
         uint8 m_slot;
         Bag* m_container;
         ItemUpdateState uState;

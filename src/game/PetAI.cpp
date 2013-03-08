@@ -79,7 +79,7 @@ void PetAI::AttackStart(Unit* u)
         // thus with the following clear the original TMG gets invalidated and crash, doh
         // hope it doesn't start to leak memory without this :-/
         // i_pet->Clear();
-        HandleMovementOnAttackStart(u);
+        m_creature->GetMotionMaster()->MoveChase(u);
         inCombat = true;
     }
 }
@@ -220,16 +220,13 @@ void PetAI::UpdateAI(const uint32 diff)
                 {
                     // allow only spell without spell cost or with spell cost but not duration limit
                     int32 duration = GetSpellDuration(spellInfo);
-                    if ((spellInfo->manaCost || spellInfo->ManaCostPercentage || spellInfo->manaPerSecond) && duration > 0)
+                    SpellPowerEntry const* spellPower = spellInfo->GetSpellPower();
+                    if (spellPower && (spellPower->manaCost || spellPower->ManaCostPercentage || spellPower->manaPerSecond) && duration > 0)
                         continue;
 
                     // allow only spell without cooldown > duration
                     int32 cooldown = GetSpellRecoveryTime(spellInfo);
                     if (cooldown >= 0 && duration >= 0 && cooldown > duration)
-                        continue;
-
-                    // not allow instant kill autocasts as full health cost
-                    if (IsSpellHaveEffect(spellInfo, SPELL_EFFECT_INSTAKILL))
                         continue;
                 }
             }
@@ -294,8 +291,6 @@ void PetAI::UpdateAI(const uint32 diff)
             }
 
             m_creature->AddCreatureSpellCooldown(spell->m_spellInfo->Id);
-            if (m_creature->IsPet())
-                ((Pet*)m_creature)->CheckLearning(spell->m_spellInfo->Id);
 
             spell->prepare(&targets);
         }

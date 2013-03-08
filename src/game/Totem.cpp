@@ -23,7 +23,6 @@
 #include "Player.h"
 #include "ObjectMgr.h"
 #include "SpellMgr.h"
-#include "DBCStores.h"
 #include "CreatureAI.h"
 #include "InstanceData.h"
 
@@ -36,6 +35,7 @@ Totem::Totem() : Creature(CREATURE_SUBTYPE_TOTEM)
 bool Totem::Create(uint32 guidlow, CreatureCreatePos& cPos, CreatureInfo const* cinfo, Unit* owner)
 {
     SetMap(cPos.GetMap());
+    SetPhaseMask(cPos.GetPhaseMask(), false);
 
     Team team = owner->GetTypeId() == TYPEID_PLAYER ? ((Player*)owner)->GetTeam() : TEAM_NONE;
 
@@ -94,10 +94,6 @@ void Totem::Summon(Unit* owner)
     AIM_Initialize();
     owner->GetMap()->Add((Creature*)this);
 
-    WorldPacket data(SMSG_GAMEOBJECT_SPAWN_ANIM_OBSOLETE, 8);
-    data << GetObjectGuid();
-    SendMessageToSet(&data, true);
-
     if (owner->GetTypeId() == TYPEID_UNIT && ((Creature*)owner)->AI())
         ((Creature*)owner)->AI()->JustSummoned((Creature*)this);
 
@@ -119,8 +115,6 @@ void Totem::Summon(Unit* owner)
 
 void Totem::UnSummon()
 {
-    SendObjectDeSpawnAnim(GetObjectGuid());
-
     CombatStop();
     RemoveAurasDueToSpell(GetSpell());
 
@@ -132,6 +126,8 @@ void Totem::UnSummon()
         // remove aura all party members too
         if (owner->GetTypeId() == TYPEID_PLAYER)
         {
+            ((Player*)owner)->SendAutoRepeatCancel(this);
+
             // Not only the player can summon the totem (scripted AI)
             if (Group* pGroup = ((Player*)owner)->GetGroup())
             {
@@ -187,44 +183,28 @@ void Totem::SetTypeBySummonSpell(SpellEntry const* spellProto)
 
 bool Totem::IsImmuneToSpellEffect(SpellEntry const* spellInfo, SpellEffectIndex index, bool castOnSelf) const
 {
-    // Check for Mana Spring & Healing Stream totems
-    switch (spellInfo->SpellFamilyName)
+    SpellEffectEntry const* spellEffect = spellInfo->GetSpellEffect(index);
+    if(spellEffect)
     {
-        case SPELLFAMILY_SHAMAN:
-            if (spellInfo->IsFitToFamilyMask(UI64LIT(0x00000002000)) ||
-                    spellInfo->IsFitToFamilyMask(UI64LIT(0x00000004000)))
-                return false;
-            break;
-        default:
-            break;
-    }
-
-    switch (spellInfo->Effect[index])
-    {
-        case SPELL_EFFECT_ATTACK_ME:
-            // immune to any type of regeneration effects hp/mana etc.
-        case SPELL_EFFECT_HEAL:
-        case SPELL_EFFECT_HEAL_MAX_HEALTH:
-        case SPELL_EFFECT_HEAL_MECHANICAL:
-        case SPELL_EFFECT_HEAL_PCT:
-        case SPELL_EFFECT_ENERGIZE:
-        case SPELL_EFFECT_ENERGIZE_PCT:
-            return true;
-        default:
-            break;
-    }
-
-    if (!IsPositiveSpell(spellInfo))
-    {
-        // immune to all negative auras
-        if (IsAuraApplyEffect(spellInfo, index))
-            return true;
-    }
-    else
-    {
-        // immune to any type of regeneration auras hp/mana etc.
-        if (IsPeriodicRegenerateEffect(spellInfo, index))
-            return true;
+        // TODO: possibly all negative auras immune?
+        switch(spellEffect->Effect)
+        {
+            case SPELL_EFFECT_ATTACK_ME:
+                return true;
+            default:
+                break;
+        }
+        switch(spellEffect->EffectApplyAuraName)
+        {
+            case SPELL_AURA_PERIODIC_DAMAGE:
+            case SPELL_AURA_PERIODIC_LEECH:
+            case SPELL_AURA_MOD_FEAR:
+            case SPELL_AURA_TRANSFORM:
+            case SPELL_AURA_MOD_TAUNT:
+                return true;
+            default:
+                break;
+        }
     }
 
     return Creature::IsImmuneToSpellEffect(spellInfo, index, castOnSelf);

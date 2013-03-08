@@ -122,20 +122,24 @@ enum Target
     // Self (m_creature)
     TARGET_T_SELF = 0,                                      // Self cast
 
-    // Hostile targets
+    // Hostile targets (if pet then returns pet owner)
     TARGET_T_HOSTILE,                                       // Our current target (ie: highest aggro)
     TARGET_T_HOSTILE_SECOND_AGGRO,                          // Second highest aggro (generaly used for cleaves and some special attacks)
     TARGET_T_HOSTILE_LAST_AGGRO,                            // Dead last on aggro (no idea what this could be used for)
     TARGET_T_HOSTILE_RANDOM,                                // Just any random target on our threat list
     TARGET_T_HOSTILE_RANDOM_NOT_TOP,                        // Any random target except top threat
 
-    // Invoker targets
+    // Invoker targets (if pet then returns pet owner)
     TARGET_T_ACTION_INVOKER,                                // Unit who caused this Event to occur (only works for EVENT_T_AGGRO, EVENT_T_KILL, EVENT_T_DEATH, EVENT_T_SPELLHIT, EVENT_T_OOC_LOS, EVENT_T_FRIENDLY_HP, EVENT_T_FRIENDLY_IS_CC, EVENT_T_FRIENDLY_MISSING_BUFF)
-    TARGET_T_ACTION_INVOKER_OWNER,                          // Unit who is responsible for Event to occur (only works for EVENT_T_AGGRO, EVENT_T_KILL, EVENT_T_DEATH, EVENT_T_SPELLHIT, EVENT_T_OOC_LOS, EVENT_T_FRIENDLY_HP, EVENT_T_FRIENDLY_IS_CC, EVENT_T_FRIENDLY_MISSING_BUFF)
 
-    // Hostile players
-    TARGET_T_HOSTILE_RANDOM_PLAYER,                         // Just any random player on our threat list
-    TARGET_T_HOSTILE_RANDOM_NOT_TOP_PLAYER,                 // Any random player from threat list except top threat
+    // Hostile targets (including pets)
+    TARGET_T_HOSTILE_WPET,                                  // Current target (can be a pet)
+    TARGET_T_HOSTILE_WPET_SECOND_AGGRO,                     // Second highest aggro (generaly used for cleaves and some special attacks)
+    TARGET_T_HOSTILE_WPET_LAST_AGGRO,                       // Dead last on aggro (no idea what this could be used for)
+    TARGET_T_HOSTILE_WPET_RANDOM,                           // Just any random target on our threat list
+    TARGET_T_HOSTILE_WPET_RANDOM_NOT_TOP,                   // Any random target except top threat
+
+    TARGET_T_ACTION_INVOKER_WPET,
 
     TARGET_T_END
 };
@@ -143,15 +147,15 @@ enum Target
 enum EventFlags
 {
     EFLAG_REPEATABLE            = 0x01,                     // Event repeats
-    EFLAG_NORMAL                = 0x02,                     // Event only occurs in Normal instance difficulty
-    EFLAG_HEROIC                = 0x04,                     // Event only occurs in Heroic instance difficulty
-    EFLAG_RESERVED_3            = 0x08,                     // Used in master for difficulty 2
-    EFLAG_RESERVED_4            = 0x10,                     // Used in master for difficulty 3
+    EFLAG_DIFFICULTY_0          = 0x02,                     // Event only occurs in instance difficulty 0
+    EFLAG_DIFFICULTY_1          = 0x04,                     // Event only occurs in instance difficulty 1
+    EFLAG_DIFFICULTY_2          = 0x08,                     // Event only occurs in instance difficulty 2
+    EFLAG_DIFFICULTY_3          = 0x10,                     // Event only occurs in instance difficulty 3
     EFLAG_RANDOM_ACTION         = 0x20,                     // Event only execute one from existed actions instead each action.
     EFLAG_RESERVED_6            = 0x40,
     EFLAG_DEBUG_ONLY            = 0x80,                     // Event only occurs in debug build
     // no free bits, uint8 field
-    EFLAG_DIFFICULTY_ALL        = (EFLAG_NORMAL | EFLAG_HEROIC)
+    EFLAG_DIFFICULTY_ALL        = (EFLAG_DIFFICULTY_0 | EFLAG_DIFFICULTY_1 | EFLAG_DIFFICULTY_2 | EFLAG_DIFFICULTY_3)
 };
 
 enum SpawnedEventMode
@@ -614,9 +618,10 @@ class MANGOS_DLL_SPEC CreatureEventAI : public CreatureAI
         void ProcessAction(CreatureEventAI_Action const& action, uint32 rnd, uint32 EventId, Unit* pActionInvoker);
         inline uint32 GetRandActionParam(uint32 rnd, uint32 param1, uint32 param2, uint32 param3);
         inline int32 GetRandActionParam(uint32 rnd, int32 param1, int32 param2, int32 param3);
-        inline Unit* GetTargetByType(uint32 Target, Unit* pActionInvoker, uint32 forSpellId = 0, uint32 selectFlags = 0);
+        inline Unit* GetTargetByType(uint32 Target, Unit* pActionInvoker);
 
         void DoScriptText(int32 textEntry, WorldObject* pSource, Unit* target);
+        bool CanCast(Unit* Target, SpellEntry const* Spell, bool Triggered);
 
         bool SpawnedEventConditionsCheck(CreatureEventAI_Event const& event);
 
@@ -634,7 +639,10 @@ class MANGOS_DLL_SPEC CreatureEventAI : public CreatureAI
         CreatureEventAIList m_CreatureEventAIList;          // Holder for events (stores enabled, time, and eventid)
 
         uint8  m_Phase;                                     // Current phase, max 32 phases
+        bool   m_CombatMovementEnabled;                     // If we allow targeted movment gen (movement twoards top threat)
         bool   m_MeleeEnabled;                              // If we allow melee auto attack
+        float  m_AttackDistance;                            // Distance to attack from
+        float  m_AttackAngle;                               // Angle of attack
         uint32 m_InvinceabilityHpLevel;                     // Minimal health level allowed at damage apply
 };
 

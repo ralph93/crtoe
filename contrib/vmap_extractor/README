@@ -3,7 +3,7 @@ Linux:
 1. Building
 
 	Because vmap_extractor depends on libmpq for reading mpq files, you will have
-	to build libmpq prior to vmap_extractor. Therefore cd to dep/libmpq and execute:
+	to build libmpq prior to vmap_extractor. Therefore cd to dep/StormLib and execute:
 
 	$ ./autogen.sh
 	$ ./configure

@@ -145,6 +145,21 @@ float GetFloatValueFromArray(Tokens const& data, uint16 index)
     return result;
 }
 
+// modulos a radian orientation to the range of 0..2PI
+float NormalizeOrientation(float o)
+{
+    // fmod only supports positive numbers. Thus we have
+    // to emulate negative numbers
+    if (o < 0)
+    {
+        float mod = o * -1;
+        mod = fmod(mod, 2.0f * M_PI_F);
+        mod = -mod + 2.0f * M_PI_F;
+        return mod;
+    }
+    return fmod(o, 2.0f * M_PI_F);
+}
+
 void stripLineInvisibleChars(std::string& str)
 {
     static std::string invChars = " \t\7\n";
@@ -243,6 +258,21 @@ std::string TimeToTimestampStr(time_t t)
     char buf[20];
     snprintf(buf, 20, "%04d-%02d-%02d_%02d-%02d-%02d", aTm->tm_year + 1900, aTm->tm_mon + 1, aTm->tm_mday, aTm->tm_hour, aTm->tm_min, aTm->tm_sec);
     return std::string(buf);
+}
+
+std::string MoneyToString(uint64 money)
+{
+    uint32 gold = money / 10000;
+    uint32 silv = (money % 10000) / 100;
+    uint32 copp = (money % 10000) % 100;
+    std::stringstream ss;
+    if (gold)
+        ss << gold << "g";
+    if (silv || gold)
+        ss << silv << "s";
+    ss << copp << "c";
+
+    return ss.str();
 }
 
 /// Check if the string is a valid ip address representation
@@ -433,7 +463,7 @@ std::wstring GetMainPartOfName(std::wstring wname, uint32 declension)
         { &ie_End[1], &i_End[1],    NULL,         NULL,        NULL,         NULL,         NULL,       NULL }
     };
 
-    for (wchar_t const* const* itr = &dropEnds[declension][0]; *itr; ++itr)
+    for (wchar_t const * const* itr = &dropEnds[declension][0]; *itr; ++itr)
     {
         size_t len = size_t((*itr)[-1]);                    // get length from string size field
 
@@ -503,8 +533,8 @@ void utf8printf(FILE* out, const char* str, ...)
 void vutf8printf(FILE* out, const char* str, va_list* ap)
 {
 #if PLATFORM == PLATFORM_WINDOWS
-    char temp_buf[32*1024];
-    wchar_t wtemp_buf[32*1024];
+    char temp_buf[32 * 1024];
+    wchar_t wtemp_buf[32 * 1024];
 
     size_t temp_len = vsnprintf(temp_buf, 32 * 1024, str, *ap);
 

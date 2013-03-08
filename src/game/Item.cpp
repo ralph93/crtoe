@@ -205,6 +205,13 @@ bool ItemCanGoIntoBag(ItemPrototype const* pProto, ItemPrototype const* pBagProt
                     if (!(pProto->BagFamily & BAG_FAMILY_MASK_LEATHERWORKING_SUPP))
                         return false;
                     return true;
+                case ITEM_SUBCLASS_INSCRIPTION_CONTAINER:
+                    if (!(pProto->BagFamily & BAG_FAMILY_MASK_INSCRIPTION_SUPP))
+                        return false;
+                case ITEM_SUBCLASS_FISHING_CONTAINER:
+                    if (!(pProto->BagFamily & BAG_FAMILY_MASK_FISHING_SUPP))
+                        return false;
+                    return true;
                 default:
                     return false;
             }
@@ -226,13 +233,138 @@ bool ItemCanGoIntoBag(ItemPrototype const* pProto, ItemPrototype const* pBagProt
     return false;
 }
 
-Item::Item() :
-    loot(NULL)
+uint32 ItemPrototype::GetArmor() const
+{
+    if (Quality >= ITEM_QUALITY_HEIRLOOM)                   // heirlooms have it's own dbc...
+        return 0;
+
+    if (Class == ITEM_CLASS_ARMOR && SubClass == ITEM_SUBCLASS_ARMOR_SHIELD)
+    {
+        if (ItemArmorShieldEntry const* ias = sItemArmorShieldStore.LookupEntry(ItemLevel))
+        {
+            return uint32(floor(ias->Value[Quality] + 0.5f));
+        }
+        return 0;
+    }
+
+    ItemArmorQualityEntry const* iaq = sItemArmorQualityStore.LookupEntry(ItemLevel);
+    ItemArmorTotalEntry const* iat = sItemArmorTotalStore.LookupEntry(ItemLevel);
+
+    if (!iaq || !iat)
+        return 0;
+
+    if (InventoryType != INVTYPE_HEAD && InventoryType != INVTYPE_CHEST && InventoryType != INVTYPE_SHOULDERS &&
+        InventoryType != INVTYPE_LEGS && InventoryType != INVTYPE_FEET && InventoryType != INVTYPE_WRISTS &&
+        InventoryType != INVTYPE_HANDS && InventoryType != INVTYPE_WAIST && InventoryType != INVTYPE_CLOAK &&
+        InventoryType != INVTYPE_ROBE)
+        return 0;
+
+    ArmorLocationEntry const* al = NULL;
+
+    if (InventoryType == INVTYPE_ROBE)
+        al = sArmorLocationStore.LookupEntry(INVTYPE_CHEST);
+    else
+        al = sArmorLocationStore.LookupEntry(InventoryType);
+
+    if (!al)
+        return 0;
+
+    float iatMult, alMult;
+
+    switch (SubClass)
+    {
+        case ITEM_SUBCLASS_ARMOR_CLOTH:
+            iatMult = iat->Value[0];
+            alMult = al->Value[0];
+            break;
+        case ITEM_SUBCLASS_ARMOR_LEATHER:
+            iatMult = iat->Value[1];
+            alMult = al->Value[1];
+            break;
+        case ITEM_SUBCLASS_ARMOR_MAIL:
+            iatMult = iat->Value[2];
+            alMult = al->Value[2];
+            break;
+        case ITEM_SUBCLASS_ARMOR_PLATE:
+            iatMult = iat->Value[3];
+            alMult = al->Value[3];
+            break;
+        default:
+            return 0;
+    }
+
+    return uint32(floor(iaq->Value[Quality] * iatMult * alMult + 0.5f));
+}
+
+float ItemPrototype::getDPS() const
+{
+    float damage = 0.0f;
+
+    if (Class == ITEM_CLASS_WEAPON)
+    {
+        if (Quality >= ITEM_QUALITY_HEIRLOOM)               // heirlooms have it's own dbc...
+            return damage;
+
+        ItemDamageEntry const* id = NULL;
+
+        switch (InventoryType)
+        {
+            case INVTYPE_WEAPON:
+            case INVTYPE_WEAPONMAINHAND:
+            case INVTYPE_WEAPONOFFHAND:
+                if (Flags2 & ITEM_FLAG2_CASTER_WEAPON)      // caster weapon flag
+                    id = sItemDamageOneHandCasterStore.LookupEntry(ItemLevel);
+                else
+                    id = sItemDamageOneHandStore.LookupEntry(ItemLevel);
+                break;
+            case INVTYPE_2HWEAPON:
+                if (Flags2 & ITEM_FLAG2_CASTER_WEAPON)      // caster weapon flag
+                    id = sItemDamageTwoHandCasterStore.LookupEntry(ItemLevel);
+                else
+                    id = sItemDamageTwoHandStore.LookupEntry(ItemLevel);
+                break;
+            case INVTYPE_AMMO:
+                id = sItemDamageAmmoStore.LookupEntry(ItemLevel);
+                break;
+            case INVTYPE_RANGED:
+            case INVTYPE_THROWN:
+            case INVTYPE_RANGEDRIGHT:
+                switch (SubClass)
+                {
+                    case ITEM_SUBCLASS_WEAPON_BOW:
+                    case ITEM_SUBCLASS_WEAPON_GUN:
+                    case ITEM_SUBCLASS_WEAPON_CROSSBOW:
+                        id = sItemDamageRangedStore.LookupEntry(ItemLevel);
+                        break;
+                    case ITEM_SUBCLASS_WEAPON_THROWN:
+                        id = sItemDamageThrownStore.LookupEntry(ItemLevel);
+                        break;
+                    case ITEM_SUBCLASS_WEAPON_WAND:
+                        id = sItemDamageWandStore.LookupEntry(ItemLevel);
+                        break;
+                    default:
+                        break;
+                }
+                break;
+            default:
+                break;
+        }
+
+        if (!id)
+            return damage;
+
+        return id->Value[Quality];
+    }
+
+    return damage;
+}
+
+Item::Item()
 {
     m_objectType |= TYPEMASK_ITEM;
     m_objectTypeId = TYPEID_ITEM;
-    // 2.3.2 - 0x18
-    m_updateFlag = (UPDATEFLAG_LOWGUID | UPDATEFLAG_HIGHGUID);
+
+    m_updateFlag = 0;
 
     m_valuesCount = ITEM_END;
     m_slot = 0;
@@ -278,7 +410,10 @@ void Item::UpdateDuration(Player* owner, uint32 diff)
 
     if (GetUInt32Value(ITEM_FIELD_DURATION) <= diff)
     {
-        owner->DestroyItem(GetBagSlot(), GetSlot(), true);
+        if (uint32 newItemId = sObjectMgr.GetItemExpireConvert(GetEntry()))
+            owner->ConvertItem(this, newItemId);
+        else
+            owner->DestroyItem(GetBagSlot(), GetSlot(), true);
         return;
     }
 
@@ -303,21 +438,21 @@ void Item::SaveToDB()
             for (uint16 i = 0; i < m_valuesCount; ++i)
                 ss << GetUInt32Value(i) << " ";
 
-            stmt = CharacterDatabase.CreateStatement(insItem, "INSERT INTO item_instance (guid,owner_guid,data) VALUES (?, ?, ?)");
-            stmt.PExecute(guid, GetOwnerGuid().GetCounter(), ss.str().c_str());
+            stmt = CharacterDatabase.CreateStatement(insItem, "INSERT INTO item_instance (guid,owner_guid,data,text) VALUES (?, ?, ?, ?)");
+            stmt.PExecute(guid, GetOwnerGuid().GetCounter(), ss.str().c_str(), m_text.c_str());
         } break;
         case ITEM_CHANGED:
         {
             static SqlStatementID updInstance ;
             static SqlStatementID updGifts ;
 
-            SqlStatement stmt = CharacterDatabase.CreateStatement(updInstance, "UPDATE item_instance SET data = ?, owner_guid = ? WHERE guid = ?");
+            SqlStatement stmt = CharacterDatabase.CreateStatement(updInstance, "UPDATE item_instance SET data = ?, owner_guid = ?, text = ? WHERE guid = ?");
 
             std::ostringstream ss;
             for (uint16 i = 0; i < m_valuesCount; ++i)
                 ss << GetUInt32Value(i) << " ";
 
-            stmt.PExecute(ss.str().c_str(), GetOwnerGuid().GetCounter(), guid);
+            stmt.PExecute(ss.str().c_str(), GetOwnerGuid().GetCounter(), m_text.c_str(), guid);
 
             if (HasFlag(ITEM_FIELD_FLAGS, ITEM_DYNFLAG_WRAPPED))
             {
@@ -327,16 +462,9 @@ void Item::SaveToDB()
         } break;
         case ITEM_REMOVED:
         {
-            static SqlStatementID delItemText;
             static SqlStatementID delInst ;
             static SqlStatementID delGifts ;
             static SqlStatementID delLoot ;
-
-            if (uint32 item_text_id = GetUInt32Value(ITEM_FIELD_ITEM_TEXT_ID))
-            {
-                SqlStatement stmt = CharacterDatabase.CreateStatement(delItemText, "DELETE FROM item_text WHERE id = ?");
-                stmt.PExecute(item_text_id);
-            }
 
             SqlStatement stmt = CharacterDatabase.CreateStatement(delInst, "DELETE FROM item_instance WHERE guid = ?");
             stmt.PExecute(guid);
@@ -428,6 +556,8 @@ bool Item::LoadFromDB(uint32 guidLow, Field* fields, ObjectGuid ownerGuid)
         return false;
     }
 
+    SetText(fields[1].GetCppString());
+
     bool need_save = false;                                 // need explicit save data at load fixes
 
     // overwrite possible wrong/corrupted guid
@@ -518,7 +648,8 @@ bool Item::LoadFromDB(uint32 guidLow, Field* fields, ObjectGuid ownerGuid)
 
 void Item::LoadLootFromDB(Field* fields)
 {
-    uint32 item_id     = fields[1].GetUInt32();
+    uint32 item_id     = abs(fields[1].GetInt32());
+    uint8  type        = fields[1].GetInt32() > 0 ? LOOT_ITEM_TYPE_ITEM : LOOT_ITEM_TYPE_CURRENCY;
     uint32 item_amount = fields[2].GetUInt32();
     uint32 item_suffix = fields[3].GetUInt32();
     int32  item_propid = fields[4].GetInt32();
@@ -532,16 +663,32 @@ void Item::LoadLootFromDB(Field* fields)
     }
 
     // normal item case
-    ItemPrototype const* proto = ObjectMgr::GetItemPrototype(item_id);
-
-    if (!proto)
+    if (type == LOOT_ITEM_TYPE_ITEM)
     {
-        CharacterDatabase.PExecute("DELETE FROM item_loot WHERE guid = '%u' AND itemid = '%u'", GetGUIDLow(), item_id);
-        sLog.outError("Item::LoadLootFromDB: %s has an unknown item (id: #%u) in item_loot, deleted.", GetOwnerGuid().GetString().c_str(), item_id);
-        return;
+        ItemPrototype const* proto = ObjectMgr::GetItemPrototype(item_id);
+        if (!proto)
+        {
+            CharacterDatabase.PExecute("DELETE FROM item_loot WHERE guid = '%u' AND itemid = '%u'", GetGUIDLow(), item_id);
+            sLog.outError("Item::LoadLootFromDB: %s has an unknown item (id: #%u) in item_loot, deleted.", GetOwnerGuid().GetString().c_str(), item_id);
+            return;
+        }
+
+        loot.items.push_back(LootItem(item_id, type, item_amount, item_suffix, item_propid));
+    }
+    // currency case
+    else //if (type == LOOT_ITEM_TYPE_CURRENCY)
+    {
+        CurrencyTypesEntry const* currencyEntry = sCurrencyTypesStore.LookupEntry(item_id);
+        if (!currencyEntry)
+        {
+            CharacterDatabase.PExecute("DELETE FROM item_loot WHERE guid = '%u' AND itemid = '%i'", GetGUIDLow(), -int32(item_id));
+            sLog.outError("Item::LoadLootFromDB: %s has an unknown currency (id: #%u) in item_loot, deleted.", GetOwnerGuid().GetString().c_str(), item_id);
+            return;
+        }
+
+        loot.items.push_back(LootItem(item_id, type, item_amount));
     }
 
-    loot.items.push_back(LootItem(item_id, item_amount, item_suffix, item_propid));
     ++loot.unlootedCount;
 
     SetLootState(ITEM_LOOT_UNCHANGED);
@@ -586,7 +733,7 @@ uint32 Item::GetSkill()
 
     const static uint32 item_armor_skills[MAX_ITEM_SUBCLASS_ARMOR] =
     {
-        0, SKILL_CLOTH, SKILL_LEATHER, SKILL_MAIL, SKILL_PLATE_MAIL, 0, SKILL_SHIELD, 0, 0, 0
+        0, SKILL_CLOTH, SKILL_LEATHER, SKILL_MAIL, SKILL_PLATE_MAIL, 0, SKILL_SHIELD, 0, 0, 0, 0
     };
 
     ItemPrototype const* proto = GetProto();
@@ -608,46 +755,6 @@ uint32 Item::GetSkill()
         default:
             return 0;
     }
-}
-
-uint32 Item::GetSpell()
-{
-    ItemPrototype const* proto = GetProto();
-
-    switch (proto->Class)
-    {
-        case ITEM_CLASS_WEAPON:
-            switch (proto->SubClass)
-            {
-                case ITEM_SUBCLASS_WEAPON_AXE:     return  196;
-                case ITEM_SUBCLASS_WEAPON_AXE2:    return  197;
-                case ITEM_SUBCLASS_WEAPON_BOW:     return  264;
-                case ITEM_SUBCLASS_WEAPON_GUN:     return  266;
-                case ITEM_SUBCLASS_WEAPON_MACE:    return  198;
-                case ITEM_SUBCLASS_WEAPON_MACE2:   return  199;
-                case ITEM_SUBCLASS_WEAPON_POLEARM: return  200;
-                case ITEM_SUBCLASS_WEAPON_SWORD:   return  201;
-                case ITEM_SUBCLASS_WEAPON_SWORD2:  return  202;
-                case ITEM_SUBCLASS_WEAPON_STAFF:   return  227;
-                case ITEM_SUBCLASS_WEAPON_DAGGER:  return 1180;
-                case ITEM_SUBCLASS_WEAPON_THROWN:  return 2567;
-                case ITEM_SUBCLASS_WEAPON_SPEAR:   return 3386;
-                case ITEM_SUBCLASS_WEAPON_CROSSBOW:return 5011;
-                case ITEM_SUBCLASS_WEAPON_WAND:    return 5009;
-                default: return 0;
-            }
-        case ITEM_CLASS_ARMOR:
-            switch (proto->SubClass)
-            {
-                case ITEM_SUBCLASS_ARMOR_CLOTH:    return 9078;
-                case ITEM_SUBCLASS_ARMOR_LEATHER:  return 9077;
-                case ITEM_SUBCLASS_ARMOR_MAIL:     return 8737;
-                case ITEM_SUBCLASS_ARMOR_PLATE:    return  750;
-                case ITEM_SUBCLASS_ARMOR_SHIELD:   return 9116;
-                default: return 0;
-            }
-    }
-    return 0;
 }
 
 int32 Item::GenerateItemRandomPropertyId(uint32 item_id)
@@ -834,10 +941,11 @@ bool Item::IsEquipped() const
     return !IsInBag() && m_slot < EQUIPMENT_SLOT_END;
 }
 
-bool Item::CanBeTraded() const
+bool Item::CanBeTraded(bool mail) const
 {
-    if (IsSoulBound())
+    if ((!mail || !IsBoundAccountWide()) && IsSoulBound())
         return false;
+
     if (IsBag() && (Player::IsBagPos(GetPos()) || !((Bag const*)this)->IsEmpty()))
         return false;
 
@@ -867,6 +975,12 @@ bool Item::IsBoundByEnchant() const
         if (!enchant_id)
             continue;
 
+        if (enchant_slot == TRANSMOGRIFY_ENCHANTMENT_SLOT)
+            return true;
+
+        if (enchant_slot > PRISMATIC_ENCHANTMENT_SLOT && enchant_slot < PROP_ENCHANTMENT_SLOT_0)
+            continue;
+
         SpellItemEnchantmentEntry const* enchantEntry = sSpellItemEnchantmentStore.LookupEntry(enchant_id);
         if (!enchantEntry)
             continue;
@@ -881,14 +995,34 @@ bool Item::IsFitToSpellRequirements(SpellEntry const* spellInfo) const
 {
     ItemPrototype const* proto = GetProto();
 
-    if (spellInfo->EquippedItemClass != -1)                 // -1 == any item class
+    // Enchant spells only use Effect[0] (patch 3.3.2)
+    if (proto->IsVellum())
     {
-        if (spellInfo->EquippedItemClass != int32(proto->Class))
+        SpellEffectEntry const* spellEffect_0 = spellInfo->GetSpellEffect(EFFECT_INDEX_0);
+
+        if (spellEffect_0 && spellEffect_0->Effect == SPELL_EFFECT_ENCHANT_ITEM)
+        {
+            // EffectItemType[0] is the associated scroll itemID, if a scroll can be made
+            if (spellEffect_0->EffectItemType == 0)
+                return false;
+            // Other checks do not apply to vellum enchants, so return final result
+            int32 eqItemClass = spellInfo->GetEquippedItemClass();
+            return proto->SubClass == ITEM_SUBCLASS_VELLUM && (eqItemClass == ITEM_CLASS_WEAPON || eqItemClass == ITEM_CLASS_ARMOR);
+        }
+    }
+
+    SpellEquippedItemsEntry const* equippedItems = spellInfo->GetSpellEquippedItems();
+    if (!equippedItems)
+        return true;
+
+    if (equippedItems->EquippedItemClass != -1)             // -1 == any item class
+    {
+        if (equippedItems->EquippedItemClass != int32(proto->Class))
             return false;                                   //  wrong item class
 
-        if (spellInfo->EquippedItemSubClassMask != 0)       // 0 == any subclass
+        if (equippedItems->EquippedItemSubClassMask != 0)   // 0 == any subclass
         {
-            if ((spellInfo->EquippedItemSubClassMask & (1 << proto->SubClass)) == 0)
+            if ((equippedItems->EquippedItemSubClassMask & (1 << proto->SubClass)) == 0)
                 return false;                               // subclass not present in mask
         }
     }
@@ -896,9 +1030,9 @@ bool Item::IsFitToSpellRequirements(SpellEntry const* spellInfo) const
     // Only check for item enchantments (TARGET_FLAG_ITEM), all other spells are either NPC spells
     // or spells where slot requirements are already handled with AttributesEx3 fields
     // and special code (Titan's Grip, Windfury Attack). Check clearly not applicable for Lava Lash.
-    if (spellInfo->EquippedItemInventoryTypeMask != 0 && (spellInfo->Targets & TARGET_FLAG_ITEM))    // 0 == any inventory type
+    if (equippedItems->EquippedItemInventoryTypeMask != 0 && (spellInfo->GetTargets() & TARGET_FLAG_ITEM))    // 0 == any inventory type
     {
-        if ((spellInfo->EquippedItemInventoryTypeMask  & (1 << proto->InventoryType)) == 0)
+        if ((equippedItems->EquippedItemInventoryTypeMask  & (1 << proto->InventoryType)) == 0)
             return false;                                   // inventory type not present in mask
     }
 
@@ -967,7 +1101,7 @@ bool Item::GemsFitSockets() const
     bool fits = true;
     for (uint32 enchant_slot = SOCK_ENCHANTMENT_SLOT; enchant_slot < SOCK_ENCHANTMENT_SLOT + MAX_GEM_SOCKETS; ++enchant_slot)
     {
-        uint8 SocketColor = GetProto()->Socket[enchant_slot-SOCK_ENCHANTMENT_SLOT].Color;
+        uint8 SocketColor = GetProto()->Socket[enchant_slot - SOCK_ENCHANTMENT_SLOT].Color;
 
         uint32 enchant_id = GetEnchantmentId(EnchantmentSlot(enchant_slot));
         if (!enchant_id)
@@ -1016,6 +1150,29 @@ uint8 Item::GetGemCountWithID(uint32 GemID) const
             continue;
 
         if (GemID == enchantEntry->GemID)
+            ++count;
+    }
+    return count;
+}
+
+uint8 Item::GetGemCountWithLimitCategory(uint32 limitCategory) const
+{
+    uint8 count = 0;
+    for (uint32 enchant_slot = SOCK_ENCHANTMENT_SLOT; enchant_slot < SOCK_ENCHANTMENT_SLOT + MAX_GEM_SOCKETS; ++enchant_slot)
+    {
+        uint32 enchant_id = GetEnchantmentId(EnchantmentSlot(enchant_slot));
+        if (!enchant_id)
+            continue;
+
+        SpellItemEnchantmentEntry const* enchantEntry = sSpellItemEnchantmentStore.LookupEntry(enchant_id);
+        if (!enchantEntry)
+            continue;
+
+        ItemPrototype const* gemProto = ObjectMgr::GetItemPrototype(enchantEntry->GemID);
+        if (!gemProto)
+            continue;
+
+        if (gemProto->ItemLimitCategory == limitCategory)
             ++count;
     }
     return count;
@@ -1096,7 +1253,20 @@ bool Item::IsBindedNotWith(Player const* player) const
     if (!IsSoulBound())
         return false;
 
-    return true;
+    // not BOA item case
+    if (!IsBoundAccountWide())
+        return true;
+
+    // online
+    if (Player* owner = GetOwner())
+    {
+        return owner->GetSession()->GetAccountId() != player->GetSession()->GetAccountId();
+    }
+    // offline slow case
+    else
+    {
+        return sObjectMgr.GetPlayerAccountIdByGUID(GetOwnerGuid()) != player->GetSession()->GetAccountId();
+    }
 }
 
 void Item::AddToClientUpdateList()
@@ -1152,6 +1322,31 @@ bool ItemRequiredTarget::IsFitToRequirements(Unit* pUnitTarget) const
             return !pUnitTarget->isAlive();
         default:
             return false;
+    }
+}
+
+bool Item::HasMaxCharges() const
+{
+    ItemPrototype const* itemProto = GetProto();
+
+    for (int i = 0; i < MAX_ITEM_PROTO_SPELLS; ++i)
+        if (GetSpellCharges(i) != itemProto->Spells[i].SpellCharges)
+            return false;
+
+    return true;
+}
+
+void Item::RestoreCharges()
+{
+    ItemPrototype const* itemProto = GetProto();
+
+    for (int i = 0; i < MAX_ITEM_PROTO_SPELLS; ++i)
+    {
+        if (GetSpellCharges(i) != itemProto->Spells[i].SpellCharges)
+        {
+            SetSpellCharges(i, itemProto->Spells[i].SpellCharges);
+            SetState(ITEM_CHANGED);
+        }
     }
 }
 

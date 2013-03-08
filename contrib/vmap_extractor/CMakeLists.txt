@@ -1,4 +1,4 @@
-# Copyright (C) 2005-2012 MaNGOS project <http://getmangos.com/>
+# Copyright (C) 2005-2013 MaNGOS project <http://getmangos.com/>
 #
 # This file is free software; as a special exception the author gives
 # unlimited permission to copy and/or distribute it, with or without
@@ -20,6 +20,6 @@ ADD_DEFINITIONS("-Wall")
 ADD_DEFINITIONS("-ggdb")
 ADD_DEFINITIONS("-O3")
 
-include_directories(${CMAKE_SOURCE_DIR}/../../dep/libmpq)
+include_directories(../../dep/libmpq)
 
 add_subdirectory(vmapextract)

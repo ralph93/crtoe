@@ -21,15 +21,15 @@
 // -----------------------------------  SQLStorageBase  ---------------------------------------- //
 
 SQLStorageBase::SQLStorageBase() :
+    m_recordCount(0),
+    m_maxEntry(0),
+    m_dstFieldCount(0),
+    m_srcFieldCount(0),
+    m_recordSize(0),
     m_tableName(NULL),
     m_entry_field(NULL),
     m_src_format(NULL),
     m_dst_format(NULL),
-    m_dstFieldCount(0),
-    m_srcFieldCount(0),
-    m_recordCount(0),
-    m_maxEntry(0),
-    m_recordSize(0),
     m_data(NULL)
 {}
 
@@ -131,10 +131,10 @@ void SQLStorage::Free()
     m_Index = NULL;
 }
 
-void SQLStorage::Load(bool error_at_empty /*= true*/)
+void SQLStorage::Load()
 {
     SQLStorageLoader loader;
-    loader.Load(*this, error_at_empty);
+    loader.Load(*this);
 }
 
 SQLStorage::SQLStorage(const char* fmt, const char* _entry_field, const char* sqlname)

@@ -18,7 +18,7 @@
 
 #include "DatabaseEnv.h"
 
-SqlStmtParameters::SqlStmtParameters(uint32 nParams)
+SqlStmtParameters::SqlStmtParameters(int nParams)
 {
     // reserve memory if needed
     if (nParams > 0)

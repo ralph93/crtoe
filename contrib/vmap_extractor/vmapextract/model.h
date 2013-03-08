@@ -19,13 +19,12 @@
 #ifndef MODEL_H
 #define MODEL_H
 
-#include "loadlib/loadlib.h"
 #include "vec3d.h"
 //#include "mpq.h"
 #include "modelheaders.h"
 #include <vector>
-#include "vmapexport.h"
 
+class Model;
 class WMOInstance;
 class MPQFile;
 
@@ -35,12 +34,12 @@ class Model
 {
     public:
         ModelHeader header;
-        ModelVertex* origVertices;
-        Vec3D* vertices;
-        uint16* indices;
+        uint32 offsBB_vertices, offsBB_indices;
+        Vec3D* BB_vertices, *vertices;
+        uint16* BB_indices, *indices;
         size_t nIndices;
 
-        bool open(StringSet& failedPaths);
+        bool open();
         bool ConvertToVMAPModel(const char* outfilename);
 
         bool ok;

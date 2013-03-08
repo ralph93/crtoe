@@ -64,6 +64,20 @@ namespace VMAP
         return pos;
     }
 
+    //=========================================================
+
+    Vector3 VMapManager2::convertPositionToMangosRep(float x, float y, float z) const
+    {
+        Vector3 pos;
+        const float mid = 0.5f * 64.0f * 533.33333333f;
+        pos.x = mid - x;
+        pos.y = mid - y;
+        pos.z = z;
+
+        return pos;
+    }
+    //=========================================================
+
     // move to MapTree too?
     std::string VMapManager2::getMapFileName(unsigned int pMapId)
     {
@@ -175,7 +189,7 @@ namespace VMAP
                 Vector3 pos2 = convertPositionToInternalRep(x2, y2, z2);
                 Vector3 resultPos;
                 result = instanceTree->second->getObjectHitPos(pos1, pos2, resultPos, pModifyDist);
-                resultPos = convertPositionToInternalRep(resultPos.x, resultPos.y, resultPos.z);
+                resultPos = convertPositionToMangosRep(resultPos.x, resultPos.y, resultPos.z);
                 rx = resultPos.x;
                 ry = resultPos.y;
                 rz = resultPos.z;
@@ -221,7 +235,7 @@ namespace VMAP
             // z is not touched by convertPositionToMangosRep(), so just copy
             z = pos.z;
         }
-        return result;
+        return(result);
     }
 
     bool VMapManager2::GetLiquidLevel(uint32 pMapId, float x, float y, float z, uint8 ReqLiquidType, float& level, float& floor, uint32& type) const
@@ -258,7 +272,7 @@ namespace VMAP
                 delete worldmodel;
                 return NULL;
             }
-            DEBUG_FILTER_LOG(LOG_FILTER_MAP_LOADING, "VMapManager2: loading file '%s%s'.", basepath.c_str(), filename.c_str());
+            DEBUG_LOG("VMapManager2: loading file '%s%s'.", basepath.c_str(), filename.c_str());
             model = iLoadedModelFiles.insert(std::pair<std::string, ManagedModel>(filename, ManagedModel())).first;
             model->second.setModel(worldmodel);
         }
@@ -276,7 +290,7 @@ namespace VMAP
         }
         if (model->second.decRefCount() == 0)
         {
-            DEBUG_FILTER_LOG(LOG_FILTER_MAP_LOADING, "VMapManager2: unloading file '%s'", filename.c_str());
+            DEBUG_LOG("VMapManager2: unloading file '%s'", filename.c_str());
             delete model->second.getModel();
             iLoadedModelFiles.erase(model);
         }

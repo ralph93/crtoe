@@ -18,6 +18,7 @@
 
 #include "Common.h"
 #include "Database/DatabaseEnv.h"
+#include "DBCStores.h"
 #include "Opcodes.h"
 #include "Log.h"
 #include "Player.h"
@@ -27,10 +28,56 @@
 
 void WorldSession::HandleLearnTalentOpcode(WorldPacket& recv_data)
 {
+    DEBUG_LOG("CMSG_LEARN_PREVIEW_TALENTS");
+
     uint32 talent_id, requested_rank;
     recv_data >> talent_id >> requested_rank;
 
-    _player->LearnTalent(talent_id, requested_rank);
+    if (_player->LearnTalent(talent_id, requested_rank))
+        _player->SendTalentsInfoData(false);
+    else
+        sLog.outError("WorldSession::HandleLearnTalentOpcode: learn talent %u rank %u failed for %s (account %u)", talent_id, requested_rank, GetPlayerName(), GetAccountId());
+}
+
+void WorldSession::HandleLearnPreviewTalents(WorldPacket& recvPacket)
+{
+    DEBUG_LOG("CMSG_LEARN_PREVIEW_TALENTS");
+
+    int32 tabPage;
+    uint32 talentsCount;
+    recvPacket >> tabPage;    // talent tree
+
+    // prevent cheating (selecting new tree with points already in another)
+    if (tabPage >= 0)   // -1 if player already has specialization
+    {
+        if (TalentTabEntry const* talentTabEntry = sTalentTabStore.LookupEntry(_player->GetPrimaryTalentTree(_player->GetActiveSpec())))
+        {
+            if (talentTabEntry->tabpage != tabPage)
+            {
+                recvPacket.rfinish();
+                sLog.outError("WorldSession::HandleLearnPreviewTalents: tabPage != talent tabPage for %s (account %u)", GetPlayerName(), GetAccountId());
+                return;
+            }
+        }
+    }
+
+    recvPacket >> talentsCount;
+
+    uint32 talentId, talentRank;
+
+    for (uint32 i = 0; i < talentsCount; ++i)
+    {
+        recvPacket >> talentId >> talentRank;
+
+        if (!_player->LearnTalent(talentId, talentRank))
+        {
+            recvPacket.rfinish();
+            sLog.outError("WorldSession::HandleLearnPreviewTalents: learn talent %u rank %u tab %u failed for %s (account %u)", talentId, talentRank, tabPage, GetPlayerName(), GetAccountId());
+            break;
+        }
+    }
+
+    _player->SendTalentsInfoData(false);
 }
 
 void WorldSession::HandleTalentWipeConfirmOpcode(WorldPacket& recv_data)
@@ -59,6 +106,7 @@ void WorldSession::HandleTalentWipeConfirmOpcode(WorldPacket& recv_data)
         return;
     }
 
+    _player->SendTalentsInfoData(false);
     unit->CastSpell(_player, 14867, true);                  // spell: "Untalent Visual Effect"
 }
 

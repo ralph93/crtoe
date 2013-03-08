@@ -24,6 +24,7 @@
 #include "World.h"
 #include "Creature.h"
 #include "Player.h"
+#include "Vehicle.h"
 #include "ObjectMgr.h"
 #include "ObjectGuid.h"
 #include "UpdateData.h"
@@ -48,7 +49,8 @@ Object::Object()
     m_objectTypeId      = TYPEID_OBJECT;
     m_objectType        = TYPEMASK_OBJECT;
 
-    m_uint32Values      = NULL;
+    m_uint32Values      = 0;
+    m_uint32Values_mirror = 0;
     m_valuesCount       = 0;
 
     m_inWorld           = false;
@@ -71,6 +73,7 @@ Object::~Object()
     }
 
     delete[] m_uint32Values;
+    delete[] m_uint32Values_mirror;
 }
 
 void Object::_InitValues()
@@ -78,7 +81,8 @@ void Object::_InitValues()
     m_uint32Values = new uint32[ m_valuesCount ];
     memset(m_uint32Values, 0, m_valuesCount * sizeof(uint32));
 
-    m_changedValues.resize(m_valuesCount, false);
+    m_uint32Values_mirror = new uint32[ m_valuesCount ];
+    memset(m_uint32Values_mirror, 0, m_valuesCount * sizeof(uint32));
 
     m_objectUpdated = false;
 }
@@ -118,40 +122,42 @@ void Object::SendForcedObjectUpdate()
     }
 }
 
-void Object::BuildMovementUpdateBlock(UpdateData* data, uint8 flags) const
-{
-    ByteBuffer buf(500);
-
-    buf << uint8(UPDATETYPE_MOVEMENT);
-    buf << GetObjectGuid();
-
-    BuildMovementUpdate(&buf, flags);
-
-    data->AddUpdateBlock(buf);
-}
-
 void Object::BuildCreateUpdateBlockForPlayer(UpdateData* data, Player* target) const
 {
     if (!target)
         return;
 
     uint8  updatetype   = UPDATETYPE_CREATE_OBJECT;
-    uint8 updateFlags  = m_updateFlag;
+    uint16 updateFlags  = m_updateFlag;
 
     /** lower flag1 **/
     if (target == this)                                     // building packet for yourself
         updateFlags |= UPDATEFLAG_SELF;
 
+    switch (GetObjectGuid().GetHigh())
+    {
+        case HIGHGUID_PLAYER:
+        case HIGHGUID_PET:
+        case HIGHGUID_CORPSE:
+        case HIGHGUID_DYNAMICOBJECT:
+            updatetype = UPDATETYPE_CREATE_OBJECT2;
+            break;
+        case HIGHGUID_UNIT:
+        {
+            Creature* creature = (Creature*)this;
+            if (creature->IsTemporarySummon() && ((TemporarySummon*)this)->GetSummonerGuid().IsPlayer())
+                updatetype = UPDATETYPE_CREATE_OBJECT2;
+            break;
+        }
+        case HIGHGUID_GAMEOBJECT:
+        {
+            if (((GameObject*)this)->GetOwnerGuid().IsPlayer())
+                updatetype = UPDATETYPE_CREATE_OBJECT2;
+            break;
+        }
+    }
     if (updateFlags & UPDATEFLAG_HAS_POSITION)
     {
-        // UPDATETYPE_CREATE_OBJECT2 dynamic objects, corpses...
-        if (isType(TYPEMASK_DYNAMICOBJECT) || isType(TYPEMASK_CORPSE) || isType(TYPEMASK_PLAYER))
-            updatetype = UPDATETYPE_CREATE_OBJECT2;
-
-        // UPDATETYPE_CREATE_OBJECT2 for pets...
-        if (target->GetPetGuid() == GetObjectGuid())
-            updatetype = UPDATETYPE_CREATE_OBJECT2;
-
         // UPDATETYPE_CREATE_OBJECT2 for some gameobject types...
         if (isType(TYPEMASK_GAMEOBJECT))
         {
@@ -197,7 +203,7 @@ void Object::BuildCreateUpdateBlockForPlayer(UpdateData* data, Player* target) c
 void Object::SendCreateUpdateToPlayer(Player* player)
 {
     // send create update to player
-    UpdateData upd;
+    UpdateData upd(player->GetMapId());
     WorldPacket packet;
 
     BuildCreateUpdateBlockForPlayer(&upd, player);
@@ -226,139 +232,318 @@ void Object::BuildOutOfRangeUpdateBlock(UpdateData* data) const
     data->AddOutOfRangeGUID(GetObjectGuid());
 }
 
-void Object::DestroyForPlayer(Player* target) const
+void Object::DestroyForPlayer(Player* target, bool anim) const
 {
     MANGOS_ASSERT(target);
 
-    WorldPacket data(SMSG_DESTROY_OBJECT, 8);
+    WorldPacket data(SMSG_DESTROY_OBJECT, 9);
     data << GetObjectGuid();
+    data << uint8(anim ? 1 : 0);                            // WotLK (bool), may be despawn animation
     target->GetSession()->SendPacket(&data);
 }
 
-void Object::BuildMovementUpdate(ByteBuffer* data, uint8 updateFlags) const
+void Object::BuildMovementUpdate(ByteBuffer * data, uint16 updateFlags) const
 {
-    *data << uint8(updateFlags);                            // update flags
+    ObjectGuid Guid = GetObjectGuid();
 
-    // 0x20
-    if (updateFlags & UPDATEFLAG_LIVING)
+    data->WriteBit(false);
+    data->WriteBit(false);
+    data->WriteBit(updateFlags & UPDATEFLAG_ROTATION);
+    data->WriteBit(updateFlags & UPDATEFLAG_ANIM_KITS);               // AnimKits
+    data->WriteBit(updateFlags & UPDATEFLAG_HAS_ATTACKING_TARGET);
+    data->WriteBit(updateFlags & UPDATEFLAG_SELF);
+    data->WriteBit(updateFlags & UPDATEFLAG_VEHICLE);
+    data->WriteBit(updateFlags & UPDATEFLAG_LIVING);
+    data->WriteBits(0, 24);                                     // Byte Counter
+    data->WriteBit(false);
+    data->WriteBit(updateFlags & UPDATEFLAG_POSITION);                // flags & UPDATEFLAG_HAS_POSITION Game Object Position
+    data->WriteBit(updateFlags & UPDATEFLAG_HAS_POSITION);            // Stationary Position
+    data->WriteBit(updateFlags & UPDATEFLAG_TRANSPORT_ARR);
+    data->WriteBit(false);
+    data->WriteBit(updateFlags & UPDATEFLAG_TRANSPORT);
+
+    bool hasTransport = false,
+        isSplineEnabled = false,
+        hasPitch = false,
+        hasFallData = false,
+        hasFallDirection = false,
+        hasElevation = false,
+        hasOrientation = !isType(TYPEMASK_ITEM),
+        hasTimeStamp = true,
+        hasTransportTime2 = false,
+        hasTransportTime3 = false;
+
+    if (isType(TYPEMASK_UNIT))
     {
-        Unit* unit = ((Unit*)this);
+        Unit const* unit = (Unit const*)this;
+        hasTransport = !unit->m_movementInfo.GetTransportGuid().IsEmpty();
+        isSplineEnabled = unit->IsSplineEnabled();
 
         if (GetTypeId() == TYPEID_PLAYER)
         {
-            Player* player = ((Player*)unit);
-            if (player->GetTransport())
-                player->m_movementInfo.AddMovementFlag(MOVEFLAG_ONTRANSPORT);
-            else
-                player->m_movementInfo.RemoveMovementFlag(MOVEFLAG_ONTRANSPORT);
+            // use flags received from client as they are more correct
+            hasPitch = unit->m_movementInfo.GetStatusInfo().hasPitch;
+            hasFallData = unit->m_movementInfo.GetStatusInfo().hasFallData;
+            hasFallDirection = unit->m_movementInfo.GetStatusInfo().hasFallDirection;
+            hasElevation = unit->m_movementInfo.GetStatusInfo().hasSplineElevation;
+            hasTransportTime2 = unit->m_movementInfo.GetStatusInfo().hasTransportTime2;
+            hasTransportTime3 = unit->m_movementInfo.GetStatusInfo().hasTransportTime3;
+        }
+        else
+        {
+            hasPitch = unit->m_movementInfo.HasMovementFlag(MovementFlags(MOVEFLAG_SWIMMING | MOVEFLAG_FLYING)) ||
+                            unit->m_movementInfo.HasMovementFlag2(MOVEFLAG2_ALLOW_PITCHING);
+            hasFallData = unit->m_movementInfo.HasMovementFlag2(MOVEFLAG2_INTERP_TURNING);
+            hasFallDirection = unit->m_movementInfo.HasMovementFlag(MOVEFLAG_FALLING);
+            hasElevation = unit->m_movementInfo.HasMovementFlag(MOVEFLAG_SPLINE_ELEVATION);
+        }
+    }
+
+    if (updateFlags & UPDATEFLAG_LIVING)
+    {
+        Unit const* unit = (Unit const*)this;
+
+        data->WriteBit(!unit->m_movementInfo.GetMovementFlags());
+        data->WriteBit(!hasOrientation);
+
+        data->WriteGuidMask<7, 3, 2>(Guid);
+
+        if (unit->m_movementInfo.GetMovementFlags())
+            data->WriteBits(unit->m_movementInfo.GetMovementFlags(), 30);
+
+        data->WriteBit(false);
+        data->WriteBit(!hasPitch);
+        data->WriteBit(isSplineEnabled);
+        data->WriteBit(hasFallData);
+        data->WriteBit(!hasElevation);
+        data->WriteGuidMask<5>(Guid);
+        data->WriteBit(hasTransport);
+        data->WriteBit(!hasTimeStamp);
+
+        if (hasTransport)
+        {
+            ObjectGuid tGuid = unit->m_movementInfo.GetTransportGuid();
+
+            data->WriteGuidMask<1>(tGuid);
+            data->WriteBit(hasTransportTime2);
+            data->WriteGuidMask<4, 0, 6>(tGuid);
+            data->WriteBit(hasTransportTime3);
+            data->WriteGuidMask<7, 5, 3, 2>(tGuid);
         }
 
-        // Update movement info time
-        unit->m_movementInfo.UpdateTime(WorldTimer::getMSTime());
-        // Write movement info
-        unit->m_movementInfo.Write(*data);
+        data->WriteGuidMask<4>(Guid);
 
-        // Unit speeds
-        *data << float(unit->GetSpeed(MOVE_WALK));
-        *data << float(unit->GetSpeed(MOVE_RUN));
+        if (isSplineEnabled)
+            Movement::PacketBuilder::WriteCreateBits(*unit->movespline, *data);
+
+        data->WriteGuidMask<6>(Guid);
+
+        if (hasFallData)
+            data->WriteBit(hasFallDirection);
+
+        data->WriteGuidMask<0, 1>(Guid);
+        data->WriteBit(false);    // Unknown 4.3.3
+        data->WriteBit(!unit->m_movementInfo.GetMovementFlags2());
+
+        if (unit->m_movementInfo.GetMovementFlags2())
+            data->WriteBits(unit->m_movementInfo.GetMovementFlags2(), 12);
+    }
+
+    // used only with GO's, placeholder
+    if (updateFlags & UPDATEFLAG_POSITION)
+    {
+        ObjectGuid transGuid;
+        data->WriteGuidMask<5>(transGuid);
+        data->WriteBit(hasTransportTime3);
+        data->WriteGuidMask<0, 3, 6, 1, 4, 2>(transGuid);
+        data->WriteBit(hasTransportTime2);
+        data->WriteGuidMask<7>(transGuid);
+    }
+
+    if (updateFlags & UPDATEFLAG_HAS_ATTACKING_TARGET)
+    {
+        ObjectGuid guid;
+        if (Unit* victim = ((Unit*)this)->getVictim())
+            guid = victim->GetObjectGuid();
+
+        data->WriteGuidMask<2, 7, 0, 4, 5, 6, 1, 3>(guid);
+    }
+
+    if (updateFlags & UPDATEFLAG_ANIM_KITS)
+    {
+        data->WriteBit(true);   // hasAnimKit0 == false
+        data->WriteBit(true);   // hasAnimKit1 == false
+        data->WriteBit(true);   // hasAnimKit2 == false
+    }
+
+    data->FlushBits();
+
+    if (updateFlags & UPDATEFLAG_LIVING)
+    {
+        Unit const* unit = (Unit const*)this;
+
+        data->WriteGuidBytes<4>(Guid);
+
         *data << float(unit->GetSpeed(MOVE_RUN_BACK));
-        *data << float(unit->GetSpeed(MOVE_SWIM));
+
+        if (hasFallData)
+        {
+            if (hasFallDirection)
+            {
+                *data << float(unit->m_movementInfo.GetJumpInfo().cosAngle);
+                *data << float(unit->m_movementInfo.GetJumpInfo().xyspeed);
+                *data << float(unit->m_movementInfo.GetJumpInfo().sinAngle);
+            }
+
+            *data << uint32(unit->m_movementInfo.GetFallTime());
+            *data << float(unit->m_movementInfo.GetJumpInfo().velocity);
+        }
+
         *data << float(unit->GetSpeed(MOVE_SWIM_BACK));
-        *data << float(unit->GetSpeed(MOVE_FLIGHT));
+
+        if (hasElevation)
+            *data << float(unit->m_movementInfo.GetSplineElevation());
+
+        if (isSplineEnabled)
+            Movement::PacketBuilder::WriteCreateBytes(*unit->movespline, *data);
+
+        *data << float(unit->GetPositionZ());
+        data->WriteGuidBytes<5>(Guid);
+
+        if (hasTransport)
+        {
+            ObjectGuid tGuid = unit->m_movementInfo.GetTransportGuid();
+
+            data->WriteGuidBytes<5, 7>(tGuid);
+            *data << uint32(unit->m_movementInfo.GetTransportTime());
+            *data << float(unit->m_movementInfo.GetTransportPos()->o);
+
+            if (hasTransportTime2)
+                *data << uint32(unit->m_movementInfo.GetTransportTime2());
+
+            *data << float(unit->m_movementInfo.GetTransportPos()->y);
+            *data << float(unit->m_movementInfo.GetTransportPos()->x);
+            data->WriteGuidBytes<3>(tGuid);
+            *data << float(unit->m_movementInfo.GetTransportPos()->z);
+            data->WriteGuidBytes<0>(tGuid);
+
+            if (hasTransportTime3)
+                *data << uint32(unit->m_movementInfo.GetFallTime());
+
+            *data << int32(unit->m_movementInfo.GetTransportSeat());
+            data->WriteGuidBytes<1, 6, 2, 4>(tGuid);
+        }
+
+        *data << float(unit->GetPositionX());
+        *data << float(unit->GetSpeed(MOVE_PITCH_RATE));
+        data->WriteGuidBytes<3, 0>(Guid);
+        *data << float(unit->GetSpeed(MOVE_SWIM));
+        *data << float(unit->GetPositionY());
+        data->WriteGuidBytes<7, 1, 2>(Guid);
+        *data << float(unit->GetSpeed(MOVE_WALK));
+
+        *data << uint32(WorldTimer::getMSTime());
+
         *data << float(unit->GetSpeed(MOVE_FLIGHT_BACK));
+        data->WriteGuidBytes<6>(Guid);
         *data << float(unit->GetSpeed(MOVE_TURN_RATE));
 
-        // 0x08000000
-        if (unit->m_movementInfo.GetMovementFlags() & MOVEFLAG_SPLINE_ENABLED)
-            Movement::PacketBuilder::WriteCreate(*unit->movespline, *data);
-    }
-    // 0x40
-    else if (updateFlags & UPDATEFLAG_HAS_POSITION)
-    {
-        // 0x02
-        if (updateFlags & UPDATEFLAG_TRANSPORT && ((GameObject*)this)->GetGoType() == GAMEOBJECT_TYPE_MO_TRANSPORT)
-        {
-            *data << float(0);
-            *data << float(0);
-            *data << float(0);
-            *data << float(((WorldObject*)this)->GetOrientation());
-        }
-        else
-        {
-            *data << float(((WorldObject*)this)->GetPositionX());
-            *data << float(((WorldObject*)this)->GetPositionY());
-            *data << float(((WorldObject*)this)->GetPositionZ());
-            *data << float(((WorldObject*)this)->GetOrientation());
-        }
+        if (hasOrientation)
+            *data << float(NormalizeOrientation(unit->GetOrientation()));
+
+        *data << float(unit->GetSpeed(MOVE_RUN));
+
+        if (hasPitch)
+            *data << float(unit->m_movementInfo.GetPitch());
+
+        *data << float(unit->GetSpeed(MOVE_FLIGHT));
     }
 
-    // 0x8
-    if (updateFlags & UPDATEFLAG_LOWGUID)
+    if (updateFlags & UPDATEFLAG_VEHICLE)
     {
-        switch (GetTypeId())
-        {
-            case TYPEID_OBJECT:
-            case TYPEID_ITEM:
-            case TYPEID_CONTAINER:
-            case TYPEID_GAMEOBJECT:
-            case TYPEID_DYNAMICOBJECT:
-            case TYPEID_CORPSE:
-                *data << uint32(GetGUIDLow());              // GetGUIDLow()
-                break;
-            case TYPEID_UNIT:
-                *data << uint32(0x0000000B);                // unk, can be 0xB or 0xC
-                break;
-            case TYPEID_PLAYER:
-                if (updateFlags & UPDATEFLAG_SELF)
-                    *data << uint32(0x00000015);            // unk, can be 0x15 or 0x22
-                else
-                    *data << uint32(0x00000008);            // unk, can be 0x7 or 0x8
-                break;
-            default:
-                *data << uint32(0x00000000);                // unk
-                break;
-        }
+        *data << float(NormalizeOrientation(((WorldObject*)this)->GetOrientation()));
+        *data << uint32(((Unit*)this)->GetVehicleInfo()->GetVehicleEntry()->m_ID); // vehicle id
     }
 
-    // 0x10
-    if (updateFlags & UPDATEFLAG_HIGHGUID)
+    // used only with GO's, placeholder
+    if (updateFlags & UPDATEFLAG_POSITION)
     {
-        switch (GetTypeId())
-        {
-            case TYPEID_OBJECT:
-            case TYPEID_ITEM:
-            case TYPEID_CONTAINER:
-            case TYPEID_GAMEOBJECT:
-            case TYPEID_DYNAMICOBJECT:
-            case TYPEID_CORPSE:
-                *data << uint32(GetObjectGuid().GetHigh()); // GetGUIDHigh()
-                break;
-            default:
-                *data << uint32(0x00000000);                // unk
-                break;
-        }
+        ObjectGuid transGuid;
+
+        data->WriteGuidBytes<0, 5>(transGuid);
+        if (hasTransportTime3)
+            *data << uint32(0);
+
+        data->WriteGuidBytes<3>(transGuid);
+        *data << float(0.0f);   // x offset
+        data->WriteGuidBytes<4, 6, 1>(transGuid);
+        *data << uint32(0);     // transport time
+        *data << float(0.0f);   // y offset
+        data->WriteGuidBytes<2, 7>(transGuid);
+        *data << float(0.0f);   // z offset
+        *data << int8(-1);      // transport seat
+        *data << float(0.0f);   // o offset
+
+        if (hasTransportTime2)
+            *data << uint32(0);
     }
 
-    // 0x4
-    if (updateFlags & UPDATEFLAG_HAS_ATTACKING_TARGET)      // packed guid (current target guid)
+    if (updateFlags & UPDATEFLAG_ROTATION)
+        *data << int64(((GameObject*)this)->GetPackedWorldRotation());
+
+    if (updateFlags & UPDATEFLAG_TRANSPORT_ARR)
     {
-        if (((Unit*)this)->getVictim())
-            *data << ((Unit*)this)->getVictim()->GetPackGUID();
-        else
-            data->appendPackGUID(0);
+        *data << float(0.0f);
+        *data << float(0.0f);
+        *data << float(0.0f);
+        *data << float(0.0f);
+        *data << uint8(0);
+        *data << float(0.0f);
+        *data << float(0.0f);
+        *data << float(0.0f);
+        *data << float(0.0f);
+        *data << float(0.0f);
+        *data << float(0.0f);
+        *data << float(0.0f);
+        *data << float(0.0f);
+        *data << float(0.0f);
+        *data << float(0.0f);
+        *data << float(0.0f);
+        *data << float(0.0f);
     }
 
-    // 0x2
+    if (updateFlags & UPDATEFLAG_HAS_POSITION)
+    {
+        *data << float(NormalizeOrientation(((WorldObject*)this)->GetOrientation()));
+        *data << float(((WorldObject*)this)->GetPositionX());
+        *data << float(((WorldObject*)this)->GetPositionY());
+        *data << float(((WorldObject*)this)->GetPositionZ());
+    }
+
+    if (updateFlags & UPDATEFLAG_HAS_ATTACKING_TARGET)
+    {
+        ObjectGuid guid;
+        if (Unit* victim = ((Unit*)this)->getVictim())
+            guid = victim->GetObjectGuid();
+
+        data->WriteGuidBytes<4, 0, 3, 5, 7, 6, 2, 1>(guid);
+    }
+
+    //if (updateFlags & UPDATEFLAG_ANIM_KITS)
+    //    *data << uint16(0) << uint16(0) << uint16(0);
+
     if (updateFlags & UPDATEFLAG_TRANSPORT)
-    {
-        *data << uint32(WorldTimer::getMSTime());           // ms time
-    }
+        *data << uint32(WorldTimer::getMSTime());
 }
 
 void Object::BuildValuesUpdate(uint8 updatetype, ByteBuffer* data, UpdateMask* updateMask, Player* target) const
 {
     if (!target)
         return;
+
+    uint32 valuesCount = m_valuesCount;
+    if(GetTypeId() == TYPEID_PLAYER && target != this)
+        valuesCount = PLAYER_END_NOT_SELF;
 
     bool IsActivateToQuest = false;
     bool IsPerCasterAuraState = false;
@@ -370,7 +555,7 @@ void Object::BuildValuesUpdate(uint8 updatetype, ByteBuffer* data, UpdateMask* u
             if (((GameObject*)this)->ActivateToQuest(target) || target->isGameMaster())
                 IsActivateToQuest = true;
 
-            updateMask->SetBit(GAMEOBJECT_DYN_FLAGS);
+            updateMask->SetBit(GAMEOBJECT_DYNAMIC);
         }
         else if (isType(TYPEMASK_UNIT))
         {
@@ -388,8 +573,8 @@ void Object::BuildValuesUpdate(uint8 updatetype, ByteBuffer* data, UpdateMask* u
             if (((GameObject*)this)->ActivateToQuest(target) || target->isGameMaster())
                 IsActivateToQuest = true;
 
-            updateMask->SetBit(GAMEOBJECT_DYN_FLAGS);
-            updateMask->SetBit(GAMEOBJECT_ANIMPROGRESS);
+            updateMask->SetBit(GAMEOBJECT_DYNAMIC);
+            updateMask->SetBit(GAMEOBJECT_BYTES_1);         // why do we need this here?
         }
         else if (isType(TYPEMASK_UNIT))
         {
@@ -409,7 +594,7 @@ void Object::BuildValuesUpdate(uint8 updatetype, ByteBuffer* data, UpdateMask* u
     // 2 specialized loops for speed optimization in non-unit case
     if (isType(TYPEMASK_UNIT))                              // unit (creature/player) case
     {
-        for (uint16 index = 0; index < m_valuesCount; ++index)
+        for (uint16 index = 0; index < valuesCount; ++index)
         {
             if (updateMask->GetBit(index))
             {
@@ -419,6 +604,9 @@ void Object::BuildValuesUpdate(uint8 updatetype, ByteBuffer* data, UpdateMask* u
 
                     if (GetTypeId() == TYPEID_UNIT)
                     {
+                        if (!target->canSeeSpellClickOn((Creature*)this))
+                            appendValue &= ~UNIT_NPC_FLAG_SPELLCLICK;
+
                         if (appendValue & UNIT_NPC_FLAG_TRAINER)
                         {
                             if (!((Creature*)this)->IsTrainerOf(target, false))
@@ -472,9 +660,15 @@ void Object::BuildValuesUpdate(uint8 updatetype, ByteBuffer* data, UpdateMask* u
                 else if (index == UNIT_DYNAMIC_FLAGS && GetTypeId() == TYPEID_UNIT)
                 {
                     if (!target->isAllowedToLoot((Creature*)this))
-                        *data << (m_uint32Values[index] & ~UNIT_DYNFLAG_LOOTABLE);
+                        *data << (m_uint32Values[index] & ~(UNIT_DYNFLAG_LOOTABLE | UNIT_DYNFLAG_TAPPED_BY_PLAYER));
                     else
-                        *data << (m_uint32Values[index] & ~UNIT_DYNFLAG_TAPPED);
+                    {
+                        // flag only for original loot recipent
+                        if (target->GetObjectGuid() == ((Creature*)this)->GetLootRecipientGuid())
+                            *data << m_uint32Values[index];
+                        else
+                            *data << (m_uint32Values[index] & ~(UNIT_DYNFLAG_TAPPED | UNIT_DYNFLAG_TAPPED_BY_PLAYER));
+                    }
                 }
                 else
                 {
@@ -486,12 +680,12 @@ void Object::BuildValuesUpdate(uint8 updatetype, ByteBuffer* data, UpdateMask* u
     }
     else if (isType(TYPEMASK_GAMEOBJECT))                   // gameobject case
     {
-        for (uint16 index = 0; index < m_valuesCount; ++index)
+        for (uint16 index = 0; index < valuesCount; ++index)
         {
             if (updateMask->GetBit(index))
             {
                 // send in current format (float as float, uint32 as uint32)
-                if (index == GAMEOBJECT_DYN_FLAGS)
+                if (index == GAMEOBJECT_DYNAMIC)
                 {
                     // GAMEOBJECT_TYPE_DUNGEON_DIFFICULTY can have lo flag = 2
                     //      most likely related to "can enter map" and then should be 0 if can not enter
@@ -501,23 +695,30 @@ void Object::BuildValuesUpdate(uint8 updatetype, ByteBuffer* data, UpdateMask* u
                         switch (((GameObject*)this)->GetGoType())
                         {
                             case GAMEOBJECT_TYPE_QUESTGIVER:
+                                // GO also seen with GO_DYNFLAG_LO_SPARKLE explicit, relation/reason unclear (192861)
                                 *data << uint16(GO_DYNFLAG_LO_ACTIVATE);
-                                *data << uint16(0);
+                                *data << uint16(-1);
                                 break;
                             case GAMEOBJECT_TYPE_CHEST:
                             case GAMEOBJECT_TYPE_GENERIC:
                             case GAMEOBJECT_TYPE_SPELL_FOCUS:
                             case GAMEOBJECT_TYPE_GOOBER:
                                 *data << uint16(GO_DYNFLAG_LO_ACTIVATE | GO_DYNFLAG_LO_SPARKLE);
-                                *data << uint16(0);
+                                *data << uint16(-1);
                                 break;
                             default:
-                                *data << uint32(0);         // unknown, not happen.
+                                // unknown, not happen.
+                                *data << uint16(0);
+                                *data << uint16(-1);
                                 break;
                         }
                     }
                     else
-                        *data << uint32(0);                 // disable quest object
+                    {
+                        // disable quest object
+                        *data << uint16(0);
+                        *data << uint16(-1);
+                    }
                 }
                 else
                     *data << m_uint32Values[index];         // other cases
@@ -526,7 +727,7 @@ void Object::BuildValuesUpdate(uint8 updatetype, ByteBuffer* data, UpdateMask* u
     }
     else                                                    // other objects case (no special index checks)
     {
-        for (uint16 index = 0; index < m_valuesCount; ++index)
+        for (uint16 index = 0; index < valuesCount; ++index)
         {
             if (updateMask->GetBit(index))
             {
@@ -542,7 +743,10 @@ void Object::ClearUpdateMask(bool remove)
     if (m_uint32Values)
     {
         for (uint16 index = 0; index < m_valuesCount; ++index)
-            m_changedValues[index] = false;
+        {
+            if (m_uint32Values_mirror[index] != m_uint32Values[index])
+                m_uint32Values_mirror[index] = m_uint32Values[index];
+        }
     }
 
     if (m_objectUpdated)
@@ -572,28 +776,39 @@ bool Object::LoadValues(const char* data)
     return true;
 }
 
-void Object::_SetUpdateBits(UpdateMask* updateMask, Player* /*target*/) const
+void Object::_SetUpdateBits(UpdateMask *updateMask, Player* target) const
 {
-    for (uint16 index = 0; index < m_valuesCount; ++index)
-        if (m_changedValues[index])
+    uint32 valuesCount = m_valuesCount;
+    if(GetTypeId() == TYPEID_PLAYER && target != this)
+        valuesCount = PLAYER_END_NOT_SELF;
+
+    for( uint16 index = 0; index < valuesCount; ++index )
+    {
+        if (m_uint32Values_mirror[index] != m_uint32Values[index])
             updateMask->SetBit(index);
+    }
 }
 
-void Object::_SetCreateBits(UpdateMask* updateMask, Player* /*target*/) const
+void Object::_SetCreateBits(UpdateMask *updateMask, Player* target) const
 {
-    for (uint16 index = 0; index < m_valuesCount; ++index)
+    uint32 valuesCount = m_valuesCount;
+    if(GetTypeId() == TYPEID_PLAYER && target != this)
+        valuesCount = PLAYER_END_NOT_SELF;
+
+    for (uint16 index = 0; index < valuesCount; ++index)
+    {
         if (GetUInt32Value(index) != 0)
             updateMask->SetBit(index);
+    }
 }
 
 void Object::SetInt32Value(uint16 index, int32 value)
 {
     MANGOS_ASSERT(index < m_valuesCount || PrintIndexError(index, true));
 
-    if (m_int32Values[index] != value)
+    if (m_int32Values[ index ] != value)
     {
-        m_int32Values[index] = value;
-        m_changedValues[index] = true;
+        m_int32Values[ index ] = value;
         MarkForClientUpdate();
     }
 }
@@ -602,10 +817,9 @@ void Object::SetUInt32Value(uint16 index, uint32 value)
 {
     MANGOS_ASSERT(index < m_valuesCount || PrintIndexError(index, true));
 
-    if (m_uint32Values[index] != value)
+    if (m_uint32Values[ index ] != value)
     {
-        m_uint32Values[index] = value;
-        m_changedValues[index] = true;
+        m_uint32Values[ index ] = value;
         MarkForClientUpdate();
     }
 }
@@ -613,12 +827,10 @@ void Object::SetUInt32Value(uint16 index, uint32 value)
 void Object::SetUInt64Value(uint16 index, const uint64& value)
 {
     MANGOS_ASSERT(index + 1 < m_valuesCount || PrintIndexError(index, true));
-    if (*((uint64*) & (m_uint32Values[index])) != value)
+    if (*((uint64*) & (m_uint32Values[ index ])) != value)
     {
-        m_uint32Values[index] = *((uint32*)&value);
-        m_uint32Values[index + 1] = *(((uint32*)&value) + 1);
-        m_changedValues[index] = true;
-        m_changedValues[index + 1] = true;
+        m_uint32Values[ index ] = *((uint32*)&value);
+        m_uint32Values[ index + 1 ] = *(((uint32*)&value) + 1);
         MarkForClientUpdate();
     }
 }
@@ -627,10 +839,9 @@ void Object::SetFloatValue(uint16 index, float value)
 {
     MANGOS_ASSERT(index < m_valuesCount || PrintIndexError(index, true));
 
-    if (m_floatValues[index] != value)
+    if (m_floatValues[ index ] != value)
     {
-        m_floatValues[index] = value;
-        m_changedValues[index] = true;
+        m_floatValues[ index ] = value;
         MarkForClientUpdate();
     }
 }
@@ -645,11 +856,10 @@ void Object::SetByteValue(uint16 index, uint8 offset, uint8 value)
         return;
     }
 
-    if (uint8(m_uint32Values[index] >> (offset * 8)) != value)
+    if (uint8(m_uint32Values[ index ] >> (offset * 8)) != value)
     {
-        m_uint32Values[index] &= ~uint32(uint32(0xFF) << (offset * 8));
-        m_uint32Values[index] |= uint32(uint32(value) << (offset * 8));
-        m_changedValues[index] = true;
+        m_uint32Values[ index ] &= ~uint32(uint32(0xFF) << (offset * 8));
+        m_uint32Values[ index ] |= uint32(uint32(value) << (offset * 8));
         MarkForClientUpdate();
     }
 }
@@ -664,11 +874,10 @@ void Object::SetUInt16Value(uint16 index, uint8 offset, uint16 value)
         return;
     }
 
-    if (uint16(m_uint32Values[index] >> (offset * 16)) != value)
+    if (uint16(m_uint32Values[ index ] >> (offset * 16)) != value)
     {
-        m_uint32Values[index] &= ~uint32(uint32(0xFFFF) << (offset * 16));
-        m_uint32Values[index] |= uint32(uint32(value) << (offset * 16));
-        m_changedValues[index] = true;
+        m_uint32Values[ index ] &= ~uint32(uint32(0xFFFF) << (offset * 16));
+        m_uint32Values[ index ] |= uint32(uint32(value) << (offset * 16));
         MarkForClientUpdate();
     }
 }
@@ -724,13 +933,12 @@ void Object::ApplyModPositiveFloatValue(uint16 index, float  val, bool apply)
 void Object::SetFlag(uint16 index, uint32 newFlag)
 {
     MANGOS_ASSERT(index < m_valuesCount || PrintIndexError(index, true));
-    uint32 oldval = m_uint32Values[index];
+    uint32 oldval = m_uint32Values[ index ];
     uint32 newval = oldval | newFlag;
 
     if (oldval != newval)
     {
-        m_uint32Values[index] = newval;
-        m_changedValues[index] = true;
+        m_uint32Values[ index ] = newval;
         MarkForClientUpdate();
     }
 }
@@ -738,13 +946,12 @@ void Object::SetFlag(uint16 index, uint32 newFlag)
 void Object::RemoveFlag(uint16 index, uint32 oldFlag)
 {
     MANGOS_ASSERT(index < m_valuesCount || PrintIndexError(index, true));
-    uint32 oldval = m_uint32Values[index];
+    uint32 oldval = m_uint32Values[ index ];
     uint32 newval = oldval & ~oldFlag;
 
     if (oldval != newval)
     {
-        m_uint32Values[index] = newval;
-        m_changedValues[index] = true;
+        m_uint32Values[ index ] = newval;
         MarkForClientUpdate();
     }
 }
@@ -759,10 +966,9 @@ void Object::SetByteFlag(uint16 index, uint8 offset, uint8 newFlag)
         return;
     }
 
-    if (!(uint8(m_uint32Values[index] >> (offset * 8)) & newFlag))
+    if (!(uint8(m_uint32Values[ index ] >> (offset * 8)) & newFlag))
     {
-        m_uint32Values[index] |= uint32(uint32(newFlag) << (offset * 8));
-        m_changedValues[index] = true;
+        m_uint32Values[ index ] |= uint32(uint32(newFlag) << (offset * 8));
         MarkForClientUpdate();
     }
 }
@@ -777,10 +983,9 @@ void Object::RemoveByteFlag(uint16 index, uint8 offset, uint8 oldFlag)
         return;
     }
 
-    if (uint8(m_uint32Values[index] >> (offset * 8)) & oldFlag)
+    if (uint8(m_uint32Values[ index ] >> (offset * 8)) & oldFlag)
     {
-        m_uint32Values[index] &= ~uint32(uint32(oldFlag) << (offset * 8));
-        m_changedValues[index] = true;
+        m_uint32Values[ index ] &= ~uint32(uint32(oldFlag) << (offset * 8));
         MarkForClientUpdate();
     }
 }
@@ -792,7 +997,6 @@ void Object::SetShortFlag(uint16 index, bool highpart, uint16 newFlag)
     if (!(uint16(m_uint32Values[index] >> (highpart ? 16 : 0)) & newFlag))
     {
         m_uint32Values[index] |= uint32(uint32(newFlag) << (highpart ? 16 : 0));
-        m_changedValues[index] = true;
         MarkForClientUpdate();
     }
 }
@@ -804,7 +1008,6 @@ void Object::RemoveShortFlag(uint16 index, bool highpart, uint16 oldFlag)
     if (uint16(m_uint32Values[index] >> (highpart ? 16 : 0)) & oldFlag)
     {
         m_uint32Values[index] &= ~uint32(uint32(oldFlag) << (highpart ? 16 : 0));
-        m_changedValues[index] = true;
         MarkForClientUpdate();
     }
 }
@@ -832,7 +1035,7 @@ void Object::BuildUpdateDataForPlayer(Player* pl, UpdateDataMapType& update_play
 
     if (iter == update_players.end())
     {
-        std::pair<UpdateDataMapType::iterator, bool> p = update_players.insert(UpdateDataMapType::value_type(pl, UpdateData()));
+        std::pair<UpdateDataMapType::iterator, bool> p = update_players.insert(UpdateDataMapType::value_type(pl, UpdateData(pl->GetMapId())));
         MANGOS_ASSERT(p.second);
         iter = p.first;
     }
@@ -872,7 +1075,7 @@ void Object::MarkForClientUpdate()
 
 WorldObject::WorldObject() :
     m_transportInfo(NULL), m_currMap(NULL),
-    m_mapId(0), m_InstanceId(0),
+    m_mapId(0), m_InstanceId(0), m_phaseMask(PHASEMASK_NORMAL),
     m_isActiveObject(false)
 {
 }
@@ -882,9 +1085,10 @@ void WorldObject::CleanupsBeforeDelete()
     RemoveFromWorld();
 }
 
-void WorldObject::_Create(uint32 guidlow, HighGuid guidhigh)
+void WorldObject::_Create(uint32 guidlow, HighGuid guidhigh, uint32 phaseMask)
 {
     Object::_Create(guidlow, 0, guidhigh);
+    m_phaseMask = phaseMask;
 }
 
 void WorldObject::Relocate(float x, float y, float z, float orientation)
@@ -892,7 +1096,7 @@ void WorldObject::Relocate(float x, float y, float z, float orientation)
     m_position.x = x;
     m_position.y = y;
     m_position.z = z;
-    m_position.o = orientation;
+    m_position.o = NormalizeOrientation(orientation);
 
     if (isType(TYPEMASK_UNIT))
         ((Unit*)this)->m_movementInfo.ChangePosition(x, y, z, orientation);
@@ -910,7 +1114,7 @@ void WorldObject::Relocate(float x, float y, float z)
 
 void WorldObject::SetOrientation(float orientation)
 {
-    m_position.o = orientation;
+    m_position.o = NormalizeOrientation(orientation);
 
     if (isType(TYPEMASK_UNIT))
         ((Unit*)this)->m_movementInfo.ChangeOrientation(orientation);
@@ -1163,13 +1367,13 @@ bool WorldObject::HasInArc(const float arcangle, const WorldObject* obj) const
     float arc = arcangle;
 
     // move arc to range 0.. 2*pi
-    arc = MapManager::NormalizeOrientation(arc);
+    arc = NormalizeOrientation(arc);
 
     float angle = GetAngle(obj);
     angle -= m_position.o;
 
     // move angle to range -pi ... +pi
-    angle = MapManager::NormalizeOrientation(angle);
+    angle = NormalizeOrientation(angle);
     if (angle > M_PI_F)
         angle -= 2.0f * M_PI_F;
 
@@ -1223,7 +1427,7 @@ void WorldObject::GetRandomPoint(float x, float y, float z, float distance, floa
 
 void WorldObject::UpdateGroundPositionZ(float x, float y, float& z) const
 {
-    float new_z = GetMap()->GetHeight(x, y, z);
+    float new_z = GetTerrain()->GetHeight(x, y, z, true);
     if (new_z > INVALID_HEIGHT)
         z = new_z + 0.05f;                                  // just to be sure that we are not a few pixel under the surface
 }
@@ -1242,7 +1446,7 @@ void WorldObject::UpdateAllowedPositionZ(float x, float y, float& z) const
                 float ground_z = z;
                 float max_z = canSwim
                               ? GetTerrain()->GetWaterOrGroundLevel(x, y, z, &ground_z, !((Unit const*)this)->HasAuraType(SPELL_AURA_WATER_WALK))
-                              : ((ground_z = GetMap()->GetHeight(x, y, z)));
+                              : ((ground_z = GetTerrain()->GetHeight(x, y, z, true)));
                 if (max_z > INVALID_HEIGHT)
                 {
                     if (z > max_z)
@@ -1253,7 +1457,7 @@ void WorldObject::UpdateAllowedPositionZ(float x, float y, float& z) const
             }
             else
             {
-                float ground_z = GetMap()->GetHeight(x, y, z);
+                float ground_z = GetTerrain()->GetHeight(x, y, z, true);
                 if (z < ground_z)
                     z = ground_z;
             }
@@ -1261,7 +1465,7 @@ void WorldObject::UpdateAllowedPositionZ(float x, float y, float& z) const
         }
         case TYPEID_PLAYER:
         {
-            // for server controlled moves player work same as creature (but it can always swim)
+            // for server controlled moves playr work same as creature (but it can always swim)
             if (!((Player const*)this)->CanFly())
             {
                 float ground_z = z;
@@ -1276,7 +1480,7 @@ void WorldObject::UpdateAllowedPositionZ(float x, float y, float& z) const
             }
             else
             {
-                float ground_z = GetMap()->GetHeight(x, y, z);
+                float ground_z = GetTerrain()->GetHeight(x, y, z, true);
                 if (z < ground_z)
                     z = ground_z;
             }
@@ -1284,7 +1488,7 @@ void WorldObject::UpdateAllowedPositionZ(float x, float y, float& z) const
         }
         default:
         {
-            float ground_z = GetMap()->GetHeight(x, y, z);
+            float ground_z = GetTerrain()->GetHeight(x, y, z, true);
             if (ground_z > INVALID_HEIGHT)
                 z = ground_z;
             break;
@@ -1426,6 +1630,8 @@ void WorldObject::BuildMonsterChat(WorldPacket* data, ObjectGuid senderGuid, uin
     *data << uint32(strlen(text) + 1);
     *data << text;
     *data << uint8(0);                                      // ChatTag
+    *data << float(0.0f);
+    *data << uint8(0);
 }
 
 void WorldObject::SendMessageToSet(WorldPacket* data, bool /*bToSelf*/)
@@ -1447,7 +1653,7 @@ void WorldObject::SendMessageToSetExcept(WorldPacket* data, Player const* skippe
     // if object is in world, map for it already created!
     if (IsInWorld())
     {
-        MaNGOS::MessageDelivererExcept notifier(data, skipped_receiver);
+        MaNGOS::MessageDelivererExcept notifier(this, data, skipped_receiver);
         Cell::VisitWorldObjects(this, notifier, GetMap()->GetVisibilityDistance());
     }
 }
@@ -1502,7 +1708,7 @@ Creature* WorldObject::SummonCreature(uint32 id, float x, float y, float z, floa
     if (GetTypeId() == TYPEID_PLAYER)
         team = ((Player*)this)->GetTeam();
 
-    CreatureCreatePos pos(GetMap(), x, y, z, ang);
+    CreatureCreatePos pos(GetMap(), x, y, z, ang, GetPhaseMask());
 
     if (x == 0.0f && y == 0.0f && z == 0.0f)
         pos = CreatureCreatePos(this, GetOrientation(), CONTACT_DISTANCE, ang);
@@ -1513,7 +1719,7 @@ Creature* WorldObject::SummonCreature(uint32 id, float x, float y, float z, floa
         return NULL;
     }
 
-    pCreature->SetRespawnCoord(pos);
+    pCreature->SetSummonPoint(pos);
 
     // Active state set before added to map
     pCreature->SetActiveObjectState(asActiveObject);
@@ -1537,7 +1743,7 @@ namespace MaNGOS
     {
         public:
             NearUsedPosDo(WorldObject const& obj, WorldObject const* searcher, float absAngle, ObjectPosSelector& selector)
-                : i_object(obj), i_searcher(searcher), i_absAngle(MapManager::NormalizeOrientation(absAngle)), i_selector(selector) {}
+                : i_object(obj), i_searcher(searcher), i_absAngle(NormalizeOrientation(absAngle)), i_selector(selector) {}
 
             void operator()(Corpse*) const {}
             void operator()(DynamicObject*) const {}
@@ -1646,7 +1852,7 @@ void WorldObject::GetNearPoint(WorldObject const* searcher, float& x, float& y, 
     // adding used positions around object
     {
         MaNGOS::NearUsedPosDo u_do(*this, searcher, absAngle, selector);
-        MaNGOS::WorldObjectWorker<MaNGOS::NearUsedPosDo> worker(u_do);
+        MaNGOS::WorldObjectWorker<MaNGOS::NearUsedPosDo> worker(this, u_do);
 
         Cell::VisitAllObjects(this, worker, distance2d + searcher_bounding_radius);
     }
@@ -1727,10 +1933,19 @@ void WorldObject::GetNearPoint(WorldObject const* searcher, float& x, float& y, 
         UpdateGroundPositionZ(x, y, z);
 }
 
+void WorldObject::SetPhaseMask(uint32 newPhaseMask, bool update)
+{
+    m_phaseMask = newPhaseMask;
+
+    if (update && IsInWorld())
+        UpdateVisibilityAndView();
+}
+
 void WorldObject::PlayDistanceSound(uint32 sound_id, Player* target /*= NULL*/)
 {
     WorldPacket data(SMSG_PLAY_OBJECT_SOUND, 4 + 8);
     data << uint32(sound_id);
+    data << GetObjectGuid();
     data << GetObjectGuid();
     if (target)
         target->SendDirectMessage(&data);
@@ -1742,6 +1957,7 @@ void WorldObject::PlayDirectSound(uint32 sound_id, Player* target /*= NULL*/)
 {
     WorldPacket data(SMSG_PLAY_SOUND, 4);
     data << uint32(sound_id);
+    data << ObjectGuid();
     if (target)
         target->SendDirectMessage(&data);
     else
@@ -1795,7 +2011,7 @@ struct WorldObjectChangeAccumulator
         }
     }
 
-    template<class SKIP> void Visit(GridRefManager<SKIP> &) {}
+    template<class SKIP> void Visit(GridRefManager<SKIP>&) {}
 };
 
 void WorldObject::BuildUpdateData(UpdateDataMapType& update_players)

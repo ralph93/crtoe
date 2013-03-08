@@ -34,6 +34,10 @@ BattleGroundAV::BattleGroundAV()
     m_StartMessageIds[BG_STARTING_EVENT_FOURTH] = LANG_BG_AV_HAS_BEGUN;
 }
 
+BattleGroundAV::~BattleGroundAV()
+{
+}
+
 void BattleGroundAV::HandleKillPlayer(Player* player, Player* killer)
 {
     if (GetStatus() != STATUS_IN_PROGRESS)
@@ -269,9 +273,20 @@ void BattleGroundAV::Update(uint32 diff)
     }
 }
 
+void BattleGroundAV::StartingEventCloseDoors()
+{
+    DEBUG_LOG("BattleGroundAV: entering state STATUS_WAIT_JOIN ...");
+}
+
 void BattleGroundAV::StartingEventOpenDoors()
 {
+    UpdateWorldState(BG_AV_SHOW_H_SCORE, WORLD_STATE_ADD);
+    UpdateWorldState(BG_AV_SHOW_A_SCORE, WORLD_STATE_ADD);
+
     OpenDoorEvent(BG_EVENT_DOOR);
+
+    // Players that join battleground after start are not available to get achievement.
+    StartTimedAchievement(ACHIEVEMENT_CRITERIA_TYPE_WIN_BG, BG_AV_EVENT_START_BATTLE);
 }
 
 void BattleGroundAV::AddPlayer(Player* plr)
@@ -337,6 +352,10 @@ void BattleGroundAV::EndBattleGround(Team winner)
         RewardHonorToTeam(m_HonorMapComplete, HORDE);
     }
     BattleGround::EndBattleGround(winner);
+}
+
+void BattleGroundAV::RemovePlayer(Player* /*plr*/, ObjectGuid /*guid*/)
+{
 }
 
 void BattleGroundAV::HandleAreaTrigger(Player* source, uint32 trigger)
@@ -788,7 +807,7 @@ void BattleGroundAV::Reset()
     {
         m_Mine_Owner[i] = BG_AV_TEAM_NEUTRAL;
         m_Mine_PrevOwner[i] = m_Mine_Owner[i];
-        m_ActiveEvents[BG_AV_MINE_BOSSES+ i] = BG_AV_TEAM_NEUTRAL;
+        m_ActiveEvents[BG_AV_MINE_BOSSES + i] = BG_AV_TEAM_NEUTRAL;
         m_ActiveEvents[BG_AV_MINE_EVENT + i] = BG_AV_TEAM_NEUTRAL;
         m_Mine_Timer[i] = BG_AV_MINE_TICK_TIMER;
     }

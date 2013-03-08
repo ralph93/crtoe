@@ -14,9 +14,9 @@
 #include <string>
 
 #ifndef G3D_WIN32
+#   include <unistd.h>
 #   include <pthread.h>
 #   include <signal.h>
-#   include <unistd.h>
 #endif
 
 

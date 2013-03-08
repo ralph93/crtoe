@@ -44,8 +44,8 @@
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
       <Optimization>Disabled</Optimization>
-      <AdditionalIncludeDirectories>..\..\..\..\dep\libmpq;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <PreprocessorDefinitions>WIN32;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>..\..\..\..\dep\StormLib\src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>WIN32;_DEBUG;_WINDOWS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <MinimalRebuild>true</MinimalRebuild>
       <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
       <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
@@ -53,17 +53,21 @@
       <DebugInformationFormat>EditAndContinue</DebugInformationFormat>
     </ClCompile>
     <Link>
-      <AdditionalDependencies>libmpq.lib;%(AdditionalDependencies)</AdditionalDependencies>
-      <AdditionalLibraryDirectories>..\..\..\..\dep\libmpq\bin\$(Platform)_$(Configuration);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>..\..\..\..\dep\StormLib\bin\StormLib\$(Platform)\$(Configuration)AD;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <TargetMachine>MachineX86</TargetMachine>
+      <SubSystem>Console</SubSystem>
+      <RandomizedBaseAddress>false</RandomizedBaseAddress>
+      <DataExecutionPrevention>
+      </DataExecutionPrevention>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <ClCompile>
       <Optimization>MaxSpeed</Optimization>
       <IntrinsicFunctions>true</IntrinsicFunctions>
-      <AdditionalIncludeDirectories>..\..\..\..\dep\libmpq;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\..\..\..\dep\StormLib\src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>WIN32;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
       <FunctionLevelLinking>true</FunctionLevelLinking>
@@ -71,8 +75,8 @@
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
     </ClCompile>
     <Link>
-      <AdditionalDependencies>libmpq.lib;%(AdditionalDependencies)</AdditionalDependencies>
-      <AdditionalLibraryDirectories>..\..\..\..\dep\libmpq\bin\$(Platform)_$(Configuration);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>StormLibRAD.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>..\..\..\..\dep\StormLib\bin\StormLib\$(Platform)\$(Configuration)AD;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <GenerateDebugInformation>false</GenerateDebugInformation>
       <OptimizeReferences>true</OptimizeReferences>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
@@ -82,9 +86,8 @@
   <ItemGroup>
     <ClCompile Include="..\..\vmapextract\adtfile.cpp" />
     <ClCompile Include="..\..\vmapextract\dbcfile.cpp" />
-    <ClCompile Include="..\..\vmapextract\gameobject_extract.cpp" />
     <ClCompile Include="..\..\vmapextract\model.cpp" />
-    <ClCompile Include="..\..\vmapextract\mpq_libmpq.cpp" />
+    <ClCompile Include="..\..\vmapextract\mpqfile.cpp" />
     <ClCompile Include="..\..\vmapextract\vmapexport.cpp" />
     <ClCompile Include="..\..\vmapextract\wdtfile.cpp" />
     <ClCompile Include="..\..\vmapextract\wmo.cpp" />
@@ -94,7 +97,7 @@
     <ClInclude Include="..\..\vmapextract\dbcfile.h" />
     <ClInclude Include="..\..\vmapextract\model.h" />
     <ClInclude Include="..\..\vmapextract\modelheaders.h" />
-    <ClInclude Include="..\..\vmapextract\mpq_libmpq04.h" />
+    <ClInclude Include="..\..\vmapextract\mpqfile.h" />
     <ClInclude Include="..\..\vmapextract\vec3d.h" />
     <ClInclude Include="..\..\vmapextract\vmapexport.h" />
     <ClInclude Include="..\..\vmapextract\wdtfile.h" />

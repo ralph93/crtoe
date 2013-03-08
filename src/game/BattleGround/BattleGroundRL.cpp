@@ -37,6 +37,24 @@ BattleGroundRL::BattleGroundRL()
     m_StartMessageIds[BG_STARTING_EVENT_FOURTH] = LANG_ARENA_HAS_BEGUN;
 }
 
+BattleGroundRL::~BattleGroundRL()
+{
+}
+
+void BattleGroundRL::Update(uint32 diff)
+{
+    BattleGround::Update(diff);
+
+    /*if (GetStatus() == STATUS_IN_PROGRESS)
+    {
+        // update something
+    }*/
+}
+
+void BattleGroundRL::StartingEventCloseDoors()
+{
+}
+
 void BattleGroundRL::StartingEventOpenDoors()
 {
     OpenDoorEvent(BG_EVENT_DOOR);
@@ -118,6 +136,17 @@ void BattleGroundRL::FillInitialWorldStates(WorldPacket& data, uint32& count)
     FillInitialWorldState(data, count, 0xbb8, GetAlivePlayersCountByTeam(ALLIANCE));
     FillInitialWorldState(data, count, 0xbb9, GetAlivePlayersCountByTeam(HORDE));
     FillInitialWorldState(data, count, 0xbba, 1);
+}
+
+void BattleGroundRL::Reset()
+{
+    // call parent's reset
+    BattleGround::Reset();
+}
+
+bool BattleGroundRL::SetupBattleGround()
+{
+    return true;
 }
 
 /*

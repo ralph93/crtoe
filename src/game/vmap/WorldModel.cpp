@@ -106,13 +106,13 @@ namespace VMAP
     WmoLiquid::WmoLiquid(uint32 width, uint32 height, const Vector3& corner, uint32 type):
         iTilesX(width), iTilesY(height), iCorner(corner), iType(type)
     {
-        iHeight = new float[(width+1)*(height+1)];
-        iFlags = new uint8[width*height];
+        iHeight = new float[(width + 1) * (height + 1)];
+        iFlags = new uint8[width * height];
     }
 
-    WmoLiquid::WmoLiquid(const WmoLiquid& other): iHeight(NULL), iFlags(NULL)
+    WmoLiquid::WmoLiquid(const WmoLiquid& other): iHeight(0), iFlags(0)
     {
-        *this = other;                                      // use assignment operator defined below
+        *this = other; // use assignment operator...
     }
 
     WmoLiquid::~WmoLiquid()
@@ -125,29 +125,26 @@ namespace VMAP
     {
         if (this == &other)
             return *this;
-
         iTilesX = other.iTilesX;
         iTilesY = other.iTilesY;
         iCorner = other.iCorner;
         iType = other.iType;
-        delete[] iHeight;
-        delete[] iFlags;
-
+        delete iHeight;
+        delete iFlags;
         if (other.iHeight)
         {
             iHeight = new float[(iTilesX + 1) * (iTilesY + 1)];
-            memcpy(iHeight, other.iHeight, (iTilesX + 1) * (iTilesY + 1) * sizeof(float));
+            memcpy(iHeight, other.iHeight, (iTilesX + 1) * (iTilesY + 1)*sizeof(float));
         }
         else
-            iHeight = NULL;
+            iHeight = 0;
         if (other.iFlags)
         {
             iFlags = new uint8[iTilesX * iTilesY];
-            memcpy(iFlags, other.iFlags, iTilesX * iTilesY * sizeof(uint8));
+            memcpy(iFlags, other.iFlags, iTilesX * iTilesY);
         }
         else
-            iFlags = NULL;
-
+            iFlags = 0;
         return *this;
     }
 
@@ -164,7 +161,7 @@ namespace VMAP
 
         // check if tile shall be used for liquid level
         // checking for 0x08 *might* be enough, but disabled tiles always are 0x?F:
-        if ((iFlags[tx + ty*iTilesX] & 0x0F) == 0x0F)
+        if ((iFlags[tx + ty * iTilesX] & 0x0F) == 0x0F)
             return false;
 
         // (dx, dy) coordinates inside tile, in [0,1]^2
@@ -186,14 +183,14 @@ namespace VMAP
         const uint32 rowOffset = iTilesX + 1;
         if (dx > dy) // case (a)
         {
-            float sx = iHeight[tx+1 +  ty    * rowOffset] - iHeight[tx   + ty * rowOffset];
-            float sy = iHeight[tx+1 + (ty+1) * rowOffset] - iHeight[tx+1 + ty * rowOffset];
+            float sx = iHeight[tx + 1 +  ty    * rowOffset] - iHeight[tx   + ty * rowOffset];
+            float sy = iHeight[tx + 1 + (ty + 1) * rowOffset] - iHeight[tx + 1 + ty * rowOffset];
             liqHeight = iHeight[tx + ty * rowOffset] + dx * sx + dy * sy;
         }
         else // case (b)
         {
-            float sx = iHeight[tx+1 + (ty+1) * rowOffset] - iHeight[tx + (ty+1) * rowOffset];
-            float sy = iHeight[tx   + (ty+1) * rowOffset] - iHeight[tx +  ty    * rowOffset];
+            float sx = iHeight[tx + 1 + (ty + 1) * rowOffset] - iHeight[tx + (ty + 1) * rowOffset];
+            float sy = iHeight[tx   + (ty + 1) * rowOffset] - iHeight[tx +  ty    * rowOffset];
             liqHeight = iHeight[tx + ty * rowOffset] + dx * sx + dy * sy;
         }
         return true;
@@ -284,8 +281,7 @@ namespace VMAP
         chunkSize = sizeof(uint32) + sizeof(MeshTriangle) * count;
         if (result && fwrite(&chunkSize, sizeof(uint32), 1, wf) != 1) result = false;
         if (result && fwrite(&count, sizeof(uint32), 1, wf) != 1) result = false;
-        if (count)
-            if (result && fwrite(&triangles[0], sizeof(MeshTriangle), count, wf) != count) result = false;
+        if (result && fwrite(&triangles[0], sizeof(MeshTriangle), count, wf) != count) result = false;
 
         // write mesh BIH
         if (result && fwrite("MBIH", 1, 4, wf) != 4) result = false;
@@ -293,10 +289,15 @@ namespace VMAP
 
         // write liquid data
         if (result && fwrite("LIQU", 1, 4, wf) != 4) result = false;
-        chunkSize = iLiquid ? iLiquid->GetFileSize() : 0;
+        if (!iLiquid)
+        {
+            chunkSize = 0;
+            if (result && fwrite(&chunkSize, sizeof(uint32), 1, wf) != 1) result = false;
+            return result;
+        }
+        chunkSize = iLiquid->GetFileSize();
         if (result && fwrite(&chunkSize, sizeof(uint32), 1, wf) != 1) result = false;
-        if (chunkSize)
-            if (result) result = iLiquid->writeToFile(wf);
+        if (result) result = iLiquid->writeToFile(wf);
 
         return result;
     }
@@ -328,17 +329,14 @@ namespace VMAP
         if (result && !readChunk(rf, chunk, "TRIM", 4)) result = false;
         if (result && fread(&chunkSize, sizeof(uint32), 1, rf) != 1) result = false;
         if (result && fread(&count, sizeof(uint32), 1, rf) != 1) result = false;
-        if (count)
-        {
-            if (result) triangles.resize(count);
-            if (result && fread(&triangles[0], sizeof(MeshTriangle), count, rf) != count) result = false;
-        }
+        if (result) triangles.resize(count);
+        if (result && fread(&triangles[0], sizeof(MeshTriangle), count, rf) != count) result = false;
 
         // read mesh BIH
         if (result && !readChunk(rf, chunk, "MBIH", 4)) result = false;
         if (result) result = meshTree.readFromFile(rf);
 
-        // read liquid data
+        // write liquid data
         if (result && !readChunk(rf, chunk, "LIQU", 4)) result = false;
         if (result && fread(&chunkSize, sizeof(uint32), 1, rf) != 1) result = false;
         if (result && chunkSize > 0)
@@ -350,7 +348,7 @@ namespace VMAP
     {
         GModelRayCallback(const std::vector<MeshTriangle>& tris, const std::vector<Vector3>& vert):
             vertices(vert.begin()), triangles(tris.begin()), hit(false) {}
-        bool operator()(const G3D::Ray& ray, uint32 entry, float& distance, bool /*pStopAtFirstHit*/)
+        bool operator()(const G3D::Ray& ray, uint32 entry, float& distance, bool pStopAtFirstHit)
         {
             bool result = IntersectTriangle(triangles[entry], vertices, ray, distance);
             if (result)  hit = true;
@@ -363,7 +361,7 @@ namespace VMAP
 
     bool GroupModel::IntersectRay(const G3D::Ray& ray, float& distance, bool stopAtFirstHit) const
     {
-        if (triangles.empty())
+        if (!triangles.size())
             return false;
         GModelRayCallback callback(triangles, vertices);
         meshTree.intersectRay(ray, callback, distance, stopAtFirstHit);
@@ -372,7 +370,7 @@ namespace VMAP
 
     bool GroupModel::IsInsideObject(const Vector3& pos, const Vector3& down, float& z_dist) const
     {
-        if (triangles.empty() || !iBound.contains(pos))
+        if (!triangles.size() || !iBound.contains(pos))
             return false;
         GModelRayCallback callback(triangles, vertices);
         Vector3 rPos = pos - 0.1f * down;
@@ -393,8 +391,9 @@ namespace VMAP
 
     uint32 GroupModel::GetLiquidType() const
     {
+        // convert to type mask, matching MAP_LIQUID_TYPE_* defines in Map.h
         if (iLiquid)
-            return iLiquid->GetType();
+            return (1 << iLiquid->GetType());
         return 0;
     }
 
@@ -471,7 +470,7 @@ namespace VMAP
 
     bool WorldModel::IntersectPoint(const G3D::Vector3& p, const G3D::Vector3& down, float& dist, AreaInfo& info) const
     {
-        if (groupModels.empty())
+        if (!groupModels.size())
             return false;
         WModelAreaCallback callback(groupModels, down);
         groupTree.intersectPoint(p, callback);
@@ -489,7 +488,7 @@ namespace VMAP
 
     bool WorldModel::GetLocationInfo(const G3D::Vector3& p, const G3D::Vector3& down, float& dist, LocationInfo& info) const
     {
-        if (groupModels.empty())
+        if (!groupModels.size())
             return false;
         WModelAreaCallback callback(groupModels, down);
         groupTree.intersectPoint(p, callback);
@@ -542,8 +541,7 @@ namespace VMAP
             return false;
 
         bool result = true;
-        uint32 chunkSize = 0;
-        uint32 count = 0;
+        uint32 chunkSize, count;
         char chunk[8];                          // Ignore the added magic header
         if (!readChunk(rf, chunk, VMAP_MAGIC, 8)) result = false;
 

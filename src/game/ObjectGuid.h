@@ -59,17 +59,23 @@ enum TypeMask
 
 enum HighGuid
 {
-    HIGHGUID_ITEM           = 0x4000,                       // blizz 4000
-    HIGHGUID_CONTAINER      = 0x4000,                       // blizz 4000
-    HIGHGUID_PLAYER         = 0x0000,                       // blizz 0000
-    HIGHGUID_GAMEOBJECT     = 0xF110,                       // blizz F110
-    HIGHGUID_TRANSPORT      = 0xF120,                       // blizz F120 (for GAMEOBJECT_TYPE_TRANSPORT)
-    HIGHGUID_UNIT           = 0xF130,                       // blizz F130
-    HIGHGUID_PET            = 0xF140,                       // blizz F140
-    HIGHGUID_DYNAMICOBJECT  = 0xF100,                       // blizz F100
-    HIGHGUID_CORPSE         = 0xF101,                       // blizz F100
-    HIGHGUID_MO_TRANSPORT   = 0x1FC0,                       // blizz 1FC0 (for GAMEOBJECT_TYPE_MO_TRANSPORT)
-    HIGHGUID_GROUP          = 0x1F50,                       // blizz 1F5x
+    HIGHGUID_ITEM           = 0x470,                        // blizz 470
+    HIGHGUID_CONTAINER      = 0x470,                        // blizz 470
+    HIGHGUID_PLAYER         = 0x000,                        // blizz 070 (temporary reverted back to 0 high guid
+    // in result unknown source visibility player with
+    // player problems. please reapply only after its resolve)
+    HIGHGUID_GAMEOBJECT     = 0xF11,                        // blizz F11/F51
+    HIGHGUID_TRANSPORT      = 0xF12,                        // blizz F12/F52 (for GAMEOBJECT_TYPE_TRANSPORT)
+    HIGHGUID_UNIT           = 0xF13,                        // blizz F13/F53
+    HIGHGUID_PET            = 0xF14,                        // blizz F14/F54
+    HIGHGUID_VEHICLE        = 0xF15,                        // blizz F15/F55
+    HIGHGUID_DYNAMICOBJECT  = 0xF10,                        // blizz F10/F50
+    HIGHGUID_CORPSE         = 0xF50,                        // blizz F10/F50 used second variant to resolve conflict with HIGHGUID_DYNAMICOBJECT
+    HIGHGUID_BATTLEGROUND   = 0x1F1,                        // blizz 1F1, used for battlegrounds and battlefields
+    HIGHGUID_MO_TRANSPORT   = 0x1FC,                        // blizz 1FC (for GAMEOBJECT_TYPE_MO_TRANSPORT)
+    HIGHGUID_INSTANCE       = 0x1F4,                        // blizz 1F4
+    HIGHGUID_GROUP          = 0x1F5,                        // blizz 1F5
+    HIGHGUID_GUILD          = 0x1FF7,                       // blizz 1FF7
 };
 
 class ObjectGuid;
@@ -81,13 +87,15 @@ struct PackedGuidReader
     ObjectGuid* m_guidPtr;
 };
 
+#define NUM_GUID_BYTES sizeof(uint64)
+
 class MANGOS_DLL_SPEC ObjectGuid
 {
     public:                                                 // constructors
         ObjectGuid() : m_guid(0) {}
-        explicit ObjectGuid(uint64 const& guid) : m_guid(guid) {}
-        ObjectGuid(HighGuid hi, uint32 entry, uint32 counter) : m_guid(counter ? uint64(counter) | (uint64(entry) << 24) | (uint64(hi) << 48) : 0) {}
-        ObjectGuid(HighGuid hi, uint32 counter) : m_guid(counter ? uint64(counter) | (uint64(hi) << 48) : 0) {}
+        explicit ObjectGuid(uint64 guid) : m_guid(guid) {}
+        ObjectGuid(HighGuid hi, uint32 entry, uint32 counter) : m_guid(counter ? uint64(counter) | (uint64(entry) << 32) | (uint64(hi) << (IsLargeHigh(hi) ? 48 : 52)) : 0) {}
+        ObjectGuid(HighGuid hi, uint32 counter) : m_guid(counter ? uint64(counter) | (uint64(hi) << (IsLargeHigh(hi) ? 48 : 52)) : 0) {}
 
         operator uint64() const { return m_guid; }
     private:
@@ -98,26 +106,31 @@ class MANGOS_DLL_SPEC ObjectGuid
     public:                                                 // modifiers
         PackedGuidReader ReadAsPacked() { return PackedGuidReader(*this); }
 
-        void Set(uint64 const& guid) { m_guid = guid; }
+        void Set(uint64 guid) { m_guid = guid; }
         void Clear() { m_guid = 0; }
 
         PackedGuid WriteAsPacked() const;
     public:                                                 // accessors
-        uint64 const& GetRawValue() const { return m_guid; }
-        HighGuid GetHigh() const { return HighGuid((m_guid >> 48) & 0x0000FFFF); }
-        uint32   GetEntry() const { return HasEntry() ? uint32((m_guid >> 24) & UI64LIT(0x0000000000FFFFFF)) : 0; }
+        uint64   GetRawValue() const { return m_guid; }
+        HighGuid GetHigh() const
+        {
+            HighGuid high = HighGuid((m_guid >> 48) & 0xFFFF);
+            return HighGuid(IsLargeHigh(high) ? high :
+                (m_guid >> 52) & 0xFFF);
+        }
+        uint32   GetEntry() const { return HasEntry() ? uint32((m_guid >> 32) & UI64LIT(0xFFFF)) : 0; }
         uint32   GetCounter()  const
         {
             return HasEntry()
-                   ? uint32(m_guid & UI64LIT(0x0000000000FFFFFF))
-                   : uint32(m_guid & UI64LIT(0x00000000FFFFFFFF));
+                   ? uint32(m_guid & UI64LIT(0x00000000FFFFFFFF))
+                   : uint32(m_guid & UI64LIT(0x00000000FFFFFFFF));  // TODO: switch to 40 bits, but this needs rewrite code to use uint64 instead uint32
         }
 
         static uint32 GetMaxCounter(HighGuid high)
         {
             return HasEntry(high)
-                   ? uint32(0x00FFFFFF)
-                   : uint32(0xFFFFFFFF);
+                   ? uint32(0xFFFFFFFF)
+                   : uint32(0xFFFFFFFF);    // TODO: switch to 40 bits
         }
 
         uint32 GetMaxCounter() const { return GetMaxCounter(GetHigh()); }
@@ -125,8 +138,10 @@ class MANGOS_DLL_SPEC ObjectGuid
         bool IsEmpty()             const { return m_guid == 0;                                }
         bool IsCreature()          const { return GetHigh() == HIGHGUID_UNIT;                 }
         bool IsPet()               const { return GetHigh() == HIGHGUID_PET;                  }
+        bool IsVehicle()           const { return GetHigh() == HIGHGUID_VEHICLE;              }
         bool IsCreatureOrPet()     const { return IsCreature() || IsPet();                    }
-        bool IsAnyTypeCreature()   const { return IsCreature() || IsPet();                    } // wrapper to master branch
+        bool IsCreatureOrVehicle() const { return IsCreature() || IsVehicle();                }
+        bool IsAnyTypeCreature()   const { return IsCreature() || IsPet() || IsVehicle();     }
         bool IsPlayer()            const { return !IsEmpty() && GetHigh() == HIGHGUID_PLAYER; }
         bool IsUnit()              const { return IsAnyTypeCreature() || IsPlayer();          }
         bool IsItem()              const { return GetHigh() == HIGHGUID_ITEM;                 }
@@ -135,7 +150,10 @@ class MANGOS_DLL_SPEC ObjectGuid
         bool IsCorpse()            const { return GetHigh() == HIGHGUID_CORPSE;               }
         bool IsTransport()         const { return GetHigh() == HIGHGUID_TRANSPORT;            }
         bool IsMOTransport()       const { return GetHigh() == HIGHGUID_MO_TRANSPORT;         }
+        bool IsInstance()          const { return GetHigh() == HIGHGUID_INSTANCE;             }
         bool IsGroup()             const { return GetHigh() == HIGHGUID_GROUP;                }
+        bool IsBattleGround()      const { return GetHigh() == HIGHGUID_BATTLEGROUND;         }
+        bool IsGuild()             const { return GetHigh() == HIGHGUID_GUILD;                }
 
         static TypeID GetTypeId(HighGuid high)
         {
@@ -147,10 +165,12 @@ class MANGOS_DLL_SPEC ObjectGuid
                 case HIGHGUID_PET:          return TYPEID_UNIT;
                 case HIGHGUID_PLAYER:       return TYPEID_PLAYER;
                 case HIGHGUID_GAMEOBJECT:   return TYPEID_GAMEOBJECT;
-                case HIGHGUID_DYNAMICOBJECT:return TYPEID_DYNAMICOBJECT;
+                case HIGHGUID_DYNAMICOBJECT: return TYPEID_DYNAMICOBJECT;
                 case HIGHGUID_CORPSE:       return TYPEID_CORPSE;
                 case HIGHGUID_MO_TRANSPORT: return TYPEID_GAMEOBJECT;
+                case HIGHGUID_VEHICLE:      return TYPEID_UNIT;
                     // unknown
+                case HIGHGUID_INSTANCE:
                 case HIGHGUID_GROUP:
                 default:                    return TYPEID_OBJECT;
             }
@@ -162,6 +182,28 @@ class MANGOS_DLL_SPEC ObjectGuid
         bool operator== (ObjectGuid const& guid) const { return GetRawValue() == guid.GetRawValue(); }
         bool operator!= (ObjectGuid const& guid) const { return GetRawValue() != guid.GetRawValue(); }
         bool operator< (ObjectGuid const& guid) const { return GetRawValue() < guid.GetRawValue(); }
+
+        uint8& operator[] (uint8 index)
+        {
+            MANGOS_ASSERT(index < NUM_GUID_BYTES);
+
+#if MANGOS_ENDIAN == MANGOS_LITTLEENDIAN
+            return m_guidBytes[index];
+#else
+            return m_guidBytes[NUM_GUID_BYTES - 1 - index];
+#endif
+        }
+
+        uint8 const& operator[] (uint8 index) const
+        {
+            MANGOS_ASSERT(index < NUM_GUID_BYTES);
+
+#if MANGOS_ENDIAN == MANGOS_LITTLEENDIAN
+            return m_guidBytes[index];
+#else
+            return m_guidBytes[NUM_GUID_BYTES - 1 - index];
+#endif
+        }
 
     public:                                                 // accessors - for debug
         static char const* GetTypeName(HighGuid high);
@@ -178,12 +220,15 @@ class MANGOS_DLL_SPEC ObjectGuid
                 case HIGHGUID_DYNAMICOBJECT:
                 case HIGHGUID_CORPSE:
                 case HIGHGUID_MO_TRANSPORT:
+                case HIGHGUID_INSTANCE:
                 case HIGHGUID_GROUP:
                     return false;
                 case HIGHGUID_GAMEOBJECT:
                 case HIGHGUID_TRANSPORT:
                 case HIGHGUID_UNIT:
                 case HIGHGUID_PET:
+                case HIGHGUID_VEHICLE:
+                case HIGHGUID_BATTLEGROUND:
                 default:
                     return true;
             }
@@ -191,8 +236,25 @@ class MANGOS_DLL_SPEC ObjectGuid
 
         bool HasEntry() const { return HasEntry(GetHigh()); }
 
+        static bool IsLargeHigh(HighGuid high)
+        {
+            switch(high)
+            {
+                case HIGHGUID_GUILD:
+                    return true;
+                default:
+                    return false;
+            }
+        }
+
+        bool IsLargeHigh() const { return IsLargeHigh(GetHigh()); }
+
     private:                                                // fields
-        uint64 m_guid;
+        union
+        {
+            uint64 m_guid;
+            uint8 m_guidBytes[NUM_GUID_BYTES];
+        };
 };
 
 // Some Shared defines
@@ -262,5 +324,75 @@ class hash<ObjectGuid>
 };
 
 HASH_NAMESPACE_END
+
+#define DEFINE_READGUIDMASK(T1, T2) template <T1> \
+    void ByteBuffer::ReadGuidMask(ObjectGuid& guid) \
+    { \
+        uint8 maskArr[] = { T2 }; \
+        for (uint8 i = 0; i < countof(maskArr); ++i) \
+            guid[maskArr[i]] = ReadBit(); \
+    }
+
+#define DEFINE_WRITEGUIDMASK(T1, T2) template <T1> \
+    void ByteBuffer::WriteGuidMask(ObjectGuid guid) \
+    { \
+        uint8 maskArr[] = { T2 }; \
+        for (uint8 i = 0; i < countof(maskArr); ++i) \
+            WriteBit(guid[maskArr[i]]); \
+    }
+
+#define DEFINE_READGUIDBYTES(T1, T2) template <T1> \
+    void ByteBuffer::ReadGuidBytes(ObjectGuid& guid) \
+    { \
+        uint8 maskArr[] = { T2 }; \
+        for (uint8 i = 0; i < countof(maskArr); ++i) \
+            if (guid[maskArr[i]] != 0) \
+                guid[maskArr[i]] ^= read<uint8>(); \
+    }
+
+#define DEFINE_WRITEGUIDBYTES(T1, T2) template <T1> \
+    void ByteBuffer::WriteGuidBytes(ObjectGuid guid) \
+    { \
+        uint8 maskArr[] = { T2 }; \
+        for (uint8 i = 0; i < countof(maskArr); ++i) \
+            if (guid[maskArr[i]] != 0) \
+                (*this) << uint8(guid[maskArr[i]] ^ 1); \
+    }
+
+DEFINE_READGUIDMASK(BITS_1, BIT_VALS_1)
+DEFINE_READGUIDMASK(BITS_2, BIT_VALS_2)
+DEFINE_READGUIDMASK(BITS_3, BIT_VALS_3)
+DEFINE_READGUIDMASK(BITS_4, BIT_VALS_4)
+DEFINE_READGUIDMASK(BITS_5, BIT_VALS_5)
+DEFINE_READGUIDMASK(BITS_6, BIT_VALS_6)
+DEFINE_READGUIDMASK(BITS_7, BIT_VALS_7)
+DEFINE_READGUIDMASK(BITS_8, BIT_VALS_8)
+
+DEFINE_WRITEGUIDMASK(BITS_1, BIT_VALS_1)
+DEFINE_WRITEGUIDMASK(BITS_2, BIT_VALS_2)
+DEFINE_WRITEGUIDMASK(BITS_3, BIT_VALS_3)
+DEFINE_WRITEGUIDMASK(BITS_4, BIT_VALS_4)
+DEFINE_WRITEGUIDMASK(BITS_5, BIT_VALS_5)
+DEFINE_WRITEGUIDMASK(BITS_6, BIT_VALS_6)
+DEFINE_WRITEGUIDMASK(BITS_7, BIT_VALS_7)
+DEFINE_WRITEGUIDMASK(BITS_8, BIT_VALS_8)
+
+DEFINE_READGUIDBYTES(BITS_1, BIT_VALS_1)
+DEFINE_READGUIDBYTES(BITS_2, BIT_VALS_2)
+DEFINE_READGUIDBYTES(BITS_3, BIT_VALS_3)
+DEFINE_READGUIDBYTES(BITS_4, BIT_VALS_4)
+DEFINE_READGUIDBYTES(BITS_5, BIT_VALS_5)
+DEFINE_READGUIDBYTES(BITS_6, BIT_VALS_6)
+DEFINE_READGUIDBYTES(BITS_7, BIT_VALS_7)
+DEFINE_READGUIDBYTES(BITS_8, BIT_VALS_8)
+
+DEFINE_WRITEGUIDBYTES(BITS_1, BIT_VALS_1)
+DEFINE_WRITEGUIDBYTES(BITS_2, BIT_VALS_2)
+DEFINE_WRITEGUIDBYTES(BITS_3, BIT_VALS_3)
+DEFINE_WRITEGUIDBYTES(BITS_4, BIT_VALS_4)
+DEFINE_WRITEGUIDBYTES(BITS_5, BIT_VALS_5)
+DEFINE_WRITEGUIDBYTES(BITS_6, BIT_VALS_6)
+DEFINE_WRITEGUIDBYTES(BITS_7, BIT_VALS_7)
+DEFINE_WRITEGUIDBYTES(BITS_8, BIT_VALS_8)
 
 #endif

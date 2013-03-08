@@ -100,7 +100,7 @@ void MapManager::LoadTransports()
         }
 
         // creates the Gameobject
-        if (!t->Create(entry, mapid, x, y, z, o, GO_ANIMPROGRESS_DEFAULT))
+        if (!t->Create(entry, mapid, x, y, z, o, GO_ANIMPROGRESS_DEFAULT, 0))
         {
             delete t;
             continue;
@@ -144,13 +144,13 @@ void MapManager::LoadTransports()
 
 Transport::Transport() : GameObject()
 {
-    // 2.3.2 - 0x5A
-    m_updateFlag = (UPDATEFLAG_TRANSPORT | UPDATEFLAG_LOWGUID | UPDATEFLAG_HIGHGUID | UPDATEFLAG_HAS_POSITION);
+    m_updateFlag = UPDATEFLAG_TRANSPORT | UPDATEFLAG_HAS_POSITION | UPDATEFLAG_ROTATION;
 }
 
-bool Transport::Create(uint32 guidlow, uint32 mapid, float x, float y, float z, float ang, uint32 animprogress)
+bool Transport::Create(uint32 guidlow, uint32 mapid, float x, float y, float z, float ang, uint8 animprogress, uint16 dynamicHighValue)
 {
     Relocate(x, y, z, ang);
+    // instance id and phaseMask isn't set to values different from std.
 
     if (!IsPositionValid())
     {
@@ -174,19 +174,21 @@ bool Transport::Create(uint32 guidlow, uint32 mapid, float x, float y, float z, 
     SetObjectScale(goinfo->size);
 
     SetUInt32Value(GAMEOBJECT_FACTION, goinfo->faction);
-    SetUInt32Value(GAMEOBJECT_FLAGS, goinfo->flags);
-
+    // SetUInt32Value(GAMEOBJECT_FLAGS, goinfo->flags);
+    SetUInt32Value(GAMEOBJECT_FLAGS, (GO_FLAG_TRANSPORT | GO_FLAG_NODESPAWN));
+    SetUInt32Value(GAMEOBJECT_LEVEL, m_period);
     SetEntry(goinfo->id);
 
-    //SetDisplayId(goinfo->displayId);
-    // Use SetDisplayId only if we have the GO assigned to a proper map!
-    SetUInt32Value(GAMEOBJECT_DISPLAYID, goinfo->displayId);
-    m_displayInfo = sGameObjectDisplayInfoStore.LookupEntry(goinfo->displayId);
+    SetDisplayId(goinfo->displayId);
 
     SetGoState(GO_STATE_READY);
     SetGoType(GameobjectTypes(goinfo->type));
-
+    SetGoArtKit(0);
     SetGoAnimProgress(animprogress);
+
+    // low part always 0, dynamicHighValue is some kind of progression (not implemented)
+    SetUInt16Value(GAMEOBJECT_DYNAMIC, 0, 0);
+    SetUInt16Value(GAMEOBJECT_DYNAMIC, 1, dynamicHighValue);
 
     SetName(goinfo->name);
 
@@ -208,7 +210,7 @@ struct keyFrame
     float tFrom, tTo;
 };
 
-bool Transport::GenerateWaypoints(uint32 pathid, std::set<uint32> &mapids)
+bool Transport::GenerateWaypoints(uint32 pathid, std::set<uint32>& mapids)
 {
     if (pathid >= sTaxiPathNodesByPath.size())
         return false;
@@ -223,7 +225,7 @@ bool Transport::GenerateWaypoints(uint32 pathid, std::set<uint32> &mapids)
         if (mapChange == 0)
         {
             TaxiPathNodeEntry const& node_i = path[i];
-            if (node_i.mapid == path[i+1].mapid)
+            if (node_i.mapid == path[i + 1].mapid)
             {
                 keyFrame k(node_i);
                 keyFrames.push_back(k);
@@ -253,7 +255,7 @@ bool Transport::GenerateWaypoints(uint32 pathid, std::set<uint32> &mapids)
     // find the rest of the distances between key points
     for (size_t i = 1; i < keyFrames.size(); ++i)
     {
-        if ((keyFrames[i].node->actionFlag == 1) || (keyFrames[i].node->mapid != keyFrames[i-1].node->mapid))
+        if ((keyFrames[i].node->actionFlag == 1) || (keyFrames[i].node->mapid != keyFrames[i - 1].node->mapid))
         {
             keyFrames[i].distFromPrev = 0;
         }
@@ -550,24 +552,37 @@ void Transport::UpdateForMap(Map const* targetMap)
         {
             if (this != itr->getSource()->GetTransport())
             {
-                UpdateData transData;
+                UpdateData transData(itr->getSource()->GetMapId());
                 BuildCreateUpdateBlockForPlayer(&transData, itr->getSource());
                 WorldPacket packet;
-                transData.BuildPacket(&packet, true);
+                transData.BuildPacket(&packet);
+
+                // Prevent sending transport maps in player update object
+                if (packet.ReadUInt16() != itr->getSource()->GetMapId())
+                    return;
+
                 itr->getSource()->SendDirectMessage(&packet);
             }
         }
     }
     else
     {
-        UpdateData transData;
+        UpdateData transData(GetMapId());
         BuildOutOfRangeUpdateBlock(&transData);
         WorldPacket out_packet;
-        transData.BuildPacket(&out_packet, true);
+        transData.BuildPacket(&out_packet);
 
         for (Map::PlayerList::const_iterator itr = pl.begin(); itr != pl.end(); ++itr)
+        {
             if (this != itr->getSource()->GetTransport())
+            {
+                // Prevent sending transport maps in player update object
+                if (out_packet.ReadUInt16() != itr->getSource()->GetMapId())
+                    return;
+
                 itr->getSource()->SendDirectMessage(&out_packet);
+            }
+        }
     }
 }
 

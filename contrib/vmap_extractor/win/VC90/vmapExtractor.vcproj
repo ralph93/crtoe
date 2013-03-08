@@ -184,10 +184,6 @@
 				>
 			</File>
 			<File
-				RelativePath="..\..\vmapextract\gameobject_extract.cpp"
-				>
-			</File>
-			<File
 				RelativePath="..\..\vmapextract\model.cpp"
 				>
 			</File>

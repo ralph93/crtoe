@@ -39,24 +39,22 @@
 #include "OutdoorPvP/OutdoorPvP.h"
 #include "Util.h"
 #include "ScriptMgr.h"
-#include "vmap/GameObjectModel.h"
 #include "SQLStorages.h"
+#include <G3D/Quat.h>
 
 GameObject::GameObject() : WorldObject(),
-    loot(this),
-    m_model(NULL),
     m_goInfo(NULL),
     m_displayInfo(NULL)
 {
     m_objectType |= TYPEMASK_GAMEOBJECT;
     m_objectTypeId = TYPEID_GAMEOBJECT;
-    // 2.3.2 - 0x58
-    m_updateFlag = (UPDATEFLAG_LOWGUID | UPDATEFLAG_HIGHGUID | UPDATEFLAG_HAS_POSITION);
+
+    m_updateFlag = UPDATEFLAG_HAS_POSITION | UPDATEFLAG_ROTATION;
 
     m_valuesCount = GAMEOBJECT_END;
     m_respawnTime = 0;
     m_respawnDelayTime = 25;
-    m_lootState = GO_READY;
+    m_lootState = GO_NOT_READY;
     m_spawnedByDefault = true;
     m_useTimes = 0;
     m_spellId = 0;
@@ -64,6 +62,7 @@ GameObject::GameObject() : WorldObject(),
 
     m_captureTimer = 0;
 
+    m_packedRotation = 0;
     m_groupLootTimer = 0;
     m_groupLootId = 0;
     m_lootGroupRecipientId = 0;
@@ -71,7 +70,6 @@ GameObject::GameObject() : WorldObject(),
 
 GameObject::~GameObject()
 {
-    delete m_model;
 }
 
 void GameObject::AddToWorld()
@@ -80,13 +78,7 @@ void GameObject::AddToWorld()
     if (!IsInWorld())
         GetMap()->GetObjectsStore().insert<GameObject>(GetObjectGuid(), (GameObject*)this);
 
-    if (m_model)
-        GetMap()->InsertGameObjectModel(*m_model);
-
     Object::AddToWorld();
-
-    // After Object::AddToWorld so that for initial state the GO is added to the world (and hence handled correctly)
-    UpdateCollisionState();
 }
 
 void GameObject::RemoveFromWorld()
@@ -110,20 +102,18 @@ void GameObject::RemoveFromWorld()
             }
         }
 
-        if (m_model && GetMap()->ContainsGameObjectModel(*m_model))
-            GetMap()->RemoveGameObjectModel(*m_model);
-
         GetMap()->GetObjectsStore().erase<GameObject>(GetObjectGuid(), (GameObject*)NULL);
     }
 
     Object::RemoveFromWorld();
 }
 
-bool GameObject::Create(uint32 guidlow, uint32 name_id, Map* map, float x, float y, float z, float ang, float rotation0, float rotation1, float rotation2, float rotation3, uint32 animprogress, GOState go_state)
+bool GameObject::Create(uint32 guidlow, uint32 name_id, Map* map, uint32 phaseMask, float x, float y, float z, float ang, QuaternionData rotation, uint8 animprogress, GOState go_state)
 {
     MANGOS_ASSERT(map);
     Relocate(x, y, z, ang);
     SetMap(map);
+    SetPhaseMask(phaseMask, false);
 
     if (!IsPositionValid())
     {
@@ -134,7 +124,7 @@ bool GameObject::Create(uint32 guidlow, uint32 name_id, Map* map, float x, float
     GameObjectInfo const* goinfo = ObjectMgr::GetGameObjectInfo(name_id);
     if (!goinfo)
     {
-        sLog.outErrorDb("Gameobject (GUID: %u) not created: Entry %u does not exist in `gameobject_template`. Map: %u  (X: %f Y: %f Z: %f) ang: %f rotation0: %f rotation1: %f rotation2: %f rotation3: %f", guidlow, name_id, map->GetId(), x, y, z, ang, rotation0, rotation1, rotation2, rotation3);
+        sLog.outErrorDb("Gameobject (GUID: %u) not created: Entry %u does not exist in `gameobject_template`. Map: %u  (X: %f Y: %f Z: %f) ang: %f", guidlow, name_id, map->GetId(), x, y, z, ang);
         return false;
     }
 
@@ -150,14 +140,12 @@ bool GameObject::Create(uint32 guidlow, uint32 name_id, Map* map, float x, float
 
     SetObjectScale(goinfo->size);
 
-    SetFloatValue(GAMEOBJECT_POS_X, x);
-    SetFloatValue(GAMEOBJECT_POS_Y, y);
-    SetFloatValue(GAMEOBJECT_POS_Z, z);
-
-    SetFloatValue(GAMEOBJECT_ROTATION + 0, rotation0);
-    SetFloatValue(GAMEOBJECT_ROTATION + 1, rotation1);
-
-    UpdateRotationFields(rotation2, rotation3);             // GAMEOBJECT_FACING, GAMEOBJECT_ROTATION+2/3
+    SetWorldRotation(rotation.x, rotation.y, rotation.z, rotation.w);
+    // For most of gameobjects is (0, 0, 0, 1) quaternion, only some transports has not standart rotation
+    if (const GameObjectDataAddon* addon = sGameObjectDataAddonStorage.LookupEntry<GameObjectDataAddon>(guidlow))
+        SetTransportPathRotation(addon->path_rotation);
+    else
+        SetTransportPathRotation(QuaternionData(0, 0, 0, 1));
 
     SetUInt32Value(GAMEOBJECT_FACTION, goinfo->faction);
     SetUInt32Value(GAMEOBJECT_FLAGS, goinfo->flags);
@@ -168,18 +156,11 @@ bool GameObject::Create(uint32 guidlow, uint32 name_id, Map* map, float x, float
     SetEntry(goinfo->id);
     SetDisplayId(goinfo->displayId);
 
+    // GAMEOBJECT_BYTES_1, index at 0, 1, 2 and 3
     SetGoState(go_state);
     SetGoType(GameobjectTypes(goinfo->type));
-
+    SetGoArtKit(0);                                         // unknown what this is
     SetGoAnimProgress(animprogress);
-
-    switch (GetGoType())
-    {
-        case GAMEOBJECT_TYPE_TRAP:
-        case GAMEOBJECT_TYPE_FISHINGNODE:
-            m_lootState = GO_NOT_READY;                     // Initialize Traps and Fishingnode delayed in ::Update
-            break;
-    }
 
     // Notify the battleground or outdoor pvp script
     if (map->IsBattleGroundOrArena())
@@ -210,16 +191,16 @@ void GameObject::Update(uint32 update_diff, uint32 p_time)
         {
             switch (GetGoType())
             {
-                case GAMEOBJECT_TYPE_TRAP:                  // Initialized delayed to be able to use GetOwner()
+                case GAMEOBJECT_TYPE_TRAP:
                 {
                     // Arming Time for GAMEOBJECT_TYPE_TRAP (6)
                     Unit* owner = GetOwner();
-                    if (owner && owner->isInCombat())
+                    if (owner && ((Player*)owner)->isInCombat())
                         m_cooldownTime = time(NULL) + GetGOInfo()->trap.startDelay;
                     m_lootState = GO_READY;
                     break;
                 }
-                case GAMEOBJECT_TYPE_FISHINGNODE:           // Keep not ready for some delay
+                case GAMEOBJECT_TYPE_FISHINGNODE:
                 {
                     // fishing code (bobber ready)
                     if (time(NULL) > m_respawnTime - FISHING_BOBBER_READY_TIME)
@@ -238,10 +219,13 @@ void GameObject::Update(uint32 update_diff, uint32 p_time)
 
                         m_lootState = GO_READY;             // can be successfully open with some chance
                     }
-                    break;
+                    return;
                 }
+                default:
+                    m_lootState = GO_READY;                 // for other GO is same switched without delay to GO_READY
+                    break;
             }
-            break;
+            // NO BREAK for switch (m_lootState)
         }
         case GO_READY:
         {
@@ -321,16 +305,31 @@ void GameObject::Update(uint32 update_diff, uint32 p_time)
                         }
                     }
 
-                    // Should trap trigger?
-                    MaNGOS::AnyUnfriendlyUnitInObjectRangeCheck u_check(this, radius);
-                    MaNGOS::UnitSearcher<MaNGOS::AnyUnfriendlyUnitInObjectRangeCheck> checker(ok, u_check);
-                    Cell::VisitAllObjects(this, checker, radius);
+                    // Note: this hack with search required until GO casting not implemented
+                    // search unfriendly creature
+                    if (owner && goInfo->trap.charges > 0)  // hunter trap
+                    {
+                        MaNGOS::AnyUnfriendlyUnitInObjectRangeCheck u_check(this, owner, radius);
+                        MaNGOS::UnitSearcher<MaNGOS::AnyUnfriendlyUnitInObjectRangeCheck> checker(ok, u_check);
+                        Cell::VisitGridObjects(this, checker, radius);
+                        if (!ok)
+                            Cell::VisitWorldObjects(this, checker, radius);
+                    }
+                    else                                    // environmental trap
+                    {
+                        // environmental damage spells already have around enemies targeting but this not help in case nonexistent GO casting support
+
+                        // affect only players
+                        Player* p_ok = NULL;
+                        MaNGOS::AnyPlayerInObjectRangeCheck p_check(this, radius);
+                        MaNGOS::PlayerSearcher<MaNGOS::AnyPlayerInObjectRangeCheck>  checker(p_ok, p_check);
+                        Cell::VisitWorldObjects(this, checker, radius);
+                        ok = p_ok;
+                    }
 
                     if (ok)
                     {
                         Unit* caster =  owner ? owner : ok;
-
-                        // Code below should be refactored into GO::Use, but not clear how to handle caster/victim for non AoE spells
 
                         caster->CastSpell(ok, goInfo->trap.spellId, true, NULL, NULL, GetObjectGuid());
                         // use template cooldown if provided
@@ -523,6 +522,19 @@ void GameObject::Delete()
         AddObjectToRemoveList();
 }
 
+void GameObject::getFishLoot(Loot* fishloot, Player* loot_owner)
+{
+    fishloot->clear();
+
+    uint32 zone, subzone;
+    GetZoneAndAreaId(zone, subzone);
+
+    // if subzone loot exist use it
+    if (!fishloot->FillLoot(subzone, LootTemplates_Fishing, loot_owner, true, (subzone != zone)) && subzone != zone)
+        // else use zone loot (if zone diff. from subzone, must exist in like case)
+        fishloot->FillLoot(zone, LootTemplates_Fishing, loot_owner, true);
+}
+
 void GameObject::SaveToDB()
 {
     // this should only be used when the gameobject has already been loaded
@@ -534,10 +546,10 @@ void GameObject::SaveToDB()
         return;
     }
 
-    SaveToDB(GetMapId(), data->spawnMask);
+    SaveToDB(GetMapId(), data->spawnMask, data->phaseMask);
 }
 
-void GameObject::SaveToDB(uint32 mapid, uint8 spawnMask)
+void GameObject::SaveToDB(uint32 mapid, uint8 spawnMask, uint32 phaseMask)
 {
     const GameObjectInfo* goI = GetGOInfo();
 
@@ -550,14 +562,15 @@ void GameObject::SaveToDB(uint32 mapid, uint8 spawnMask)
     // data->guid = guid don't must be update at save
     data.id = GetEntry();
     data.mapid = mapid;
-    data.posX = GetFloatValue(GAMEOBJECT_POS_X);
-    data.posY = GetFloatValue(GAMEOBJECT_POS_Y);
-    data.posZ = GetFloatValue(GAMEOBJECT_POS_Z);
-    data.orientation = GetFloatValue(GAMEOBJECT_FACING);
-    data.rotation0 = GetFloatValue(GAMEOBJECT_ROTATION + 0);
-    data.rotation1 = GetFloatValue(GAMEOBJECT_ROTATION + 1);
-    data.rotation2 = GetFloatValue(GAMEOBJECT_ROTATION + 2);
-    data.rotation3 = GetFloatValue(GAMEOBJECT_ROTATION + 3);
+    data.phaseMask = phaseMask;
+    data.posX = GetPositionX();
+    data.posY = GetPositionY();
+    data.posZ = GetPositionZ();
+    data.orientation = GetOrientation();
+    data.rotation.x = m_worldRotation.x;
+    data.rotation.y = m_worldRotation.y;
+    data.rotation.z = m_worldRotation.z;
+    data.rotation.w = m_worldRotation.w;
     data.spawntimesecs = m_spawnedByDefault ? (int32)m_respawnDelayTime : -(int32)m_respawnDelayTime;
     data.animprogress = GetGoAnimProgress();
     data.go_state = GetGoState();
@@ -570,14 +583,15 @@ void GameObject::SaveToDB(uint32 mapid, uint8 spawnMask)
        << GetEntry() << ", "
        << mapid << ", "
        << uint32(spawnMask) << ","                         // cast to prevent save as symbol
-       << GetFloatValue(GAMEOBJECT_POS_X) << ", "
-       << GetFloatValue(GAMEOBJECT_POS_Y) << ", "
-       << GetFloatValue(GAMEOBJECT_POS_Z) << ", "
-       << GetFloatValue(GAMEOBJECT_FACING) << ", "
-       << GetFloatValue(GAMEOBJECT_ROTATION) << ", "
-       << GetFloatValue(GAMEOBJECT_ROTATION + 1) << ", "
-       << GetFloatValue(GAMEOBJECT_ROTATION + 2) << ", "
-       << GetFloatValue(GAMEOBJECT_ROTATION + 3) << ", "
+       << uint16(GetPhaseMask()) << ","                    // prevent out of range error
+       << GetPositionX() << ", "
+       << GetPositionY() << ", "
+       << GetPositionZ() << ", "
+       << GetOrientation() << ", "
+       << m_worldRotation.x << ", "
+       << m_worldRotation.y << ", "
+       << m_worldRotation.z << ", "
+       << m_worldRotation.w << ", "
        << m_respawnDelayTime << ", "
        << uint32(GetGoAnimProgress()) << ", "
        << uint32(GetGoState()) << ")";
@@ -600,20 +614,16 @@ bool GameObject::LoadFromDB(uint32 guid, Map* map)
 
     uint32 entry = data->id;
     // uint32 map_id = data->mapid;                         // already used before call
+    uint32 phaseMask = data->phaseMask;
     float x = data->posX;
     float y = data->posY;
     float z = data->posZ;
     float ang = data->orientation;
 
-    float rotation0 = data->rotation0;
-    float rotation1 = data->rotation1;
-    float rotation2 = data->rotation2;
-    float rotation3 = data->rotation3;
-
-    uint32 animprogress = data->animprogress;
+    uint8 animprogress = data->animprogress;
     GOState go_state = data->go_state;
 
-    if (!Create(guid, entry, map, x, y, z, ang, rotation0, rotation1, rotation2, rotation3, animprogress, go_state))
+    if (!Create(guid, entry, map, phaseMask, x, y, z, ang, data->rotation, animprogress, go_state))
         return false;
 
     if (!GetGOInfo()->GetDespawnPossibility() && !GetGOInfo()->IsDespawnAtAction() && data->spawntimesecs >= 0)
@@ -735,6 +745,10 @@ bool GameObject::isVisibleForInState(Player const* u, WorldObject const* viewPoi
     if (!IsInWorld() || !u->IsInWorld())
         return false;
 
+    // invisible at client always
+    if (!GetGOInfo()->displayId)
+        return false;
+
     // Transport always visible at this step implementation
     if (IsTransport() && IsInMap(u))
         return true;
@@ -753,10 +767,6 @@ bool GameObject::isVisibleForInState(Player const* u, WorldObject const* viewPoi
             if(check stuff here)
                 return false;
         }*/
-
-        // Smuggled Mana Cell required 10 invisibility type detection/state
-        if (GetEntry() == 187039 && ((u->m_detectInvisibilityMask | u->m_invisibilityMask) & (1 << 10)) == 0)
-            return false;
     }
 
     // check distance
@@ -862,7 +872,7 @@ void GameObject::SummonLinkedTrapIfAny()
 
     GameObject* linkedGO = new GameObject;
     if (!linkedGO->Create(GetMap()->GenerateLocalLowGuid(HIGHGUID_GAMEOBJECT), linkedEntry, GetMap(),
-                          GetPositionX(), GetPositionY(), GetPositionZ(), GetOrientation(), 0.0f, 0.0f, 0.0f, 0.0f, GO_ANIMPROGRESS_DEFAULT, GO_STATE_READY))
+                          GetPhaseMask(), GetPositionX(), GetPositionY(), GetPositionZ(), GetOrientation()))
     {
         delete linkedGO;
         return;
@@ -926,23 +936,6 @@ GameObject* GameObject::LookupFishingHoleAround(float range)
     Cell::VisitGridObjects(this, checker, range);
 
     return ok;
-}
-
-bool GameObject::IsCollisionEnabled() const
-{
-    if (!isSpawned())
-        return false;
-
-    // TODO: Possible that this function must consider multiple checks
-    switch (GetGoType())
-    {
-        case GAMEOBJECT_TYPE_DOOR:
-        case GAMEOBJECT_TYPE_DESTRUCTIBLE_BUILDING:
-            return GetGoState() != GO_STATE_ACTIVE && GetGoState() != GO_STATE_ACTIVE_ALTERNATIVE;
-
-        default:
-            return true;
-    }
 }
 
 void GameObject::ResetDoorOrButton()
@@ -1055,8 +1048,10 @@ void GameObject::Use(Unit* user)
             // TODO: possible must be moved to loot release (in different from linked triggering)
             if (GetGOInfo()->chest.eventId)
             {
-                DEBUG_LOG("Chest ScriptStart id %u for %s (opened by %s)", GetGOInfo()->chest.eventId, GetGuidStr().c_str(), user->GetGuidStr().c_str());
-                StartEvents_Event(GetMap(), GetGOInfo()->chest.eventId, user, this);
+                DEBUG_LOG("Chest ScriptStart id %u for GO %u", GetGOInfo()->chest.eventId, GetGUIDLow());
+
+                if (!sScriptMgr.OnProcessEvent(GetGOInfo()->chest.eventId, user, this, true))
+                    GetMap()->ScriptsStart(sEventScripts, GetGOInfo()->chest.eventId, user, this);
             }
 
             return;
@@ -1205,8 +1200,10 @@ void GameObject::Use(Unit* user)
 
                 if (info->goober.eventId)
                 {
-                    DEBUG_FILTER_LOG(LOG_FILTER_AI_AND_MOVEGENSS, "Goober ScriptStart id %u for %s (Used by %s).", info->goober.eventId, GetGuidStr().c_str(), player->GetGuidStr().c_str());
-                    StartEvents_Event(GetMap(), info->goober.eventId, player, this);
+                    DEBUG_FILTER_LOG(LOG_FILTER_AI_AND_MOVEGENSS, "Goober ScriptStart id %u for GO entry %u (GUID %u).", info->goober.eventId, GetEntry(), GetGUIDLow());
+
+                    if (!sScriptMgr.OnProcessEvent(info->goober.eventId, player, this, true))
+                        GetMap()->ScriptsStart(sEventScripts, info->goober.eventId, player, this);
                 }
 
                 // possible quest objective for active quests
@@ -1226,6 +1223,16 @@ void GameObject::Use(Unit* user)
             // cast this spell later if provided
             spellId = info->goober.spellId;
 
+            // database may contain a dummy spell, so it need replacement by actually existing
+            switch (spellId)
+            {
+                case 34448: spellId = 26566; break;
+                case 34452: spellId = 26572; break;
+                case 37639: spellId = 36326; break;
+                case 45367: spellId = 45371; break;
+                case 45370: spellId = 45368; break;
+            }
+
             break;
         }
         case GAMEOBJECT_TYPE_CAMERA:                        // 13
@@ -1243,7 +1250,10 @@ void GameObject::Use(Unit* user)
                 player->SendCinematicStart(info->camera.cinematicId);
 
             if (info->camera.eventID)
-                StartEvents_Event(GetMap(), info->camera.eventID, player, this);
+            {
+                if (!sScriptMgr.OnProcessEvent(info->camera.eventID, player, this, true))
+                    GetMap()->ScriptsStart(sEventScripts, info->camera.eventID, player, this);
+            }
 
             return;
         }
@@ -1409,6 +1419,9 @@ void GameObject::Use(Unit* user)
 
             spellId = info->summoningRitual.spellId;
 
+            if (spellId == 62330)                           // GO store nonexistent spell, replace by expected
+                spellId = 61993;
+
             // spell have reagent and mana cost but it not expected use its
             // it triggered spell in fact casted at currently channeled GO
             triggered = true;
@@ -1474,7 +1487,10 @@ void GameObject::Use(Unit* user)
             if (level < info->meetingstone.minLevel || level > info->meetingstone.maxLevel)
                 return;
 
-            spellId = 23598;
+            if (info->id == 194097)
+                spellId = 61994;                            // Ritual of Summoning
+            else
+                spellId = 59782;                            // Summoning Stone Effect
 
             break;
         }
@@ -1511,6 +1527,7 @@ void GameObject::Use(Unit* user)
             Player* player = (Player*)user;
 
             player->SendLoot(GetObjectGuid(), LOOT_FISHINGHOLE);
+            player->UpdateAchievementCriteria(ACHIEVEMENT_CRITERIA_TYPE_FISH_IN_GAMEOBJECT, GetGOInfo()->id);
             return;
         }
         case GAMEOBJECT_TYPE_FLAGDROP:                      // 26
@@ -1555,6 +1572,26 @@ void GameObject::Use(Unit* user)
             }
             break;
         }
+        case GAMEOBJECT_TYPE_BARBER_CHAIR:                  // 32
+        {
+            GameObjectInfo const* info = GetGOInfo();
+            if (!info)
+                return;
+
+            if (user->GetTypeId() != TYPEID_PLAYER)
+                return;
+
+            Player* player = (Player*)user;
+
+            // fallback, will always work
+            player->TeleportTo(GetMapId(), GetPositionX(), GetPositionY(), GetPositionZ(), GetOrientation(), TELE_TO_NOT_LEAVE_TRANSPORT | TELE_TO_NOT_LEAVE_COMBAT | TELE_TO_NOT_UNSUMMON_PET);
+
+            WorldPacket data(SMSG_ENABLE_BARBER_SHOP, 0);
+            player->GetSession()->SendPacket(&data);
+
+            player->SetStandState(UNIT_STAND_STATE_SIT_LOW_CHAIR + info->barberChair.chairheight);
+            return;
+        }
         default:
             sLog.outError("GameObject::Use unhandled GameObject type %u (entry %u).", GetGoType(), GetEntry());
             return;
@@ -1595,18 +1632,70 @@ const char* GameObject::GetNameForLocaleIdx(int32 loc_idx) const
     return GetName();
 }
 
-void GameObject::UpdateRotationFields(float rotation2 /*=0.0f*/, float rotation3 /*=0.0f*/)
+using G3D::Quat;
+struct QuaternionCompressed
 {
-    SetFloatValue(GAMEOBJECT_FACING, GetOrientation());
+    QuaternionCompressed() : m_raw(0) {}
+    QuaternionCompressed(int64 val) : m_raw(val) {}
+    QuaternionCompressed(const Quat& quat) { Set(quat); }
 
-    if (rotation2 == 0.0f && rotation3 == 0.0f)
+    enum
     {
-        rotation2 = sin(GetOrientation() / 2);
-        rotation3 = cos(GetOrientation() / 2);
+        PACK_COEFF_YZ = 1 << 20,
+        PACK_COEFF_X = 1 << 21,
+    };
+
+    void Set(const Quat& quat)
+    {
+        int8 w_sign = (quat.w >= 0 ? 1 : -1);
+        int64 X = int32(quat.x * PACK_COEFF_X) * w_sign & ((1 << 22) - 1);
+        int64 Y = int32(quat.y * PACK_COEFF_YZ) * w_sign & ((1 << 21) - 1);
+        int64 Z = int32(quat.z * PACK_COEFF_YZ) * w_sign & ((1 << 21) - 1);
+        m_raw = Z | (Y << 21) | (X << 42);
     }
 
-    SetFloatValue(GAMEOBJECT_ROTATION + 2, rotation2);
-    SetFloatValue(GAMEOBJECT_ROTATION + 3, rotation3);
+    Quat Unpack() const
+    {
+        double x = (double)(m_raw >> 42) / (double)PACK_COEFF_X;
+        double y = (double)(m_raw << 22 >> 43) / (double)PACK_COEFF_YZ;
+        double z = (double)(m_raw << 43 >> 43) / (double)PACK_COEFF_YZ;
+        double w = 1 - (x * x + y * y + z * z);
+        MANGOS_ASSERT(w >= 0);
+        w = sqrt(w);
+
+        return Quat(x, y, z, w);
+    }
+
+    int64 m_raw;
+};
+
+void GameObject::SetWorldRotation(float qx, float qy, float qz, float qw)
+{
+    Quat rotation(qx, qy, qz, qw);
+    // Temporary solution for gameobjects that has no rotation data in DB:
+    if (qz == 0.f && qw == 0.f)
+        rotation = Quat::fromAxisAngleRotation(G3D::Vector3::unitZ(), GetOrientation());
+
+    rotation.unitize();
+    m_packedRotation = QuaternionCompressed(rotation).m_raw;
+    m_worldRotation.x = rotation.x;
+    m_worldRotation.y = rotation.y;
+    m_worldRotation.z = rotation.z;
+    m_worldRotation.w = rotation.w;
+}
+
+void GameObject::SetTransportPathRotation(QuaternionData rotation)
+{
+    SetFloatValue(GAMEOBJECT_PARENTROTATION + 0, rotation.x);
+    SetFloatValue(GAMEOBJECT_PARENTROTATION + 1, rotation.y);
+    SetFloatValue(GAMEOBJECT_PARENTROTATION + 2, rotation.z);
+    SetFloatValue(GAMEOBJECT_PARENTROTATION + 3, rotation.w);
+}
+
+void GameObject::SetWorldRotationAngles(float z_rot, float y_rot, float x_rot)
+{
+    Quat quat(G3D::Matrix3::fromEulerAnglesZYX(z_rot, y_rot, x_rot));
+    SetWorldRotation(quat.x, quat.y, quat.z, quat.w);
 }
 
 bool GameObject::IsHostileTo(Unit const* unit) const
@@ -1622,9 +1711,9 @@ bool GameObject::IsHostileTo(Unit const* unit) const
     if (Unit const* targetOwner = unit->GetCharmerOrOwner())
         return IsHostileTo(targetOwner);
 
-    // for not set faction case: be hostile towards player, not hostile towards not-players
+    // for not set faction case (wild object) use hostile case
     if (!GetGOInfo()->faction)
-        return unit->IsControlledByPlayer();
+        return true;
 
     // faction base cases
     FactionTemplateEntry const* tester_faction = sFactionTemplateStore.LookupEntry(GetGOInfo()->faction);
@@ -1695,42 +1784,10 @@ bool GameObject::IsFriendlyTo(Unit const* unit) const
     return tester_faction->IsFriendlyTo(*target_faction);
 }
 
-void GameObject::SetLootState(LootState state)
-{
-    m_lootState = state;
-    UpdateCollisionState();
-}
-
-void GameObject::SetGoState(GOState state)
-{
-    SetByteValue(GAMEOBJECT_STATE, 0, state);
-    UpdateCollisionState();
-}
-
 void GameObject::SetDisplayId(uint32 modelId)
 {
     SetUInt32Value(GAMEOBJECT_DISPLAYID, modelId);
     m_displayInfo = sGameObjectDisplayInfoStore.LookupEntry(modelId);
-    UpdateModel();
-}
-
-void GameObject::UpdateCollisionState() const
-{
-    if (!m_model || !IsInWorld())
-        return;
-
-    m_model->enable(IsCollisionEnabled() ? true : false);
-}
-
-void GameObject::UpdateModel()
-{
-    if (m_model && IsInWorld() && GetMap()->ContainsGameObjectModel(*m_model))
-        GetMap()->RemoveGameObjectModel(*m_model);
-    delete m_model;
-
-    m_model = GameObjectModel::construct(this);
-    if (m_model)
-        GetMap()->InsertGameObjectModel(*m_model);
 }
 
 void GameObject::StartGroupLoot(Group* group, uint32 timer)
@@ -1816,16 +1873,10 @@ void GameObject::SetLootRecipient(Unit* pUnit)
 float GameObject::GetObjectBoundingRadius() const
 {
     // FIXME:
-    // 1. This is clearly hack way because we usually need this to check range, but a box just is no ball
+    // 1. This is clearly hack way because GameObjectDisplayInfoEntry have 6 floats related to GO sizes, but better that use DEFAULT_WORLD_OBJECT_SIZE
     // 2. In some cases this must be only interactive size, not GO size, current way can affect creature target point auto-selection in strange ways for big underground/virtual GOs
-    if (m_displayInfo)
-    {
-        float dx = m_displayInfo->geoBoxMaxX - m_displayInfo->geoBoxMinX;
-        float dy = m_displayInfo->geoBoxMaxY - m_displayInfo->geoBoxMinY;
-        float dz = m_displayInfo->geoBoxMaxZ - m_displayInfo->geoBoxMinZ;
-
-        return (std::abs(dx) + std::abs(dy) + std::abs(dz)) / 2;
-    }
+    /*if (m_displayInfo)
+        return fabs(m_displayInfo->unknown12) * GetObjectScale();*/
 
     return DEFAULT_WORLD_OBJECT_SIZE;
 }
@@ -2099,5 +2150,23 @@ void GameObject::TickCapturePoint()
     }
 
     if (eventId)
-        StartEvents_Event(GetMap(), eventId, this, this, true, *capturingPlayers.begin());
+    {
+        // Notify the battleground or outdoor pvp script
+        if (BattleGround* bg = (*capturingPlayers.begin())->GetBattleGround())
+        {
+            // Allow only certain events to be handled by other script engines
+            if (bg->HandleEvent(eventId, this))
+                return;
+        }
+        else if (OutdoorPvP* outdoorPvP = sOutdoorPvPMgr.GetScript((*capturingPlayers.begin())->GetCachedZoneId()))
+        {
+            // Allow only certain events to be handled by other script engines
+            if (outdoorPvP->HandleEvent(eventId, this))
+                return;
+        }
+
+        // Send script event to SD2 and database as well - this can be used for summoning creatures, casting specific spells or spawning GOs
+        if (!sScriptMgr.OnProcessEvent(eventId, this, this, true))
+            GetMap()->ScriptsStart(sEventScripts, eventId, this, this);
+    }
 }
